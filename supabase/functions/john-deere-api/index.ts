@@ -99,11 +99,13 @@ interface JdRing { points: JdBoundaryPoint[]; type: string; }
 interface JdPolygon { rings: JdRing[]; }
 interface JdMeasurement { valueAsDouble: number; unit: string; }
 interface JdBoundary { multipolygons: JdPolygon[]; area?: JdMeasurement; active: boolean; }
-interface JdField { id: string; name: string; activeBoundary?: JdBoundary; boundaries?: JdBoundary[]; links: JdLink[]; }
+interface JdClient { id: string; name: string; links?: JdLink[]; }
+interface JdFarm { id: string; name: string; links?: JdLink[]; }
+interface JdField { id: string; name: string; activeBoundary?: JdBoundary; boundaries?: JdBoundary[]; clients?: JdClient[]; farms?: JdFarm[]; links: JdLink[]; }
 
 async function fetchAllFieldsPaginated(accessToken: string, orgId: string): Promise<JdField[]> {
   const allFields: JdField[] = [];
-  let url: string | null = `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields?embed=activeBoundary`;
+  let url: string | null = `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields?embed=activeBoundary,clients,farms`;
 
   while (url) {
     const response = await callJohnDeereUrl(accessToken, url);
@@ -354,6 +356,51 @@ Deno.serve(async (req: Request) => {
           withoutBoundaries++;
         }
 
+        let clientName: string | null = null;
+        let clientId: string | null = null;
+        let farmName: string | null = null;
+        let farmId: string | null = null;
+
+        if (field.clients && field.clients.length > 0) {
+          clientName = field.clients[0].name || null;
+          clientId = field.clients[0].id || null;
+        } else {
+          const clientsLink = field.links?.find((l: JdLink) => l.rel === "clients");
+          if (clientsLink) {
+            try {
+              const clientsResp = await callJohnDeereUrl(accessToken, clientsLink.uri);
+              if (clientsResp.ok) {
+                const clientsData = await clientsResp.json();
+                const firstClient = (clientsData.values || [])[0];
+                if (firstClient) {
+                  clientName = firstClient.name || null;
+                  clientId = firstClient.id || null;
+                }
+              }
+            } catch (_) { /* skip client fetch errors */ }
+          }
+        }
+
+        if (field.farms && field.farms.length > 0) {
+          farmName = field.farms[0].name || null;
+          farmId = field.farms[0].id || null;
+        } else {
+          const farmsLink = field.links?.find((l: JdLink) => l.rel === "farms");
+          if (farmsLink) {
+            try {
+              const farmsResp = await callJohnDeereUrl(accessToken, farmsLink.uri);
+              if (farmsResp.ok) {
+                const farmsData = await farmsResp.json();
+                const firstFarm = (farmsData.values || [])[0];
+                if (firstFarm) {
+                  farmName = firstFarm.name || null;
+                  farmId = firstFarm.id || null;
+                }
+              }
+            } catch (_) { /* skip farm fetch errors */ }
+          }
+        }
+
         const now = new Date().toISOString();
         await supabase
           .from("fields")
@@ -366,6 +413,10 @@ Deno.serve(async (req: Request) => {
             boundary_area_value: boundaryAreaValue,
             boundary_area_unit: boundaryAreaUnit,
             active_boundary: activeBoundary,
+            client_name: clientName,
+            client_id: clientId,
+            farm_name: farmName,
+            farm_id: farmId,
             raw_response: field,
             imported_at: now,
             updated_at: now,

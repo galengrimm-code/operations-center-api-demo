@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchStoredFields, importFieldsWithBoundaries } from '@/lib/john-deere-client';
 import { formatArea } from '@/lib/area-utils';
 import { Button } from '@/components/ui/button';
 import { Loader as Loader2, Download, MapPin } from 'lucide-react';
@@ -15,49 +14,43 @@ const SOURCE_ID = 'fields-source';
 const FILL_LAYER_ID = 'fields-fill';
 const LINE_LAYER_ID = 'fields-line';
 
-export function FieldMap() {
+interface FieldMapProps {
+  fields: StoredField[];
+  selectedClient: string | null;
+  selectedFarm: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onImport: () => Promise<void>;
+  isImporting: boolean;
+}
+
+export function FieldMap({
+  fields,
+  selectedClient,
+  selectedFarm,
+  isLoading,
+  error,
+  onImport,
+  isImporting,
+}: FieldMapProps) {
   const { johnDeereConnection } = useAuth();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
   const preferredUnitRef = useRef(johnDeereConnection?.preferred_area_unit || 'ac');
 
-  const [storedFields, setStoredFields] = useState<StoredField[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     preferredUnitRef.current = johnDeereConnection?.preferred_area_unit || 'ac';
   }, [johnDeereConnection?.preferred_area_unit]);
 
-  const loadStoredFields = useCallback(async () => {
-    if (!johnDeereConnection?.selected_org_id) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await fetchStoredFields();
-      setStoredFields(data.fields || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load fields');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [johnDeereConnection?.selected_org_id]);
-
-  const handleImport = async () => {
-    setIsImporting(true);
-    setError(null);
-    try {
-      const data = await importFieldsWithBoundaries();
-      setStoredFields(data.fields || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import fields');
-    } finally {
-      setIsImporting(false);
-    }
-  };
+  const filtered = useMemo(() => {
+    let result = fields;
+    if (selectedClient) result = result.filter(f => f.client_name === selectedClient);
+    if (selectedFarm) result = result.filter(f => f.farm_name === selectedFarm);
+    return result;
+  }, [fields, selectedClient, selectedFarm]);
 
   useEffect(() => {
     if (!mapContainerRef.current || !MAPBOX_TOKEN) return;
@@ -91,10 +84,6 @@ export function FieldMap() {
   }, []);
 
   useEffect(() => {
-    loadStoredFields();
-  }, [loadStoredFields]);
-
-  useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
@@ -102,7 +91,7 @@ export function FieldMap() {
     if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
     if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
 
-    const fieldsWithBoundaries = storedFields.filter(f => f.boundary_geojson);
+    const fieldsWithBoundaries = filtered.filter(f => f.boundary_geojson);
 
     if (fieldsWithBoundaries.length === 0) return;
 
@@ -113,6 +102,8 @@ export function FieldMap() {
         area_value: field.boundary_area_value,
         area_unit: field.boundary_area_unit,
         jd_field_id: field.jd_field_id,
+        client_name: field.client_name || '',
+        farm_name: field.farm_name || '',
       },
       geometry: field.boundary_geojson!,
     }));
@@ -194,9 +185,19 @@ export function FieldMap() {
         props.area_unit || null,
         preferredUnitRef.current
       );
+      const clientName = props.client_name || '';
+      const farmName = props.farm_name || '';
 
       const areaText = areaDisplay
         ? `<div style="color:#94a3b8;font-size:12px;margin-top:2px;">${areaDisplay}</div>`
+        : '';
+
+      const clientText = clientName
+        ? `<div style="color:#0369a1;font-size:11px;margin-top:4px;">Client: ${clientName}</div>`
+        : '';
+
+      const farmText = farmName
+        ? `<div style="color:#b45309;font-size:11px;margin-top:1px;">Farm: ${farmName}</div>`
         : '';
 
       if (popupRef.current) {
@@ -206,22 +207,24 @@ export function FieldMap() {
       popupRef.current = new mapboxgl.Popup({
         closeButton: true,
         closeOnClick: true,
-        maxWidth: '200px',
+        maxWidth: '220px',
       })
         .setLngLat(e.lngLat)
         .setHTML(`
           <div style="font-family:system-ui,sans-serif;padding:2px 0;">
             <div style="font-weight:600;color:#0f172a;font-size:14px;">${name}</div>
             ${areaText}
+            ${clientText}
+            ${farmText}
           </div>
         `)
         .addTo(map);
     });
-  }, [storedFields, mapReady]);
+  }, [filtered, mapReady]);
 
-  const fieldsWithBoundaries = storedFields.filter(f => f.boundary_geojson);
-  const withoutBoundaries = storedFields.length - fieldsWithBoundaries.length;
-  const hasFields = storedFields.length > 0;
+  const fieldsWithBoundaries = filtered.filter(f => f.boundary_geojson);
+  const withoutBoundaries = filtered.length - fieldsWithBoundaries.length;
+  const hasFields = fields.length > 0;
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -243,7 +246,7 @@ export function FieldMap() {
         <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
           <div className="bg-white/95 backdrop-blur-sm rounded-lg border border-slate-200 shadow-lg p-3">
             <Button
-              onClick={handleImport}
+              onClick={onImport}
               disabled={isImporting || isLoading}
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700 text-white w-full"
@@ -263,7 +266,7 @@ export function FieldMap() {
 
             {hasFields && (
               <div className="mt-2 text-xs text-slate-600 text-center">
-                <span className="font-medium">{storedFields.length}</span> field{storedFields.length !== 1 ? 's' : ''}
+                <span className="font-medium">{filtered.length}</span> field{filtered.length !== 1 ? 's' : ''}
                 {withoutBoundaries > 0 && (
                   <span className="text-slate-400">
                     {' '}&middot; {withoutBoundaries} without boundaries
@@ -280,7 +283,7 @@ export function FieldMap() {
           )}
         </div>
 
-        {isLoading && !isImporting && storedFields.length === 0 && (
+        {isLoading && !isImporting && fields.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
             <div className="bg-white/95 backdrop-blur-sm rounded-xl border border-slate-200 shadow-lg p-6 text-center pointer-events-auto">
               <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
@@ -302,7 +305,7 @@ export function FieldMap() {
                 Import your fields from John Deere to see them on the map with their boundaries.
               </p>
               <Button
-                onClick={handleImport}
+                onClick={onImport}
                 disabled={isImporting}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { JohnDeereConnect } from '@/components/dashboard/john-deere-connect';
@@ -8,21 +8,68 @@ import { OrganizationSelector } from '@/components/dashboard/organization-select
 import { AreaUnitToggle } from '@/components/dashboard/area-unit-toggle';
 import { FieldMap } from '@/components/dashboard/field-map';
 import { FieldsList } from '@/components/dashboard/fields-list';
+import { FieldFilters } from '@/components/dashboard/field-filters';
 import { HarvestOperations } from '@/components/dashboard/harvest-operations';
+import { fetchStoredFields, importFieldsWithBoundaries } from '@/lib/john-deere-client';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader as Loader2, LogOut, Tractor, Map, MapPin, Wheat, User } from 'lucide-react';
+import type { StoredField } from '@/types/john-deere';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, loading, signOut, johnDeereConnection, refreshJohnDeereConnection, updatePreferredAreaUnit } = useAuth();
+  const { user, loading, signOut, johnDeereConnection, updatePreferredAreaUnit } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const [storedFields, setStoredFields] = useState<StoredField[]>([]);
+  const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [fieldsError, setFieldsError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [selectedFarm, setSelectedFarm] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  const loadStoredFields = useCallback(async () => {
+    if (!johnDeereConnection?.selected_org_id) return;
+    setFieldsLoading(true);
+    setFieldsError(null);
+    try {
+      const data = await fetchStoredFields();
+      setStoredFields(data.fields || []);
+    } catch (err) {
+      setFieldsError(err instanceof Error ? err.message : 'Failed to load fields');
+    } finally {
+      setFieldsLoading(false);
+    }
+  }, [johnDeereConnection?.selected_org_id]);
+
+  useEffect(() => {
+    loadStoredFields();
+  }, [loadStoredFields, refreshKey]);
+
+  useEffect(() => {
+    setSelectedClient(null);
+    setSelectedFarm(null);
+  }, [johnDeereConnection?.selected_org_id]);
+
+  const handleImport = async () => {
+    setIsImporting(true);
+    setFieldsError(null);
+    try {
+      const data = await importFieldsWithBoundaries();
+      setStoredFields(data.fields || []);
+    } catch (err) {
+      setFieldsError(err instanceof Error ? err.message : 'Failed to import fields');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -44,6 +91,8 @@ export default function DashboardPage() {
   if (!user) {
     return null;
   }
+
+  const preferredUnit = johnDeereConnection?.preferred_area_unit || 'ac';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -85,50 +134,75 @@ export default function DashboardPage() {
               <OrganizationSelector onOrganizationChange={handleOrganizationChange} />
 
               {johnDeereConnection.selected_org_id && (
-                <Tabs defaultValue="map" className="w-full">
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <TabsList className="bg-white border border-slate-200 p-1">
-                      <TabsTrigger
-                        value="map"
-                        className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                      >
-                        <Map className="w-4 h-4 mr-2" />
-                        Map
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="fields"
-                        className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                      >
-                        <MapPin className="w-4 h-4 mr-2" />
-                        Fields
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="harvest"
-                        className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                      >
-                        <Wheat className="w-4 h-4 mr-2" />
-                        Harvest Operations
-                      </TabsTrigger>
-                    </TabsList>
+                <>
+                  <FieldFilters
+                    fields={storedFields}
+                    selectedClient={selectedClient}
+                    selectedFarm={selectedFarm}
+                    onClientChange={setSelectedClient}
+                    onFarmChange={setSelectedFarm}
+                  />
 
-                    <AreaUnitToggle
-                      value={johnDeereConnection.preferred_area_unit || 'ac'}
-                      onChange={updatePreferredAreaUnit}
-                    />
-                  </div>
+                  <Tabs defaultValue="map" className="w-full">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <TabsList className="bg-white border border-slate-200 p-1">
+                        <TabsTrigger
+                          value="map"
+                          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                        >
+                          <Map className="w-4 h-4 mr-2" />
+                          Map
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="fields"
+                          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                        >
+                          <MapPin className="w-4 h-4 mr-2" />
+                          Fields
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="harvest"
+                          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                        >
+                          <Wheat className="w-4 h-4 mr-2" />
+                          Harvest Operations
+                        </TabsTrigger>
+                      </TabsList>
 
-                  <TabsContent value="map" className="mt-4 data-[state=inactive]:hidden" forceMount>
-                    <FieldMap key={`map-${refreshKey}`} />
-                  </TabsContent>
+                      <AreaUnitToggle
+                        value={preferredUnit}
+                        onChange={updatePreferredAreaUnit}
+                      />
+                    </div>
 
-                  <TabsContent value="fields" className="mt-4">
-                    <FieldsList key={`fields-${refreshKey}`} />
-                  </TabsContent>
+                    <TabsContent value="map" className="mt-4 data-[state=inactive]:hidden" forceMount>
+                      <FieldMap
+                        fields={storedFields}
+                        selectedClient={selectedClient}
+                        selectedFarm={selectedFarm}
+                        isLoading={fieldsLoading}
+                        error={fieldsError}
+                        onImport={handleImport}
+                        isImporting={isImporting}
+                      />
+                    </TabsContent>
 
-                  <TabsContent value="harvest" className="mt-4">
-                    <HarvestOperations key={`harvest-${refreshKey}`} />
-                  </TabsContent>
-                </Tabs>
+                    <TabsContent value="fields" className="mt-4">
+                      <FieldsList
+                        fields={storedFields}
+                        selectedClient={selectedClient}
+                        selectedFarm={selectedFarm}
+                        preferredUnit={preferredUnit}
+                        isLoading={fieldsLoading}
+                        error={fieldsError}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="harvest" className="mt-4">
+                      <HarvestOperations key={`harvest-${refreshKey}`} />
+                    </TabsContent>
+                  </Tabs>
+                </>
               )}
             </>
           )}

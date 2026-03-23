@@ -92,6 +92,10 @@ export interface StoredField {
   boundary_area_value: number | null;
   boundary_area_unit: string | null;
   active_boundary: boolean;
+  client_name: string | null;
+  client_id: string | null;
+  farm_name: string | null;
+  farm_id: string | null;
   imported_at: string;
   created_at: string;
   updated_at: string;
