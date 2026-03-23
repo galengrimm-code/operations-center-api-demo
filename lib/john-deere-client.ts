@@ -134,6 +134,35 @@ export async function fetchHarvestOperations() {
   return response.json();
 }
 
+export async function importFieldsWithBoundaries() {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/john-deere-api?action=import-fields`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to import fields');
+  }
+
+  return response.json();
+}
+
+export async function fetchStoredFields() {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/john-deere-api?action=get-stored-fields`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch stored fields');
+  }
+
+  return response.json();
+}
+
 export function getJohnDeereAuthUrl(redirectUri: string, state: string) {
   const params = new URLSearchParams({
     client_id: process.env.NEXT_PUBLIC_JOHN_DEERE_CLIENT_ID || '',

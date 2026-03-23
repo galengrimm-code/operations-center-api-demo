@@ -38,6 +38,7 @@ The app can be deployed to **Bolt** or **Netlify** (`netlify.toml` is already pr
 | `lib/john-deere-client.ts` | `fetch()` wrappers calling Supabase Edge Functions |
 | `supabase/functions/john-deere-auth/index.ts` | Edge Function: token exchange, refresh, disconnect |
 | `supabase/functions/john-deere-api/index.ts` | Edge Function: organizations, fields, harvest ops |
+| `components/dashboard/field-map.tsx` | Mapbox GL map showing imported field boundaries |
 | `types/database.ts` | TypeScript types for the `john_deere_connections` table |
 | `types/john-deere.ts` | TypeScript types for John Deere API responses |
 
@@ -51,6 +52,7 @@ The app can be deployed to **Bolt** or **Netlify** (`netlify.toml` is already pr
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 NEXT_PUBLIC_JOHN_DEERE_CLIENT_ID=<client-id>
+NEXT_PUBLIC_MAPBOX_TOKEN=<mapbox-public-token>
 ```
 
 ### Supabase Edge Function secrets (set via Supabase CLI or dashboard)
@@ -71,6 +73,8 @@ JOHN_DEERE_CLIENT_SECRET=<client-secret>
 - **Auto token refresh** happens inside `getValidToken()` in the `john-deere-api` edge function — if the token expires within 5 minutes, it refreshes before making the API call. Callers never need to trigger this manually.
 - **Sandbox API**: `JOHN_DEERE_API_BASE = "https://sandboxapi.deere.com/platform"`. Change this constant for production use.
 - **Edge Functions JWT validation**: Both `john-deere-auth` and `john-deere-api` functions are deployed with `verifyJWT: false` because they handle JWT validation internally using `supabase.auth.getUser()`. This prevents "Invalid JWT" errors that occur when Supabase's automatic JWT verification runs before the function code.
+- **Field boundary conversion**: John Deere's proprietary boundary format (multipolygons with rings of lat/lon points) is converted to standard GeoJSON MultiPolygon at import time and persisted in the `fields` table. This gives instant map rendering on every dashboard visit without calling the John Deere API.
+- **Paginated field fetching**: The `import-fields` action follows `nextPage` links from the John Deere API to collect all fields, even for large organizations.
 
 ---
 
@@ -91,7 +95,7 @@ JOHN_DEERE_CLIENT_SECRET=<client-secret>
 
 ---
 
-## Database schema (single table)
+## Database schema
 
 **`john_deere_connections`**
 
@@ -108,6 +112,26 @@ updated_at       timestamptz
 ```
 
 Migration file: `supabase/migrations/20260205140923_create_john_deere_tokens_table.sql`
+
+**`fields`**
+
+```sql
+id                  uuid PK
+user_id             uuid FK → auth.users (CASCADE DELETE)
+org_id              text (John Deere organization ID)
+jd_field_id         text (John Deere field ID)
+name                text (field name)
+boundary_geojson    jsonb (nullable, GeoJSON MultiPolygon)
+boundary_area_value double precision (nullable)
+boundary_area_unit  text (nullable, e.g. "ha" or "ac")
+active_boundary     boolean (default false)
+imported_at         timestamptz
+created_at          timestamptz
+updated_at          timestamptz
+UNIQUE(user_id, org_id, jd_field_id)
+```
+
+Migration file: `supabase/migrations/*_create_fields_table.sql`
 
 ---
 

@@ -82,6 +82,80 @@ async function callJohnDeereApi(accessToken: string, endpoint: string): Promise<
   return response;
 }
 
+async function callJohnDeereUrl(accessToken: string, fullUrl: string): Promise<Response> {
+  const response = await fetch(fullUrl, {
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Accept": "application/vnd.deere.axiom.v3+json",
+    },
+  });
+
+  return response;
+}
+
+interface JdLink { rel: string; uri: string; }
+interface JdBoundaryPoint { lat: number; lon: number; }
+interface JdRing { points: JdBoundaryPoint[]; type: string; }
+interface JdPolygon { rings: JdRing[]; }
+interface JdMeasurement { valueAsDouble: number; unit: string; }
+interface JdBoundary { multipolygons: JdPolygon[]; area?: JdMeasurement; active: boolean; }
+interface JdField { id: string; name: string; activeBoundary?: JdBoundary; links: JdLink[]; }
+
+async function fetchAllFieldsPaginated(accessToken: string, orgId: string): Promise<JdField[]> {
+  const allFields: JdField[] = [];
+  let url: string | null = `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields?embed=activeBoundary`;
+
+  while (url) {
+    const response = await callJohnDeereUrl(accessToken, url);
+    if (!response.ok) {
+      throw new Error(`John Deere API error: ${response.status}`);
+    }
+    const data = await response.json();
+    const values = data.values || [];
+    allFields.push(...values);
+
+    const nextLink = (data.links || []).find((l: JdLink) => l.rel === "nextPage");
+    url = nextLink ? nextLink.uri : null;
+  }
+
+  return allFields;
+}
+
+function convertBoundaryToGeoJSON(boundary: JdBoundary): { type: "MultiPolygon"; coordinates: number[][][][] } | null {
+  if (!boundary.multipolygons || boundary.multipolygons.length === 0) return null;
+
+  const polygons: number[][][][] = [];
+
+  for (const polygon of boundary.multipolygons) {
+    const rings: number[][][] = [];
+    const exteriorRings = (polygon.rings || []).filter((r: JdRing) => r.type === "exterior");
+    const interiorRings = (polygon.rings || []).filter((r: JdRing) => r.type === "interior");
+
+    for (const ring of exteriorRings) {
+      const coords = ring.points.map((p: JdBoundaryPoint) => [p.lon, p.lat]);
+      if (coords.length > 0 && (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1])) {
+        coords.push([...coords[0]]);
+      }
+      const polyRings: number[][][] = [coords];
+      for (const hole of interiorRings) {
+        const holeCoords = hole.points.map((p: JdBoundaryPoint) => [p.lon, p.lat]);
+        if (holeCoords.length > 0 && (holeCoords[0][0] !== holeCoords[holeCoords.length - 1][0] || holeCoords[0][1] !== holeCoords[holeCoords.length - 1][1])) {
+          holeCoords.push([...holeCoords[0]]);
+        }
+        polyRings.push(holeCoords);
+      }
+      rings.push(...polyRings);
+    }
+
+    if (rings.length > 0) {
+      polygons.push(rings);
+    }
+  }
+
+  if (polygons.length === 0) return null;
+  return { type: "MultiPolygon", coordinates: polygons };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -239,6 +313,98 @@ Deno.serve(async (req: Request) => {
       }
 
       return new Response(JSON.stringify({ values: allOperations }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "import-fields") {
+      const orgId = connection.selected_org_id;
+
+      if (!orgId) {
+        return new Response(JSON.stringify({ error: "No organization selected" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const allFields = await fetchAllFieldsPaginated(accessToken, orgId);
+      let withoutBoundaries = 0;
+
+      for (const field of allFields) {
+        let boundaryGeojson = null;
+        let boundaryAreaValue = null;
+        let boundaryAreaUnit = null;
+        let activeBoundary = false;
+
+        if (field.activeBoundary) {
+          boundaryGeojson = convertBoundaryToGeoJSON(field.activeBoundary);
+          if (field.activeBoundary.area) {
+            boundaryAreaValue = field.activeBoundary.area.valueAsDouble;
+            boundaryAreaUnit = field.activeBoundary.area.unit;
+          }
+          activeBoundary = field.activeBoundary.active !== false;
+        }
+
+        if (!boundaryGeojson) {
+          withoutBoundaries++;
+        }
+
+        const now = new Date().toISOString();
+        await supabase
+          .from("fields")
+          .upsert({
+            user_id: user.id,
+            org_id: orgId,
+            jd_field_id: field.id,
+            name: field.name || "Unnamed Field",
+            boundary_geojson: boundaryGeojson,
+            boundary_area_value: boundaryAreaValue,
+            boundary_area_unit: boundaryAreaUnit,
+            active_boundary: activeBoundary,
+            imported_at: now,
+            updated_at: now,
+          }, { onConflict: "user_id,org_id,jd_field_id" });
+      }
+
+      const { data: storedFields } = await supabase
+        .from("fields")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("org_id", orgId);
+
+      return new Response(JSON.stringify({
+        fields: storedFields || [],
+        totalImported: allFields.length,
+        withoutBoundaries,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "get-stored-fields") {
+      const orgId = connection.selected_org_id;
+
+      if (!orgId) {
+        return new Response(JSON.stringify({ error: "No organization selected" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: storedFields, error: fieldsError } = await supabase
+        .from("fields")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("org_id", orgId);
+
+      if (fieldsError) {
+        return new Response(JSON.stringify({ error: fieldsError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ fields: storedFields || [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

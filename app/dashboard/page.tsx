@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { JohnDeereConnect } from '@/components/dashboard/john-deere-connect';
 import { OrganizationSelector } from '@/components/dashboard/organization-selector';
+import { FieldMap } from '@/components/dashboard/field-map';
 import { FieldsList } from '@/components/dashboard/fields-list';
 import { HarvestOperations } from '@/components/dashboard/harvest-operations';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, LogOut, Tractor, MapPin, Wheat, User } from 'lucide-react';
+import { Loader as Loader2, LogOut, Tractor, Map, MapPin, Wheat, User } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -83,8 +84,15 @@ export default function DashboardPage() {
               <OrganizationSelector onOrganizationChange={handleOrganizationChange} />
 
               {johnDeereConnection.selected_org_id && (
-                <Tabs defaultValue="fields" className="w-full">
+                <Tabs defaultValue="map" className="w-full">
                   <TabsList className="bg-white border border-slate-200 p-1">
+                    <TabsTrigger
+                      value="map"
+                      className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                    >
+                      <Map className="w-4 h-4 mr-2" />
+                      Map
+                    </TabsTrigger>
                     <TabsTrigger
                       value="fields"
                       className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
@@ -100,6 +108,10 @@ export default function DashboardPage() {
                       Harvest Operations
                     </TabsTrigger>
                   </TabsList>
+
+                  <TabsContent value="map" className="mt-4">
+                    <FieldMap key={`map-${refreshKey}`} />
+                  </TabsContent>
 
                   <TabsContent value="fields" className="mt-4">
                     <FieldsList key={`fields-${refreshKey}`} />
