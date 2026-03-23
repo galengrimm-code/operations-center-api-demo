@@ -62,7 +62,7 @@ export function FieldMap() {
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/satellite-streets-v12',
+      style: 'mapbox://styles/mapbox/standard-satellite',
       center: [-95.7, 39.8],
       zoom: 4,
     });
