@@ -361,6 +361,7 @@ Deno.serve(async (req: Request) => {
             boundary_area_value: boundaryAreaValue,
             boundary_area_unit: boundaryAreaUnit,
             active_boundary: activeBoundary,
+            raw_response: field,
             imported_at: now,
             updated_at: now,
           }, { onConflict: "user_id,org_id,jd_field_id" });
