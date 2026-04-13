@@ -276,7 +276,7 @@ All functions share the same pattern:
 | `irrigation-analysis` | GET | Analyze field boundary to compute irrigated/dryland acres |
 | `shapefile-status` | GET | Check/download shapefile from JD, upload to Supabase Storage |
 
-> **Note:** The app uses the **sandbox** API (`sandboxapi.deere.com`). Change `JOHN_DEERE_API_BASE` in `_shared/john-deere.ts` for production.
+> **Note:** The app targets the John Deere **production** API (`api.deere.com`).
 
 ---
 

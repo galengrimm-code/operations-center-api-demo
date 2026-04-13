@@ -83,7 +83,7 @@ JOHN_DEERE_CLIENT_SECRET=<client-secret>
 - **No direct browser → John Deere API calls.** All calls go through Supabase Edge Functions so the client secret stays server-side.
 - **One DB row per user** in `john_deere_connections`. RLS ensures users can only see their own row. Edge Functions use the service role key (bypasses RLS) to read/write tokens on the user's behalf.
 - **Auto token refresh** happens inside `getValidToken()` in `_shared/john-deere.ts` — if the token expires within 5 minutes, it refreshes before making the API call. Callers never need to trigger this manually.
-- **Sandbox API**: `JOHN_DEERE_API_BASE = "https://sandboxapi.deere.com/platform"`. Change this constant in `_shared/john-deere.ts` for production use.
+- **Production API**: `JOHN_DEERE_API_BASE = "https://api.deere.com/platform"` in `_shared/john-deere.ts`.
 - **Edge Functions JWT validation**: All edge functions are deployed with `verifyJWT: false` because they handle JWT validation internally using `supabase.auth.getUser()`. This prevents "Invalid JWT" errors that occur when Supabase's automatic JWT verification runs before the function code.
 - **Field boundary conversion**: John Deere's proprietary boundary format (multipolygons with rings of lat/lon points) is converted to standard GeoJSON MultiPolygon at import time and persisted in the `fields` table. This gives instant map rendering on every visit without calling the John Deere API.
 - **Separate irrigated boundaries**: The JD Boundaries API (`?recordFilter=all`) is called during import to fetch irrigated boundaries as separate GeoJSON, stored alongside the active boundary. Irrigated boundaries are displayed as cyan dashed outlines on the map.

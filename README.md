@@ -150,7 +150,7 @@ A `netlify.toml` is already configured. Connect your GitHub repo to Netlify and 
 3. Request the scopes: `ag1 ag2 ag3 org1 org2 work1 work2 offline_access`.
 4. Copy the client ID and secret into your environment variables.
 
-> **Note:** The app currently targets the John Deere **sandbox** API (`sandboxapi.deere.com`). Switch the base URL in `supabase/functions/_shared/john-deere.ts` for production.
+> **Note:** The app targets the John Deere **production** API (`api.deere.com`).
 
 ## John Deere Field Boundary Setup
 
