@@ -1,5 +1,5 @@
 export interface Database {
-  public: {
+  operations_center: {
     Tables: {
       john_deere_connections: {
         Row: {
@@ -43,4 +43,4 @@ export interface Database {
   };
 }
 
-export type JohnDeereConnection = Database['public']['Tables']['john_deere_connections']['Row'];
+export type JohnDeereConnection = Database['operations_center']['Tables']['john_deere_connections']['Row'];
