@@ -411,11 +411,18 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log("[import] Request method:", req.method);
+    console.log("[import] Auth header present:", !!req.headers.get("Authorization"));
+    console.log("[import] Auth header value (first 30):", req.headers.get("Authorization")?.substring(0, 30));
+
     const authResult = await getAuthenticatedUser(req);
+    console.log("[import] authResult type:", typeof authResult, "isResponse:", isResponse(authResult));
     if (isResponse(authResult)) return authResult;
     const { user, supabase } = authResult;
+    console.log("[import] Authenticated user:", user.id);
 
     const connection = await getUserConnection(supabase, user.id);
+    console.log("[import] Connection found:", !!connection, "org:", connection?.selected_org_id);
     if (!connection) {
       return errorResponse("No John Deere connection found", 404);
     }
@@ -426,6 +433,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const accessToken = await getValidToken(supabase, connection);
+    console.log("[import] Got valid token, length:", accessToken.length);
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
@@ -462,6 +470,7 @@ Deno.serve(async (req: Request) => {
     return errorResponse("Unknown action", 400);
   } catch (error) {
     console.error("[import] Error:", error);
-    return errorResponse(error.message, 500);
+    console.error("[import] Error stack:", error.stack);
+    return errorResponse(error.message, 500, error.stack);
   }
 });
