@@ -4,7 +4,9 @@ import { errorResponse } from "./cors.ts";
 export function createServiceClient(): SupabaseClient {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  return createClient(supabaseUrl, supabaseServiceKey);
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    db: { schema: 'operations_center' }
+  });
 }
 
 export interface AuthResult {
