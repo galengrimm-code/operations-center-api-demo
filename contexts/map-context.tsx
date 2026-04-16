@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import { useClientFilter } from '@/contexts/client-filter-context';
 import { fetchStoredFields, importFieldsWithBoundaries, importOperations } from '@/lib/john-deere-client';
 import type { StoredField, StoredFieldOperation } from '@/types/john-deere';
 import type mapboxgl from 'mapbox-gl';
@@ -47,6 +48,7 @@ const MapContext = createContext<MapContextType | undefined>(undefined);
 export function MapProvider({ children }: { children: ReactNode }) {
   const { johnDeereConnection } = useAuth();
   const orgId = johnDeereConnection?.selected_org_id;
+  const { selectedClient: globalClient } = useClientFilter();
 
   const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
   const [fields, setFields] = useState<StoredField[]>([]);
@@ -114,10 +116,12 @@ export function MapProvider({ children }: { children: ReactNode }) {
 
   const filteredFields = useMemo(() => {
     let result = fields;
-    if (selectedClient) result = result.filter(f => f.client_name === selectedClient);
+    // Apply global client filter first, then per-page client filter
+    const activeClient = globalClient || selectedClient;
+    if (activeClient) result = result.filter(f => f.client_name === activeClient);
     if (selectedFarm) result = result.filter(f => f.farm_name === selectedFarm);
     return result;
-  }, [fields, selectedClient, selectedFarm]);
+  }, [fields, globalClient, selectedClient, selectedFarm]);
 
   return (
     <MapContext.Provider value={{

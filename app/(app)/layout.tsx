@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { TopBar } from '@/components/layout/top-bar';
 import { ConnectOverlay } from '@/components/overlays/connect-overlay';
 import { OrgSelectorOverlay } from '@/components/overlays/org-selector-overlay';
+import { ClientFilterProvider } from '@/contexts/client-filter-context';
 import { Loader2 } from 'lucide-react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -32,11 +33,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const needsOrg = johnDeereConnection && !johnDeereConnection.selected_org_id;
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <TopBar />
-      {children}
-      {needsConnection && <ConnectOverlay />}
-      {needsOrg && <OrgSelectorOverlay />}
-    </div>
+    <ClientFilterProvider>
+      <div className="min-h-screen bg-slate-950">
+        <TopBar />
+        {children}
+        {needsConnection && <ConnectOverlay />}
+        {needsOrg && <OrgSelectorOverlay />}
+      </div>
+    </ClientFilterProvider>
   );
 }

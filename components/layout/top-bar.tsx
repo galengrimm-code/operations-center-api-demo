@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Tractor } from 'lucide-react';
 import { NavLinks } from './nav-links';
 import { UserMenu } from './user-menu';
+import { ClientFilterDropdown } from './client-filter-dropdown';
 
 export function TopBar() {
   return (
@@ -22,8 +23,10 @@ export function TopBar() {
         {/* Center nav */}
         <NavLinks />
 
-        {/* Right: user menu */}
-        <UserMenu />
+        <div className="flex items-center gap-3">
+          <ClientFilterDropdown />
+          <UserMenu />
+        </div>
       </div>
     </header>
   );

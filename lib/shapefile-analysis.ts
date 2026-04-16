@@ -119,15 +119,21 @@ export function classifyHarvestPolygons(
   const avg = (arr: number[]) =>
     arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
+  // Use area-weighted yield (totalBushels / totalAcres) instead of simple average
+  // Suppress yield/moisture for zones with less than 1 acre (noise from edge polygons)
+  const MIN_ACRES_FOR_YIELD = 1;
+
   return {
     irrigatedHarvestedAcres: irrigatedArea,
     drylandHarvestedAcres: drylandArea,
-    irrigatedAvgYield: avg(irrigatedYields),
-    drylandAvgYield: avg(drylandYields),
+    irrigatedAvgYield: irrigatedArea >= MIN_ACRES_FOR_YIELD && irrigatedTotalBushels > 0
+      ? irrigatedTotalBushels / irrigatedArea : null,
+    drylandAvgYield: drylandArea >= MIN_ACRES_FOR_YIELD && drylandTotalBushels > 0
+      ? drylandTotalBushels / drylandArea : null,
     irrigatedTotalBushels,
     drylandTotalBushels,
-    irrigatedAvgMoisture: avg(irrigatedMoistures),
-    drylandAvgMoisture: avg(drylandMoistures),
+    irrigatedAvgMoisture: irrigatedArea >= MIN_ACRES_FOR_YIELD ? avg(irrigatedMoistures) : null,
+    drylandAvgMoisture: drylandArea >= MIN_ACRES_FOR_YIELD ? avg(drylandMoistures) : null,
     harvestPolygonCount: harvestGeoJSON.features.length,
   };
 }

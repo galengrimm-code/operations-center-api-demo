@@ -279,7 +279,9 @@ export function IrrigationAnalysis({ fields, preferredUnit }: Props) {
   const [seedingOps, setSeedingOps] = useState<OpEntry[]>([]);
   const [opsLoading, setOpsLoading] = useState(false);
 
-  const fieldsWithBoundary = fields.filter(f => f.active_boundary && f.boundary_geojson);
+  const fieldsWithBoundary = fields
+    .filter(f => f.active_boundary && f.boundary_geojson)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const handleAnalyze = async () => {
     if (!selectedFieldId) return;
