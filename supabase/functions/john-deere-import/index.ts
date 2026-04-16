@@ -53,7 +53,11 @@ async function fetchIrrigatedBoundaries(
 
     const data = await response.json();
     const boundaries: JdBoundary[] = data.values || [];
-    return boundaries.filter((b) => b.irrigated === true);
+    // Filter for irrigated boundaries that are NOT the active field boundary.
+    // The active boundary may also be marked irrigated=true, but it represents
+    // the full field — the actual irrigated polygons (pivot circles) are the
+    // inactive boundaries marked irrigated=true.
+    return boundaries.filter((b) => b.irrigated === true && b.active !== true);
   } catch (_) {
     return [];
   }
