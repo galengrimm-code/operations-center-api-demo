@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReportRow } from '@/lib/reports-data';
+import { type ReportRow, toDryYield } from '@/lib/reports-data';
 
 interface ReportsSummaryRowProps {
   rows: ReportRow[];
@@ -55,15 +55,10 @@ export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
     (r) => r.operation.avg_yield_value,
     (r) => r.totalAcres,
   );
-  const avgIrrMst = weightedAvg(
+  const avgDryBuYield = weightedAvg(
     rows,
-    (r) => r.analysis?.irrigated_moisture,
-    (r) => r.analysis?.irrigated_acres || 0,
-  );
-  const avgDryMst = weightedAvg(
-    rows,
-    (r) => r.analysis?.dryland_moisture,
-    (r) => r.analysis?.dryland_acres || 0,
+    (r) => toDryYield(r.operation.avg_yield_value, r.operation.avg_moisture, r.operation.crop_name),
+    (r) => r.totalAcres,
   );
   const avgTotalMst = weightedAvg(
     rows,
@@ -81,9 +76,8 @@ export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
         <td className="px-4 py-3 text-right">{fmt(totalAc)}</td>
         <td className="px-4 py-3 text-right text-emerald-400">{fmt(avgIrrYield)}</td>
         <td className="px-4 py-3 text-right text-amber-400">{fmt(avgDryYield)}</td>
+        <td className="px-4 py-3 text-right text-cyan-400">{fmt(avgDryBuYield)}</td>
         <td className="px-4 py-3 text-right">{fmt(avgTotalYield)}</td>
-        <td className="px-4 py-3 text-right text-emerald-400/70">{fmtPct(avgIrrMst)}</td>
-        <td className="px-4 py-3 text-right text-amber-400/70">{fmtPct(avgDryMst)}</td>
         <td className="px-4 py-3 text-right">{fmtPct(avgTotalMst)}</td>
         <td className="px-4 py-3"></td>
       </tr>

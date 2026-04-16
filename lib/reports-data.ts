@@ -13,6 +13,41 @@ export interface ReportRow {
   totalAcres: number;
 }
 
+/** Display-friendly crop names */
+const CROP_DISPLAY_NAMES: Record<string, string> = {
+  CORN_WET: 'Corn',
+  CORN_EURO: 'Amylose',
+  SOYBEANS: 'Soybeans',
+};
+
+export function formatCropName(raw: string | null): string {
+  if (!raw) return 'Unknown';
+  return CROP_DISPLAY_NAMES[raw] || raw;
+}
+
+/** Standard moisture for dry yield conversion */
+const STANDARD_MOISTURE: Record<string, number> = {
+  CORN_WET: 0.155,    // 15.5% for corn
+  CORN_EURO: 0.155,   // 15.5% for amylose corn
+};
+
+/**
+ * Convert wet yield to dry yield at standard moisture.
+ * Soybeans are already dry yield — no conversion needed.
+ * Formula: dry = wet * (1 - actual_moisture/100) / (1 - standard_moisture)
+ */
+export function toDryYield(
+  wetYield: number | null,
+  moisture: number | null,
+  cropName: string | null,
+): number | null {
+  if (wetYield == null) return null;
+  const standard = STANDARD_MOISTURE[cropName || ''];
+  if (!standard) return wetYield; // No conversion (soybeans, etc.)
+  if (moisture == null) return wetYield; // Can't convert without moisture
+  return wetYield * (1 - moisture / 100) / (1 - standard);
+}
+
 /** Fetch all fields that have irrigated boundaries */
 export async function fetchIrrigatedFields(userId: string, orgId: string): Promise<StoredField[]> {
   const { data, error } = await (supabase

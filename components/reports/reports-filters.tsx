@@ -1,5 +1,7 @@
 'use client';
 
+import { formatCropName } from '@/lib/reports-data';
+
 interface ReportsFiltersProps {
   seasons: string[];
   crops: string[];
@@ -50,7 +52,7 @@ export function ReportsFilters({
         >
           <option value="">All Crops</option>
           {crops.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>{formatCropName(c)}</option>
           ))}
         </select>
       </div>
