@@ -161,9 +161,15 @@ export function buildReportRows(
           try {
             const fieldFeature = { type: 'Feature' as const, geometry: field.boundary_geojson as any, properties: {} };
             const irrCoords = (field.irrigated_boundary_geojson as any).coordinates as number[][][][];
+            // turf/intersect v7 takes a FeatureCollection
             for (const polyCoords of irrCoords) {
               const irrigPoly = { type: 'Feature' as const, geometry: { type: 'Polygon' as const, coordinates: polyCoords }, properties: {} };
-              const clipped = turfIntersect(fieldFeature as any, irrigPoly as any);
+              const fc = { type: 'FeatureCollection' as const, features: [fieldFeature, irrigPoly] };
+              const clipped = (turfIntersect as any).intersect
+                ? (turfIntersect as any).intersect(fc)
+                : (turfIntersect as any).default
+                  ? (turfIntersect as any).default(fc)
+                  : (turfIntersect as any)(fc);
               if (clipped) {
                 irrigatedSqm += turfArea({ type: 'Feature', geometry: clipped.geometry, properties: {} });
               }

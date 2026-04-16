@@ -75,17 +75,19 @@ async function analyzeBoundary(
       let irrigatedSqm = 0;
       try {
         const fieldFeature = { type: "Feature" as const, geometry: exteriorGeoJSON, properties: {} };
+        // turf/intersect v7 takes a FeatureCollection
         // Intersect each irrigated polygon with the field boundary individually
         for (const polyCoords of irrigatedBoundaryGeoJSON.coordinates) {
           const irrigPoly = { type: "Feature" as const, geometry: { type: "Polygon" as const, coordinates: polyCoords }, properties: {} };
-          const clipped = intersect.default
-            ? intersect.default(fieldFeature, irrigPoly)
-            : intersect(fieldFeature, irrigPoly);
+          const fc = { type: "FeatureCollection" as const, features: [fieldFeature, irrigPoly] };
+          const intersectFn = intersect.intersect || intersect.default || intersect;
+          const clipped = intersectFn(fc);
           if (clipped) {
             irrigatedSqm += area({ type: "Feature", geometry: clipped.geometry, properties: {} });
           }
         }
-      } catch (_) {
+      } catch (err) {
+        console.error("[irrigation] Intersection failed:", err);
         // Fallback: use raw area capped at total if intersection fails
         irrigatedSqm = Math.min(
           area({ type: "Feature", geometry: irrigatedBoundaryGeoJSON, properties: {} }),
