@@ -13,6 +13,7 @@ import {
   type ReportRow,
 } from '@/lib/reports-data';
 import type { StoredField } from '@/types/john-deere';
+import { ReportsTable } from './reports-table';
 import { Loader2, FileBarChart } from 'lucide-react';
 
 export function ReportsView() {
@@ -31,6 +32,17 @@ export function ReportsView() {
   const [selectedSeason, setSelectedSeason] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
   const [selectedField, setSelectedField] = useState('');
+
+  const [runningOperationId, setRunningOperationId] = useState<string | null>(null);
+  const [failedOperationIds, setFailedOperationIds] = useState<Set<string>>(new Set());
+
+  const handleRunAnalysis = async (row: ReportRow) => {
+    // Will be implemented in Task 6
+  };
+
+  const handleRerunAnalysis = async (row: ReportRow) => {
+    // Will be implemented in Task 6
+  };
 
   const loadData = useCallback(async () => {
     if (!user || !orgId) return;
@@ -133,9 +145,13 @@ export function ReportsView() {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="glass rounded-xl p-6 text-slate-300">
-            {rows.length} operations loaded for {selectedSeason}
-          </div>
+          <ReportsTable
+            rows={rows}
+            runningOperationId={runningOperationId}
+            failedOperationIds={failedOperationIds}
+            onRunAnalysis={handleRunAnalysis}
+            onRerunAnalysis={handleRerunAnalysis}
+          />
         </div>
       )}
     </div>
