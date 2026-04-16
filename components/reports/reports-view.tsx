@@ -15,6 +15,11 @@ import {
 import type { StoredField } from '@/types/john-deere';
 import { ReportsTable } from './reports-table';
 import { Loader2, FileBarChart } from 'lucide-react';
+import { AnalysisRunner } from './analysis-runner';
+import { saveAnalysisResult, deleteAnalysisResult } from '@/lib/reports-data';
+import { pollForShapefileUrl } from '@/lib/john-deere-client';
+import { processShapefile, classifyHarvestPolygons } from '@/lib/shapefile-analysis';
+import { supabase } from '@/lib/supabase';
 
 export function ReportsView() {
   const { user, johnDeereConnection } = useAuth();
@@ -35,13 +40,91 @@ export function ReportsView() {
 
   const [runningOperationId, setRunningOperationId] = useState<string | null>(null);
   const [failedOperationIds, setFailedOperationIds] = useState<Set<string>>(new Set());
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fieldName: string } | null>(null);
+
+  const runAnalysisForRow = async (row: ReportRow): Promise<void> => {
+    const opId = row.operation.jd_operation_id;
+    setRunningOperationId(opId);
+    setFailedOperationIds((prev) => { const next = new Set(prev); next.delete(opId); return next; });
+
+    try {
+      const storagePath = await pollForShapefileUrl(opId, () => {});
+
+      const { data: blob, error: downloadError } = await supabase.storage
+        .from('shapefiles')
+        .download(storagePath);
+
+      if (downloadError || !blob) {
+        throw new Error(`Failed to download shapefile: ${downloadError?.message || 'No data'}`);
+      }
+
+      const zipBuffer = await blob.arrayBuffer();
+      const geojson = await processShapefile(zipBuffer);
+
+      const irrigatedBoundary = (row.field.irrigated_boundary_geojson || null) as
+        { type: 'MultiPolygon'; coordinates: number[][][][] } | null;
+
+      const stats = classifyHarvestPolygons(geojson, irrigatedBoundary, row.field.has_irrigated_boundary);
+
+      const result = {
+        user_id: user!.id,
+        field_id: row.field.id,
+        jd_field_id: row.field.jd_field_id,
+        jd_operation_id: opId,
+        operation_type: row.operation.operation_type,
+        crop_name: row.operation.crop_name || '',
+        crop_season: row.operation.crop_season || '',
+        irrigated_acres: stats.irrigatedHarvestedAcres,
+        dryland_acres: stats.drylandHarvestedAcres,
+        total_acres: stats.irrigatedHarvestedAcres + stats.drylandHarvestedAcres,
+        irrigated_yield: stats.irrigatedAvgYield,
+        dryland_yield: stats.drylandAvgYield,
+        total_yield: row.operation.avg_yield_value,
+        irrigated_moisture: stats.irrigatedAvgMoisture,
+        dryland_moisture: stats.drylandAvgMoisture,
+        total_moisture: row.operation.avg_moisture,
+        irrigated_bushels: stats.irrigatedTotalBushels,
+        dryland_bushels: stats.drylandTotalBushels,
+        polygon_count: stats.harvestPolygonCount,
+        analyzed_at: new Date().toISOString(),
+      };
+
+      await saveAnalysisResult(result);
+      await loadData();
+    } catch (err) {
+      console.error(`Analysis failed for ${opId}:`, err);
+      setFailedOperationIds((prev) => new Set(prev).add(opId));
+    } finally {
+      setRunningOperationId(null);
+    }
+  };
 
   const handleRunAnalysis = async (row: ReportRow) => {
-    // Will be implemented in Task 6
+    await runAnalysisForRow(row);
   };
 
   const handleRerunAnalysis = async (row: ReportRow) => {
-    // Will be implemented in Task 6
+    await deleteAnalysisResult(user!.id, row.operation.jd_operation_id);
+    await runAnalysisForRow(row);
+  };
+
+  const handleRunAll = async () => {
+    const unanalyzed = rows.filter((r) => !r.analysis);
+    if (unanalyzed.length === 0) return;
+
+    setIsBatchRunning(true);
+    for (let i = 0; i < unanalyzed.length; i++) {
+      const row = unanalyzed[i];
+      setBatchProgress({
+        current: i + 1,
+        total: unanalyzed.length,
+        fieldName: `${row.field.name} - ${row.operation.crop_name}`,
+      });
+      await runAnalysisForRow(row);
+    }
+    setIsBatchRunning(false);
+    setBatchProgress(null);
   };
 
   const loadData = useCallback(async () => {
@@ -129,6 +212,12 @@ export function ReportsView() {
           onSeasonChange={setSelectedSeason}
           onCropChange={setSelectedCrop}
           onFieldChange={setSelectedField}
+        />
+        <AnalysisRunner
+          unanalyzedCount={rows.filter((r) => !r.analysis).length}
+          isBatchRunning={isBatchRunning}
+          batchProgress={batchProgress}
+          onRunAll={handleRunAll}
         />
       </div>
 
