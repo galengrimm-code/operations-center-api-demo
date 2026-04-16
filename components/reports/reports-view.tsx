@@ -20,7 +20,7 @@ import { Loader2, FileBarChart } from 'lucide-react';
 import { AnalysisRunner } from './analysis-runner';
 import { ReportsExport } from './reports-export';
 import { saveAnalysisResult, deleteAnalysisResult } from '@/lib/reports-data';
-import { pollForShapefileUrl } from '@/lib/john-deere-client';
+import { pollForShapefileUrl, importFieldOperations } from '@/lib/john-deere-client';
 import { processShapefile, classifyHarvestPolygons } from '@/lib/shapefile-analysis';
 import { supabase } from '@/lib/supabase';
 
@@ -41,6 +41,9 @@ export function ReportsView() {
   const [selectedSeason, setSelectedSeason] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
   const [selectedField, setSelectedField] = useState('');
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
   const [runningOperationId, setRunningOperationId] = useState<string | null>(null);
   const [failedOperationIds, setFailedOperationIds] = useState<Set<string>>(new Set());
@@ -129,6 +132,26 @@ export function ReportsView() {
     }
     setIsBatchRunning(false);
     setBatchProgress(null);
+  };
+
+  const handleSyncOperations = async () => {
+    if (!irrigatedFields.length) return;
+    setIsSyncing(true);
+    try {
+      for (let i = 0; i < irrigatedFields.length; i++) {
+        const field = irrigatedFields[i];
+        setSyncProgress(`Syncing ${field.name}... ${i + 1} of ${irrigatedFields.length}`);
+        try {
+          await importFieldOperations(field.jd_field_id);
+        } catch (err) {
+          console.error(`Failed to sync operations for ${field.name}:`, err);
+        }
+      }
+      await loadData();
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(null);
+    }
   };
 
   const loadData = useCallback(async () => {
@@ -227,6 +250,19 @@ export function ReportsView() {
           onRunAll={handleRunAll}
         />
         <ReportsExport rows={rows} season={selectedSeason} />
+        {isSyncing ? (
+          <div className="flex items-center gap-2 text-sm text-emerald-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>{syncProgress}</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleSyncOperations}
+            className="text-xs text-slate-500 hover:text-slate-300 underline"
+          >
+            Sync Missing Operations
+          </button>
+        )}
       </div>
 
       {loading ? (

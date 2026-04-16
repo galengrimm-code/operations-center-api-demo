@@ -53,11 +53,20 @@ async function fetchIrrigatedBoundaries(
 
     const data = await response.json();
     const boundaries: JdBoundary[] = data.values || [];
+
+    // Log all boundaries for debugging
+    console.log(`[import] Field ${fieldId}: ${boundaries.length} total boundaries from API`);
+    for (const b of boundaries) {
+      console.log(`[import]   - name="${b.name || '(none)'}" active=${b.active} irrigated=${b.irrigated} area=${b.area?.valueAsDouble?.toFixed(1)} ${b.area?.unit || ''}`);
+    }
+
     // Filter for irrigated boundaries that are NOT the active field boundary.
     // The active boundary may also be marked irrigated=true, but it represents
     // the full field — the actual irrigated polygons (pivot circles) are the
     // inactive boundaries marked irrigated=true.
-    return boundaries.filter((b) => b.irrigated === true && b.active !== true);
+    const irrigated = boundaries.filter((b) => b.irrigated === true && b.active !== true);
+    console.log(`[import] Field ${fieldId}: ${irrigated.length} irrigated (non-active) boundaries found`);
+    return irrigated;
   } catch (_) {
     return [];
   }
@@ -485,6 +494,69 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({
         totalImported: opsResult.totalImported,
       });
+    }
+
+    // Import operations for a single field (avoids timeout)
+    if (action === "import-field-operations") {
+      const fieldId = url.searchParams.get("fieldId");
+      if (!fieldId) {
+        return errorResponse("Missing fieldId parameter", 400);
+      }
+
+      let totalImported = 0;
+      const operationTypes = ["HARVEST", "SEEDING"];
+
+      for (const opType of operationTypes) {
+        try {
+          const response = await callJohnDeereApi(
+            accessToken,
+            `/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`,
+          );
+
+          if (!response.ok) continue;
+
+          const data = await response.json();
+          const operations: JdOperation[] = data.values || [];
+
+          for (const op of operations) {
+            const opTypeStr = op.fieldOperationType || opType.toLowerCase();
+            const measurements = await fetchMeasurementData(accessToken, op.id, opTypeStr);
+            const imageData = await fetchAndStoreMapImage(supabase, accessToken, user.id, op.id, opTypeStr);
+
+            const firstVariety = op.varieties?.[0];
+            const firstMachine = op.fieldOperationMachines?.[0];
+
+            const now = new Date().toISOString();
+            await supabase
+              .from("field_operations")
+              .upsert({
+                user_id: user.id,
+                org_id: orgId,
+                jd_field_id: fieldId,
+                jd_operation_id: op.id,
+                operation_type: opTypeStr,
+                crop_season: op.cropSeason || null,
+                crop_name: op.cropName || null,
+                start_date: op.startDate || null,
+                end_date: op.endDate || null,
+                variety_name: firstVariety?.name || null,
+                machine_name: firstMachine?.name || null,
+                machine_vin: firstMachine?.vin || null,
+                ...measurements,
+                ...imageData,
+                raw_response: op,
+                imported_at: now,
+                updated_at: now,
+              }, { onConflict: "user_id,org_id,jd_operation_id" });
+
+            totalImported++;
+          }
+        } catch (err) {
+          console.error(`[import] Error importing ${opType} for field ${fieldId}:`, err);
+        }
+      }
+
+      return jsonResponse({ totalImported, fieldId });
     }
 
     return errorResponse("Unknown action", 400);

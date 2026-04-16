@@ -150,6 +150,21 @@ export async function importOperations() {
   return response.json();
 }
 
+export async function importFieldOperations(fieldId: string): Promise<{ totalImported: number }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${SUPABASE_URL}/functions/v1/john-deere-import?action=import-field-operations&fieldId=${encodeURIComponent(fieldId)}`,
+    { method: 'POST', headers },
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to import field operations');
+  }
+
+  return response.json();
+}
+
 export async function fetchStoredOperations(fieldId?: string, operationType?: string) {
   const headers = await getAuthHeaders();
   const params = new URLSearchParams({ action: 'get-stored-operations' });
