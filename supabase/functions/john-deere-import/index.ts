@@ -39,23 +39,23 @@ async function fetchAllFieldsPaginated(accessToken: string, orgId: string): Prom
   return allFields;
 }
 
-async function fetchIrrigatedBoundary(
+async function fetchIrrigatedBoundaries(
   accessToken: string,
   orgId: string,
   fieldId: string,
-): Promise<JdBoundary | null> {
+): Promise<JdBoundary[]> {
   try {
     const response = await callJohnDeereApi(
       accessToken,
       `/organizations/${orgId}/fields/${fieldId}/boundaries?recordFilter=all`,
     );
-    if (!response.ok) return null;
+    if (!response.ok) return [];
 
     const data = await response.json();
     const boundaries: JdBoundary[] = data.values || [];
-    return boundaries.find((b) => b.irrigated === true) || null;
+    return boundaries.filter((b) => b.irrigated === true);
   } catch (_) {
-    return null;
+    return [];
   }
 }
 
@@ -97,14 +97,30 @@ async function importFields(
     let irrigatedBoundaryAreaUnit = null;
     let hasIrrigatedBoundary = false;
 
-    const irrigatedBoundary = await fetchIrrigatedBoundary(accessToken, orgId, field.id);
-    if (irrigatedBoundary) {
-      irrigatedBoundaryGeojson = convertBoundaryToGeoJSON(irrigatedBoundary);
-      if (irrigatedBoundary.area) {
-        irrigatedBoundaryAreaValue = irrigatedBoundary.area.valueAsDouble;
-        irrigatedBoundaryAreaUnit = irrigatedBoundary.area.unit;
+    const irrigatedBoundaries = await fetchIrrigatedBoundaries(accessToken, orgId, field.id);
+    if (irrigatedBoundaries.length > 0) {
+      // Merge all irrigated boundaries into a single MultiPolygon
+      const allCoordinates: number[][][][] = [];
+      let totalArea = 0;
+      let areaUnit = "";
+
+      for (const ib of irrigatedBoundaries) {
+        const geojson = convertBoundaryToGeoJSON(ib);
+        if (geojson) {
+          allCoordinates.push(...geojson.coordinates);
+        }
+        if (ib.area) {
+          totalArea += ib.area.valueAsDouble;
+          areaUnit = ib.area.unit;
+        }
       }
-      hasIrrigatedBoundary = !!irrigatedBoundaryGeojson;
+
+      if (allCoordinates.length > 0) {
+        irrigatedBoundaryGeojson = { type: "MultiPolygon", coordinates: allCoordinates };
+        irrigatedBoundaryAreaValue = totalArea;
+        irrigatedBoundaryAreaUnit = areaUnit;
+        hasIrrigatedBoundary = true;
+      }
     }
 
     let clientName: string | null = null;

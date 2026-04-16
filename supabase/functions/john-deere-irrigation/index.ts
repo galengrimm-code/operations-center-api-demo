@@ -160,6 +160,8 @@ Deno.serve(async (req: Request) => {
       }
 
       const shapefileUrl = `${JOHN_DEERE_API_BASE}/fieldOps/${operationId}?shapeType=Polygon&resolution=EachSensor`;
+      console.log(`[irrigation] Requesting shapefile from: ${shapefileUrl}`);
+      console.log(`[irrigation] Token (first 30): ${accessToken.substring(0, 30)}...`);
 
       const response = await fetch(shapefileUrl, {
         headers: {
@@ -169,6 +171,9 @@ Deno.serve(async (req: Request) => {
         redirect: "manual",
       });
 
+      console.log(`[irrigation] JD response status: ${response.status}`);
+      console.log(`[irrigation] JD response headers:`, Object.fromEntries(response.headers.entries()));
+
       if (response.status === 307) {
         const downloadUrl = response.headers.get("Location");
         if (!downloadUrl) {
@@ -176,7 +181,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Download zip from JD's pre-signed URL
-        console.log(`[irrigation] Downloading shapefile from JD...`);
+        console.log(`[irrigation] Downloading shapefile from JD redirect...`);
         const zipResponse = await fetch(downloadUrl);
         if (!zipResponse.ok) {
           return errorResponse(`Failed to download shapefile: ${zipResponse.status}`, 502);
@@ -210,8 +215,15 @@ Deno.serve(async (req: Request) => {
         return errorResponse("Shapefile cannot be generated for this operation", 406);
       }
 
-      const text = await response.text();
-      return errorResponse(`Unexpected response from John Deere: ${response.status} ${text}`, response.status);
+      // Capture the full error response for debugging
+      const responseBody = await response.text();
+      console.error(`[irrigation] JD error response: status=${response.status}, body=${responseBody}`);
+      return jsonResponse({
+        error: `John Deere API error: ${response.status}`,
+        details: responseBody,
+        url: shapefileUrl,
+        operationId,
+      }, response.status);
     }
 
     return errorResponse("Unknown action", 400);
