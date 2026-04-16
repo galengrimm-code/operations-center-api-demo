@@ -155,31 +155,27 @@ export function buildReportRows(
         totalAcres = totalSqm * SQM_TO_AC;
 
         if (field.has_irrigated_boundary && field.irrigated_boundary_geojson) {
-          // Intersect each irrigated polygon with the field boundary
-          // to only count the irrigated area within the field
+          // Intersect the entire irrigated MultiPolygon with the field boundary
+          // in a single call — handles overlapping pivots without double-counting
           let irrigatedSqm = 0;
           try {
             const fieldFeature = { type: 'Feature' as const, geometry: field.boundary_geojson as any, properties: {} };
-            const irrCoords = (field.irrigated_boundary_geojson as any).coordinates as number[][][][];
-            // turf/intersect v7 takes a FeatureCollection
-            for (const polyCoords of irrCoords) {
-              const irrigPoly = { type: 'Feature' as const, geometry: { type: 'Polygon' as const, coordinates: polyCoords }, properties: {} };
-              const fc = { type: 'FeatureCollection' as const, features: [fieldFeature, irrigPoly] };
-              const clipped = (turfIntersect as any).intersect
-                ? (turfIntersect as any).intersect(fc)
-                : (turfIntersect as any).default
-                  ? (turfIntersect as any).default(fc)
-                  : (turfIntersect as any)(fc);
-              if (clipped) {
-                irrigatedSqm += turfArea({ type: 'Feature', geometry: clipped.geometry, properties: {} });
-              }
+            const irrigFeature = { type: 'Feature' as const, geometry: field.irrigated_boundary_geojson as any, properties: {} };
+            const fc = { type: 'FeatureCollection' as const, features: [fieldFeature, irrigFeature] };
+            const intersectFn = (turfIntersect as any).intersect
+              || (turfIntersect as any).default
+              || turfIntersect;
+            const clipped = intersectFn(fc);
+            if (clipped) {
+              irrigatedSqm = turfArea({ type: 'Feature', geometry: clipped.geometry, properties: {} });
             }
           } catch {
-            // Fallback to stored area if intersection fails
+            // Fallback to stored area capped at total
             const irrigatedUnit = field.irrigated_boundary_area_unit || 'ha';
-            irrigatedSqm = (field.irrigated_boundary_area_value
+            const fallbackAc = field.irrigated_boundary_area_value
               ? convertArea(field.irrigated_boundary_area_value, irrigatedUnit, 'ac')
-              : 0) / SQM_TO_AC; // convert back to sqm for consistency
+              : 0;
+            irrigatedSqm = Math.min(fallbackAc, totalAcres) / SQM_TO_AC;
           }
           irrigatedAcres = Math.min(irrigatedSqm * SQM_TO_AC, totalAcres);
         }

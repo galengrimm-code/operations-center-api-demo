@@ -70,25 +70,20 @@ async function analyzeBoundary(
     const totalAc = totalSqm * SQM_TO_AC;
 
     if (storedField.has_irrigated_boundary && irrigatedBoundaryGeoJSON) {
-      // Compute intersection of irrigated boundary with field boundary
-      // to get only the irrigated area that falls within the field
+      // Intersect the entire irrigated MultiPolygon with the field boundary
+      // in a single call — handles overlapping pivots without double-counting
       let irrigatedSqm = 0;
       try {
         const fieldFeature = { type: "Feature" as const, geometry: exteriorGeoJSON, properties: {} };
-        // turf/intersect v7 takes a FeatureCollection
-        // Intersect each irrigated polygon with the field boundary individually
-        for (const polyCoords of irrigatedBoundaryGeoJSON.coordinates) {
-          const irrigPoly = { type: "Feature" as const, geometry: { type: "Polygon" as const, coordinates: polyCoords }, properties: {} };
-          const fc = { type: "FeatureCollection" as const, features: [fieldFeature, irrigPoly] };
-          const intersectFn = intersect.intersect || intersect.default || intersect;
-          const clipped = intersectFn(fc);
-          if (clipped) {
-            irrigatedSqm += area({ type: "Feature", geometry: clipped.geometry, properties: {} });
-          }
+        const irrigFeature = { type: "Feature" as const, geometry: irrigatedBoundaryGeoJSON, properties: {} };
+        const fc = { type: "FeatureCollection" as const, features: [fieldFeature, irrigFeature] };
+        const intersectFn = intersect.intersect || intersect.default || intersect;
+        const clipped = intersectFn(fc);
+        if (clipped) {
+          irrigatedSqm = area({ type: "Feature", geometry: clipped.geometry, properties: {} });
         }
       } catch (err) {
         console.error("[irrigation] Intersection failed:", err);
-        // Fallback: use raw area capped at total if intersection fails
         irrigatedSqm = Math.min(
           area({ type: "Feature", geometry: irrigatedBoundaryGeoJSON, properties: {} }),
           totalSqm,
