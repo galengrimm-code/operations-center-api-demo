@@ -19,7 +19,7 @@ import { ReportsTrends } from './reports-trends';
 import { Loader2, FileBarChart } from 'lucide-react';
 import { AnalysisRunner } from './analysis-runner';
 import { ReportsExport } from './reports-export';
-import { saveAnalysisResult, deleteAnalysisResult } from '@/lib/reports-data';
+import { saveAnalysisResult, deleteAnalysisResult, formatCropName } from '@/lib/reports-data';
 import { pollForShapefileUrl, importFieldOperations } from '@/lib/john-deere-client';
 import { processShapefile, classifyHarvestPolygons } from '@/lib/shapefile-analysis';
 import { supabase } from '@/lib/supabase';
@@ -120,16 +120,56 @@ export function ReportsView() {
     const unanalyzed = rows.filter((r) => !r.analysis);
     if (unanalyzed.length === 0) return;
 
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    const failed: ReportRow[] = [];
+
     setIsBatchRunning(true);
+
+    // First pass: run all with delays between each
     for (let i = 0; i < unanalyzed.length; i++) {
       const row = unanalyzed[i];
       setBatchProgress({
         current: i + 1,
         total: unanalyzed.length,
-        fieldName: `${row.field.name} - ${row.operation.crop_name}`,
+        fieldName: `${row.field.name} - ${formatCropName(row.operation.crop_name)}`,
       });
       await runAnalysisForRow(row);
+
+      // Check if it failed
+      if (failedOperationIds.has(row.operation.jd_operation_id)) {
+        failed.push(row);
+      }
+
+      // Delay between operations to avoid flooding JD
+      if (i < unanalyzed.length - 1) {
+        await delay(4000);
+      }
     }
+
+    // Second pass: retry failures (JD may have started generating shapefiles)
+    if (failed.length > 0) {
+      setBatchProgress({
+        current: 0,
+        total: failed.length,
+        fieldName: `Retrying ${failed.length} failed...`,
+      });
+      await delay(10000); // Wait 10s before retries
+
+      for (let i = 0; i < failed.length; i++) {
+        const row = failed[i];
+        setBatchProgress({
+          current: i + 1,
+          total: failed.length,
+          fieldName: `Retry: ${row.field.name} - ${formatCropName(row.operation.crop_name)}`,
+        });
+        await runAnalysisForRow(row);
+
+        if (i < failed.length - 1) {
+          await delay(5000);
+        }
+      }
+    }
+
     setIsBatchRunning(false);
     setBatchProgress(null);
   };

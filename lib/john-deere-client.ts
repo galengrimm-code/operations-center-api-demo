@@ -217,8 +217,8 @@ export async function pollForShapefileUrl(
   onProgress?: (attempt: number, status: string) => void,
 ): Promise<string> {
   const headers = await getAuthHeaders();
-  const maxAttempts = 40;
-  const pollIntervalMs = 5000;
+  const maxAttempts = 50;
+  const pollIntervalMs = 8000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     onProgress?.(attempt, 'polling');
