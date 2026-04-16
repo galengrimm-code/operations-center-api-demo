@@ -17,6 +17,7 @@ import { ReportsTable } from './reports-table';
 import { ReportsTrends } from './reports-trends';
 import { Loader2, FileBarChart } from 'lucide-react';
 import { AnalysisRunner } from './analysis-runner';
+import { ReportsExport } from './reports-export';
 import { saveAnalysisResult, deleteAnalysisResult } from '@/lib/reports-data';
 import { pollForShapefileUrl } from '@/lib/john-deere-client';
 import { processShapefile, classifyHarvestPolygons } from '@/lib/shapefile-analysis';
@@ -220,6 +221,7 @@ export function ReportsView() {
           batchProgress={batchProgress}
           onRunAll={handleRunAll}
         />
+        <ReportsExport rows={rows} season={selectedSeason} />
       </div>
 
       {loading ? (
