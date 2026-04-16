@@ -48,7 +48,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
 
     const loadCrops = async () => {
       const ops = await fetchHarvestOperations(userId, orgId, [field.jd_field_id]);
-      const crops = [...new Set(ops.map((o) => o.crop_name).filter(Boolean) as string[])].sort();
+      const crops = Array.from(new Set(ops.map((o) => o.crop_name).filter(Boolean) as string[])).sort();
       setAvailableCrops(crops);
       if (crops.length > 0 && !crops.includes(selectedCrop)) {
         setSelectedCrop(crops[0]);
@@ -91,7 +91,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
         }
 
         const trends: TrendRow[] = [];
-        for (const [season, row] of bySeasonMap) {
+        bySeasonMap.forEach((row, season) => {
           trends.push({
             season,
             irrigatedAcres: row.analysis?.irrigated_acres || row.irrigatedAcres,
@@ -101,7 +101,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
             drylandYield: row.analysis?.dryland_yield ?? null,
             totalYield: row.operation.avg_yield_value,
           });
-        }
+        });
 
         trends.sort((a, b) => b.season.localeCompare(a.season));
         setTrendRows(trends);

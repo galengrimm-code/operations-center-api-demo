@@ -12,15 +12,15 @@ export interface ReportRow {
 
 /** Fetch all fields that have irrigated boundaries */
 export async function fetchIrrigatedFields(userId: string, orgId: string): Promise<StoredField[]> {
-  const { data, error } = await supabase
-    .from('fields')
+  const { data, error } = await (supabase
+    .from('fields') as any)
     .select('*')
     .eq('user_id', userId)
     .eq('org_id', orgId)
     .eq('has_irrigated_boundary', true);
 
-  if (error) throw new Error(`Failed to load fields: ${error.message}`);
-  return data || [];
+  if (error) throw new Error(`Failed to load fields: ${(error as any).message}`);
+  return (data as StoredField[]) || [];
 }
 
 /** Fetch harvest operations for a set of fields, optionally filtered by season and crop */
@@ -31,8 +31,8 @@ export async function fetchHarvestOperations(
   season?: string,
   cropName?: string,
 ): Promise<StoredFieldOperation[]> {
-  let query = supabase
-    .from('field_operations')
+  let query = (supabase
+    .from('field_operations') as any)
     .select('*')
     .eq('user_id', userId)
     .eq('org_id', orgId)
@@ -43,14 +43,14 @@ export async function fetchHarvestOperations(
   if (cropName) query = query.eq('crop_name', cropName);
 
   const { data, error } = await query.order('crop_season', { ascending: false });
-  if (error) throw new Error(`Failed to load operations: ${error.message}`);
-  return data || [];
+  if (error) throw new Error(`Failed to load operations: ${(error as any).message}`);
+  return (data as StoredFieldOperation[]) || [];
 }
 
 /** Fetch all available crop seasons */
 export async function fetchAvailableSeasons(userId: string, orgId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('field_operations')
+  const { data, error } = await (supabase
+    .from('field_operations') as any)
     .select('crop_season')
     .eq('user_id', userId)
     .eq('org_id', orgId)
@@ -58,7 +58,8 @@ export async function fetchAvailableSeasons(userId: string, orgId: string): Prom
     .not('crop_season', 'is', null);
 
   if (error) return [];
-  const seasons = [...new Set((data || []).map(d => d.crop_season as string))];
+  const rows = (data || []) as Array<{ crop_season: string }>;
+  const seasons = Array.from(new Set(rows.map(d => d.crop_season)));
   return seasons.sort((a, b) => b.localeCompare(a));
 }
 
@@ -68,8 +69,8 @@ export async function fetchAvailableCrops(
   orgId: string,
   fieldIds: string[],
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('field_operations')
+  const { data, error } = await (supabase
+    .from('field_operations') as any)
     .select('crop_name')
     .eq('user_id', userId)
     .eq('org_id', orgId)
@@ -78,7 +79,8 @@ export async function fetchAvailableCrops(
     .not('crop_name', 'is', null);
 
   if (error) return [];
-  const crops = [...new Set((data || []).map(d => d.crop_name as string))];
+  const rows = (data || []) as Array<{ crop_name: string }>;
+  const crops = Array.from(new Set(rows.map(d => d.crop_name)));
   return crops.sort();
 }
 
@@ -88,25 +90,25 @@ export async function fetchAnalysisResults(
   operationIds: string[],
 ): Promise<IrrigationAnalysisResult[]> {
   if (operationIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('irrigation_analysis_results')
+  const { data, error } = await (supabase
+    .from('irrigation_analysis_results') as any)
     .select('*')
     .eq('user_id', userId)
     .in('jd_operation_id', operationIds);
 
-  if (error) throw new Error(`Failed to load analysis results: ${error.message}`);
-  return data || [];
+  if (error) throw new Error(`Failed to load analysis results: ${(error as any).message}`);
+  return (data as IrrigationAnalysisResult[]) || [];
 }
 
 /** Save an analysis result (upsert by user_id + jd_operation_id) */
 export async function saveAnalysisResult(
   result: Omit<IrrigationAnalysisResult, 'id' | 'created_at'>,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('irrigation_analysis_results')
+  const { error } = await (supabase
+    .from('irrigation_analysis_results') as any)
     .upsert(result, { onConflict: 'user_id,jd_operation_id' });
 
-  if (error) throw new Error(`Failed to save analysis: ${error.message}`);
+  if (error) throw new Error(`Failed to save analysis: ${(error as any).message}`);
 }
 
 /** Delete an analysis result and its cached shapefile */
@@ -114,8 +116,8 @@ export async function deleteAnalysisResult(
   userId: string,
   operationId: string,
 ): Promise<void> {
-  await supabase
-    .from('irrigation_analysis_results')
+  await (supabase
+    .from('irrigation_analysis_results') as any)
     .delete()
     .eq('user_id', userId)
     .eq('jd_operation_id', operationId);
