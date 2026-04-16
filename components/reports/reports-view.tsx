@@ -14,6 +14,7 @@ import {
 } from '@/lib/reports-data';
 import type { StoredField } from '@/types/john-deere';
 import { ReportsTable } from './reports-table';
+import { ReportsTrends } from './reports-trends';
 import { Loader2, FileBarChart } from 'lucide-react';
 import { AnalysisRunner } from './analysis-runner';
 import { saveAnalysisResult, deleteAnalysisResult } from '@/lib/reports-data';
@@ -240,6 +241,11 @@ export function ReportsView() {
             failedOperationIds={failedOperationIds}
             onRunAnalysis={handleRunAnalysis}
             onRerunAnalysis={handleRerunAnalysis}
+          />
+          <ReportsTrends
+            userId={user!.id}
+            orgId={orgId}
+            irrigatedFields={irrigatedFields}
           />
         </div>
       )}
