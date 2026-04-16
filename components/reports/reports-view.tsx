@@ -26,7 +26,7 @@ import { supabase } from '@/lib/supabase';
 
 export function ReportsView() {
   const { user, johnDeereConnection } = useAuth();
-  const { selectedClient: globalClient } = useClientFilter();
+  const { selectedFarm: globalFarm } = useClientFilter();
   const orgId = johnDeereConnection?.selected_org_id;
   const preferredUnit = johnDeereConnection?.preferred_area_unit || 'ac';
 
@@ -138,8 +138,8 @@ export function ReportsView() {
 
     try {
       let fields = await fetchIrrigatedFields(user.id, orgId);
-      if (globalClient) {
-        fields = fields.filter((f) => f.client_name === globalClient);
+      if (globalFarm) {
+        fields = fields.filter((f) => f.farm_name === globalFarm);
       }
       setIrrigatedFields(fields);
 
@@ -178,7 +178,7 @@ export function ReportsView() {
     } finally {
       setLoading(false);
     }
-  }, [user, orgId, selectedSeason, selectedCrop, selectedField, globalClient]);
+  }, [user, orgId, selectedSeason, selectedCrop, selectedField, globalFarm]);
 
   useEffect(() => {
     loadData();

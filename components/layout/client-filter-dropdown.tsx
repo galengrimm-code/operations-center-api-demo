@@ -9,40 +9,40 @@ import { Users } from 'lucide-react';
 export function ClientFilterDropdown() {
   const { user, johnDeereConnection } = useAuth();
   const orgId = johnDeereConnection?.selected_org_id;
-  const { selectedClient, setSelectedClient, availableClients, setAvailableClients } = useClientFilter();
+  const { selectedFarm, setSelectedFarm, availableFarms, setAvailableFarms } = useClientFilter();
 
   useEffect(() => {
     if (!user || !orgId) return;
 
-    const loadClients = async () => {
+    const loadFarms = async () => {
       const { data } = await (supabase.from('fields') as any)
-        .select('client_name')
+        .select('farm_name')
         .eq('user_id', user.id)
         .eq('org_id', orgId)
-        .not('client_name', 'is', null);
+        .not('farm_name', 'is', null);
 
       if (data) {
-        const clients = Array.from(new Set((data as Array<{ client_name: string }>).map(d => d.client_name))).sort() as string[];
-        setAvailableClients(clients);
+        const farms = Array.from(new Set((data as Array<{ farm_name: string }>).map(d => d.farm_name))).sort() as string[];
+        setAvailableFarms(farms);
       }
     };
 
-    loadClients();
-  }, [user, orgId, setAvailableClients]);
+    loadFarms();
+  }, [user, orgId, setAvailableFarms]);
 
-  if (availableClients.length <= 1) return null;
+  if (availableFarms.length <= 1) return null;
 
   return (
     <div className="flex items-center gap-1.5">
       <Users className="w-3.5 h-3.5 text-slate-500" />
       <select
-        value={selectedClient || ''}
-        onChange={(e) => setSelectedClient(e.target.value || null)}
+        value={selectedFarm || ''}
+        onChange={(e) => setSelectedFarm(e.target.value || null)}
         className="bg-transparent border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
       >
-        <option value="">All Clients</option>
-        {availableClients.map((c) => (
-          <option key={c} value={c}>{c}</option>
+        <option value="">All Farms</option>
+        {availableFarms.map((f) => (
+          <option key={f} value={f}>{f}</option>
         ))}
       </select>
     </div>

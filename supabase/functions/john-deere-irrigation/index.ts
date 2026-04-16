@@ -70,7 +70,8 @@ async function analyzeBoundary(
 
     if (storedField.has_irrigated_boundary && irrigatedBoundaryGeoJSON) {
       const irrigatedSqm = area({ type: "Feature", geometry: irrigatedBoundaryGeoJSON, properties: {} });
-      irrigatedAcres = irrigatedSqm * SQM_TO_AC;
+      // Cap irrigated at total field area (pivot circles can extend beyond field boundary)
+      irrigatedAcres = Math.min(irrigatedSqm * SQM_TO_AC, totalAc);
       drylandAcres = totalAc - irrigatedAcres;
     } else if (boundary.irrigated === true) {
       irrigatedAcres = totalAc;

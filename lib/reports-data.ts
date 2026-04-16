@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { convertArea } from './area-utils';
 import type { StoredField, StoredFieldOperation, IrrigationAnalysisResult } from '@/types/john-deere';
 
 export interface ReportRow {
@@ -142,17 +143,26 @@ export function buildReportRows(
       const field = fieldMap.get(op.jd_field_id)!;
       const analysis = analysisMap.get(op.jd_operation_id) || null;
 
-      const totalBoundaryAcres = field.boundary_area_value || 0;
-      const irrigatedBoundaryAcres = field.irrigated_boundary_area_value || 0;
-      const drylandBoundaryAcres = totalBoundaryAcres - irrigatedBoundaryAcres;
+      // Convert boundary areas to acres (stored values may be in hectares)
+      const boundaryUnit = field.boundary_area_unit || 'ha';
+      const irrigatedUnit = field.irrigated_boundary_area_unit || 'ha';
+      const totalAcres = field.boundary_area_value
+        ? convertArea(field.boundary_area_value, boundaryUnit, 'ac')
+        : 0;
+      const rawIrrigatedAcres = field.irrigated_boundary_area_value
+        ? convertArea(field.irrigated_boundary_area_value, irrigatedUnit, 'ac')
+        : 0;
+      // Cap irrigated at total field area (pivot circles can extend beyond field boundary)
+      const irrigatedAcres = Math.min(rawIrrigatedAcres, totalAcres);
+      const drylandAcres = Math.max(0, totalAcres - irrigatedAcres);
 
       return {
         field,
         operation: op,
         analysis,
-        irrigatedAcres: irrigatedBoundaryAcres,
-        drylandAcres: Math.max(0, drylandBoundaryAcres),
-        totalAcres: op.area_value || totalBoundaryAcres,
+        irrigatedAcres,
+        drylandAcres,
+        totalAcres: op.area_value || totalAcres,
       };
     })
     .sort((a, b) => a.field.name.localeCompare(b.field.name));

@@ -10,7 +10,7 @@ import { MapPin, Loader2, Download, Search, X } from 'lucide-react';
 
 export default function FieldsPage() {
   const { johnDeereConnection } = useAuth();
-  const { selectedClient: globalClient } = useClientFilter();
+  const { selectedFarm: globalFarm } = useClientFilter();
   const { fields, loading, error, importFields, isImporting } = useFields();
   const [search, setSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -25,8 +25,8 @@ export default function FieldsPage() {
 
   const filtered = useMemo(() => {
     let result = fields;
-    const activeClient = globalClient || selectedClient;
-    if (activeClient) result = result.filter(f => f.client_name === activeClient);
+    if (globalFarm) result = result.filter(f => f.farm_name === globalFarm);
+    if (selectedClient) result = result.filter(f => f.client_name === selectedClient);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(f =>
@@ -36,7 +36,7 @@ export default function FieldsPage() {
       );
     }
     return result;
-  }, [fields, globalClient, selectedClient, search]);
+  }, [fields, globalFarm, selectedClient, search]);
 
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">

@@ -3,30 +3,30 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
 interface ClientFilterContextType {
-  selectedClient: string | null;
-  setSelectedClient: (client: string | null) => void;
-  availableClients: string[];
-  setAvailableClients: (clients: string[]) => void;
+  selectedFarm: string | null;
+  setSelectedFarm: (farm: string | null) => void;
+  availableFarms: string[];
+  setAvailableFarms: (farms: string[]) => void;
 }
 
 const ClientFilterContext = createContext<ClientFilterContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'ops-center-client-filter';
+const STORAGE_KEY = 'ops-center-farm-filter';
 
 export function ClientFilterProvider({ children }: { children: ReactNode }) {
-  const [selectedClient, setSelectedClientState] = useState<string | null>(null);
-  const [availableClients, setAvailableClients] = useState<string[]>([]);
+  const [selectedFarm, setSelectedFarmState] = useState<string | null>(null);
+  const [availableFarms, setAvailableFarms] = useState<string[]>([]);
 
   // Load from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) setSelectedClientState(stored);
+    if (stored) setSelectedFarmState(stored);
   }, []);
 
-  const setSelectedClient = useCallback((client: string | null) => {
-    setSelectedClientState(client);
-    if (client) {
-      localStorage.setItem(STORAGE_KEY, client);
+  const setSelectedFarm = useCallback((farm: string | null) => {
+    setSelectedFarmState(farm);
+    if (farm) {
+      localStorage.setItem(STORAGE_KEY, farm);
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -34,10 +34,10 @@ export function ClientFilterProvider({ children }: { children: ReactNode }) {
 
   return (
     <ClientFilterContext.Provider value={{
-      selectedClient,
-      setSelectedClient,
-      availableClients,
-      setAvailableClients,
+      selectedFarm,
+      setSelectedFarm,
+      availableFarms,
+      setAvailableFarms,
     }}>
       {children}
     </ClientFilterContext.Provider>
