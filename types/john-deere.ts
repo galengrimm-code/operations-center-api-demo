@@ -174,3 +174,28 @@ export interface HarvestIrrigationAnalysis extends IrrigationAnalysis {
   irrigatedAvgMoisture: number | null;
   drylandAvgMoisture: number | null;
 }
+
+export interface IrrigationAnalysisResult {
+  id: string;
+  user_id: string;
+  field_id: string;
+  jd_field_id: string;
+  jd_operation_id: string;
+  operation_type: string;
+  crop_name: string;
+  crop_season: string;
+  irrigated_acres: number;
+  dryland_acres: number;
+  total_acres: number;
+  irrigated_yield: number | null;
+  dryland_yield: number | null;
+  total_yield: number | null;
+  irrigated_moisture: number | null;
+  dryland_moisture: number | null;
+  total_moisture: number | null;
+  irrigated_bushels: number | null;
+  dryland_bushels: number | null;
+  polygon_count: number;
+  analyzed_at: string;
+  created_at: string;
+}
