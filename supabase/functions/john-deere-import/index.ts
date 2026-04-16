@@ -508,48 +508,53 @@ Deno.serve(async (req: Request) => {
 
       for (const opType of operationTypes) {
         try {
-          const response = await callJohnDeereApi(
-            accessToken,
-            `/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`,
-          );
+          // Follow pagination to get ALL operations for this field
+          let pageUrl: string | null = `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`;
 
-          if (!response.ok) continue;
+          while (pageUrl) {
+            const response = await callJohnDeereUrl(accessToken, pageUrl);
+            if (!response.ok) break;
 
-          const data = await response.json();
-          const operations: JdOperation[] = data.values || [];
+            const data = await response.json();
+            const operations: JdOperation[] = data.values || [];
 
-          for (const op of operations) {
-            const opTypeStr = op.fieldOperationType || opType.toLowerCase();
-            const measurements = await fetchMeasurementData(accessToken, op.id, opTypeStr);
-            const imageData = await fetchAndStoreMapImage(supabase, accessToken, user.id, op.id, opTypeStr);
+            for (const op of operations) {
+              const opTypeStr = op.fieldOperationType || opType.toLowerCase();
+              const measurements = await fetchMeasurementData(accessToken, op.id, opTypeStr);
+              const imageData = await fetchAndStoreMapImage(supabase, accessToken, user.id, op.id, opTypeStr);
 
-            const firstVariety = op.varieties?.[0];
-            const firstMachine = op.fieldOperationMachines?.[0];
+              const firstVariety = op.varieties?.[0];
+              const firstMachine = op.fieldOperationMachines?.[0];
 
-            const now = new Date().toISOString();
-            await supabase
-              .from("field_operations")
-              .upsert({
-                user_id: user.id,
-                org_id: orgId,
-                jd_field_id: fieldId,
-                jd_operation_id: op.id,
-                operation_type: opTypeStr,
-                crop_season: op.cropSeason || null,
-                crop_name: op.cropName || null,
-                start_date: op.startDate || null,
-                end_date: op.endDate || null,
-                variety_name: firstVariety?.name || null,
-                machine_name: firstMachine?.name || null,
-                machine_vin: firstMachine?.vin || null,
-                ...measurements,
-                ...imageData,
-                raw_response: op,
-                imported_at: now,
-                updated_at: now,
-              }, { onConflict: "user_id,org_id,jd_operation_id" });
+              const now = new Date().toISOString();
+              await supabase
+                .from("field_operations")
+                .upsert({
+                  user_id: user.id,
+                  org_id: orgId,
+                  jd_field_id: fieldId,
+                  jd_operation_id: op.id,
+                  operation_type: opTypeStr,
+                  crop_season: op.cropSeason || null,
+                  crop_name: op.cropName || null,
+                  start_date: op.startDate || null,
+                  end_date: op.endDate || null,
+                  variety_name: firstVariety?.name || null,
+                  machine_name: firstMachine?.name || null,
+                  machine_vin: firstMachine?.vin || null,
+                  ...measurements,
+                  ...imageData,
+                  raw_response: op,
+                  imported_at: now,
+                  updated_at: now,
+                }, { onConflict: "user_id,org_id,jd_operation_id" });
 
-            totalImported++;
+              totalImported++;
+            }
+
+            // Check for next page
+            const nextLink = (data.links || []).find((l: JdLink) => l.rel === "nextPage");
+            pageUrl = nextLink ? nextLink.uri : null;
           }
         } catch (err) {
           console.error(`[import] Error importing ${opType} for field ${fieldId}:`, err);
@@ -557,6 +562,43 @@ Deno.serve(async (req: Request) => {
       }
 
       return jsonResponse({ totalImported, fieldId });
+    }
+
+    // Diagnostic: show what JD returns for a field's operations
+    if (action === "debug-field-operations") {
+      const fieldId = url.searchParams.get("fieldId");
+      if (!fieldId) {
+        return errorResponse("Missing fieldId parameter", 400);
+      }
+
+      const results: Record<string, unknown> = {};
+      for (const opType of ["HARVEST", "SEEDING"]) {
+        try {
+          const response = await callJohnDeereApi(
+            accessToken,
+            `/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`,
+          );
+          if (response.ok) {
+            const data = await response.json();
+            results[opType] = {
+              count: (data.values || []).length,
+              operations: (data.values || []).map((op: JdOperation) => ({
+                id: op.id,
+                type: op.fieldOperationType,
+                season: op.cropSeason,
+                crop: op.cropName,
+                startDate: op.startDate,
+              })),
+            };
+          } else {
+            results[opType] = { error: response.status, text: await response.text() };
+          }
+        } catch (err) {
+          results[opType] = { error: (err as Error).message };
+        }
+      }
+
+      return jsonResponse({ fieldId, results });
     }
 
     return errorResponse("Unknown action", 400);
