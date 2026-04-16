@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
 import { convertArea } from './area-utils';
+import turfArea from '@turf/area';
+import turfIntersect from '@turf/intersect';
 import type { StoredField, StoredFieldOperation, IrrigationAnalysisResult } from '@/types/john-deere';
 
 export interface ReportRow {
@@ -143,17 +145,40 @@ export function buildReportRows(
       const field = fieldMap.get(op.jd_field_id)!;
       const analysis = analysisMap.get(op.jd_operation_id) || null;
 
-      // Convert boundary areas to acres (stored values may be in hectares)
-      const boundaryUnit = field.boundary_area_unit || 'ha';
-      const irrigatedUnit = field.irrigated_boundary_area_unit || 'ha';
-      const totalAcres = field.boundary_area_value
-        ? convertArea(field.boundary_area_value, boundaryUnit, 'ac')
-        : 0;
-      const rawIrrigatedAcres = field.irrigated_boundary_area_value
-        ? convertArea(field.irrigated_boundary_area_value, irrigatedUnit, 'ac')
-        : 0;
-      // Cap irrigated at total field area (pivot circles can extend beyond field boundary)
-      const irrigatedAcres = Math.min(rawIrrigatedAcres, totalAcres);
+      // Compute acreage from actual GeoJSON boundaries using turf
+      const SQM_TO_AC = 0.000247105;
+      let totalAcres = 0;
+      let irrigatedAcres = 0;
+
+      if (field.boundary_geojson) {
+        const totalSqm = turfArea({ type: 'Feature', geometry: field.boundary_geojson as any, properties: {} });
+        totalAcres = totalSqm * SQM_TO_AC;
+
+        if (field.has_irrigated_boundary && field.irrigated_boundary_geojson) {
+          // Intersect each irrigated polygon with the field boundary
+          // to only count the irrigated area within the field
+          let irrigatedSqm = 0;
+          try {
+            const fieldFeature = { type: 'Feature' as const, geometry: field.boundary_geojson as any, properties: {} };
+            const irrCoords = (field.irrigated_boundary_geojson as any).coordinates as number[][][][];
+            for (const polyCoords of irrCoords) {
+              const irrigPoly = { type: 'Feature' as const, geometry: { type: 'Polygon' as const, coordinates: polyCoords }, properties: {} };
+              const clipped = turfIntersect(fieldFeature as any, irrigPoly as any);
+              if (clipped) {
+                irrigatedSqm += turfArea({ type: 'Feature', geometry: clipped.geometry, properties: {} });
+              }
+            }
+          } catch {
+            // Fallback to stored area if intersection fails
+            const irrigatedUnit = field.irrigated_boundary_area_unit || 'ha';
+            irrigatedSqm = (field.irrigated_boundary_area_value
+              ? convertArea(field.irrigated_boundary_area_value, irrigatedUnit, 'ac')
+              : 0) / SQM_TO_AC; // convert back to sqm for consistency
+          }
+          irrigatedAcres = Math.min(irrigatedSqm * SQM_TO_AC, totalAcres);
+        }
+      }
+
       const drylandAcres = Math.max(0, totalAcres - irrigatedAcres);
 
       return {

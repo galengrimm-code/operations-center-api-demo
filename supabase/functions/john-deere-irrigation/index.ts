@@ -11,6 +11,7 @@ import {
   JdBoundary,
 } from "../_shared/boundaries.ts";
 import area from "npm:@turf/area@7";
+import intersect from "npm:@turf/intersect@7";
 
 const SQM_TO_AC = 0.000247105;
 
@@ -69,9 +70,29 @@ async function analyzeBoundary(
     const totalAc = totalSqm * SQM_TO_AC;
 
     if (storedField.has_irrigated_boundary && irrigatedBoundaryGeoJSON) {
-      const irrigatedSqm = area({ type: "Feature", geometry: irrigatedBoundaryGeoJSON, properties: {} });
-      // Cap irrigated at total field area (pivot circles can extend beyond field boundary)
-      irrigatedAcres = Math.min(irrigatedSqm * SQM_TO_AC, totalAc);
+      // Compute intersection of irrigated boundary with field boundary
+      // to get only the irrigated area that falls within the field
+      let irrigatedSqm = 0;
+      try {
+        const fieldFeature = { type: "Feature" as const, geometry: exteriorGeoJSON, properties: {} };
+        // Intersect each irrigated polygon with the field boundary individually
+        for (const polyCoords of irrigatedBoundaryGeoJSON.coordinates) {
+          const irrigPoly = { type: "Feature" as const, geometry: { type: "Polygon" as const, coordinates: polyCoords }, properties: {} };
+          const clipped = intersect.default
+            ? intersect.default(fieldFeature, irrigPoly)
+            : intersect(fieldFeature, irrigPoly);
+          if (clipped) {
+            irrigatedSqm += area({ type: "Feature", geometry: clipped.geometry, properties: {} });
+          }
+        }
+      } catch (_) {
+        // Fallback: use raw area capped at total if intersection fails
+        irrigatedSqm = Math.min(
+          area({ type: "Feature", geometry: irrigatedBoundaryGeoJSON, properties: {} }),
+          totalSqm,
+        );
+      }
+      irrigatedAcres = irrigatedSqm * SQM_TO_AC;
       drylandAcres = totalAc - irrigatedAcres;
     } else if (boundary.irrigated === true) {
       irrigatedAcres = totalAc;

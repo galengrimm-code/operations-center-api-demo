@@ -2,14 +2,21 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import { useClientFilter } from '@/contexts/client-filter-context';
 import { fetchStoredFields, importFieldsWithBoundaries } from '@/lib/john-deere-client';
 import type { StoredField } from '@/types/john-deere';
 
 export function useFields() {
   const { johnDeereConnection } = useAuth();
+  const { selectedFarm: globalFarm } = useClientFilter();
   const orgId = johnDeereConnection?.selected_org_id;
 
-  const [fields, setFields] = useState<StoredField[]>([]);
+  const [allFields, setAllFields] = useState<StoredField[]>([]);
+
+  const fields = useMemo(() => {
+    if (!globalFarm) return allFields;
+    return allFields.filter(f => f.farm_name === globalFarm);
+  }, [allFields, globalFarm]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -20,7 +27,7 @@ export function useFields() {
     setError(null);
     try {
       const data = await fetchStoredFields();
-      setFields(data.fields || []);
+      setAllFields(data.fields || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load fields');
     } finally {
@@ -33,7 +40,7 @@ export function useFields() {
     setError(null);
     try {
       const data = await importFieldsWithBoundaries();
-      setFields(data.fields || []);
+      setAllFields(data.fields || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import fields');
     } finally {
