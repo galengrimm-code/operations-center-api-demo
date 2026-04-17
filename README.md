@@ -26,7 +26,7 @@ A demo web app that connects to the **John Deere Operations Center API** to disp
 | Backend | Supabase Edge Functions (Deno) |
 | Database | Supabase (PostgreSQL) |
 | Auth | Supabase Auth (email/password) + John Deere OAuth 2.0 |
-| Hosting | Bolt (current) · Netlify (ready via `netlify.toml`) |
+| Hosting | Vercel |
 
 ## Project structure
 
@@ -137,9 +137,9 @@ npm run lint       # ESLint
 npm run typecheck  # TypeScript type check (no emit)
 ```
 
-## Deploying to Netlify
+## Deploying to Vercel
 
-A `netlify.toml` is already configured. Connect your GitHub repo to Netlify and set the environment variables listed above in **Site settings → Environment variables**. Netlify will build and deploy automatically on every push.
+Connect your GitHub repo to Vercel — Next.js is auto-detected, no config file required. Set the environment variables listed above in **Project Settings → Environment Variables** (for Production, Preview, and Development). Vercel will build and deploy automatically on every push to `main`.
 
 ## John Deere OAuth setup
 

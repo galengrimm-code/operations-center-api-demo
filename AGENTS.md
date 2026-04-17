@@ -15,7 +15,7 @@ This document is intended for AI coding agents (GitHub Copilot, Cursor, etc.) wo
 5. Displays fields on a Mapbox GL satellite map with boundary overlays and operation map image layers.
 6. Provides irrigation analysis that classifies harvest/seeding data into irrigated vs. dryland zones using shapefile-based polygon classification.
 
-The app can be deployed to **Bolt** or **Netlify** (a `netlify.toml` is already present).
+The app is deployed to **Vercel**.
 
 ---
 
@@ -304,15 +304,8 @@ All functions share the same pattern:
 
 ## Deployment
 
-### Bolt (current)
-Open the project in [bolt.new](https://bolt.new) — it reads `package.json` and runs automatically.
-
-### Netlify
-`netlify.toml` is already configured:
-- Build command: `npx next build`
-- Plugin: `@netlify/plugin-nextjs`
-
-Set the four frontend environment variables in Netlify site settings.
+### Vercel
+Connect your GitHub repo to Vercel — Next.js is auto-detected, no config file required. Set the four `NEXT_PUBLIC_*` environment variables in **Project Settings → Environment Variables** (for Production, Preview, and Development). Vercel builds and deploys automatically on every push to `main`.
 
 ### Supabase Edge Functions
 

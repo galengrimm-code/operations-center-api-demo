@@ -21,7 +21,7 @@ There are no automated tests. Use `npm run build` and `npm run typecheck` to val
 
 **Farm Data Hub** — a Next.js 13 (App Router) demo that integrates with the John Deere Operations Center API. Users authenticate with Supabase, connect their John Deere account via OAuth 2.0, choose an organization, then browse their fields, boundaries, and operations (harvest, seeding) on a map-first interface.
 
-The app can be deployed to **Bolt** or **Netlify** (`netlify.toml` is already present).
+The app is deployed to **Vercel**.
 
 ---
 
@@ -229,5 +229,5 @@ mcp__supabase__deploy_edge_function({
 })
 ```
 
-### Deploy to Netlify
-Connect the repo on Netlify. The `netlify.toml` already sets the build command and plugin. Add the four `NEXT_PUBLIC_*` environment variables in Netlify site settings.
+### Deploy to Vercel
+Connect the GitHub repo on Vercel — Next.js is auto-detected, no config file required. Add the four `NEXT_PUBLIC_*` environment variables in **Project Settings → Environment Variables** (set them for Production, Preview, and Development). Vercel builds and deploys automatically on every push to `main`.
