@@ -13,11 +13,11 @@ interface ReportsExportProps {
 export function ReportsExport({ rows, season }: ReportsExportProps) {
   const handleCSV = () => {
     const csv = generateCSV(rows, season);
-    downloadCSV(csv, `irrigation-report-${season}.csv`);
+    downloadCSV(csv, `harvest-data-report-${season}.csv`);
   };
 
   const handlePDF = () => {
-    const html = generatePDFHtml(rows, season, 'Irrigation Report');
+    const html = generatePDFHtml(rows, season, 'Harvest Data Report');
     printPDF(html);
   };
 

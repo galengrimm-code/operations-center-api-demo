@@ -61,20 +61,21 @@ export async function fetchIrrigatedFields(userId: string, orgId: string): Promi
   return (data as StoredField[]) || [];
 }
 
-/** Fetch harvest operations for a set of fields, optionally filtered by season and crop */
+/** Fetch operations (harvest, seeding, etc.) for a set of fields, optionally filtered by season and crop */
 export async function fetchHarvestOperations(
   userId: string,
   orgId: string,
   fieldIds: string[],
   season?: string,
   cropName?: string,
+  operationType: string = 'harvest',
 ): Promise<StoredFieldOperation[]> {
   let query = (supabase
     .from('field_operations') as any)
     .select('*')
     .eq('user_id', userId)
     .eq('org_id', orgId)
-    .eq('operation_type', 'harvest')
+    .eq('operation_type', operationType)
     .in('jd_field_id', fieldIds);
 
   if (season) query = query.eq('crop_season', season);
@@ -85,14 +86,18 @@ export async function fetchHarvestOperations(
   return (data as StoredFieldOperation[]) || [];
 }
 
-/** Fetch all available crop seasons */
-export async function fetchAvailableSeasons(userId: string, orgId: string): Promise<string[]> {
+/** Fetch all available crop seasons for a given operation type */
+export async function fetchAvailableSeasons(
+  userId: string,
+  orgId: string,
+  operationType: string = 'harvest',
+): Promise<string[]> {
   const { data, error } = await (supabase
     .from('field_operations') as any)
     .select('crop_season')
     .eq('user_id', userId)
     .eq('org_id', orgId)
-    .eq('operation_type', 'harvest')
+    .eq('operation_type', operationType)
     .not('crop_season', 'is', null);
 
   if (error) return [];
@@ -101,18 +106,19 @@ export async function fetchAvailableSeasons(userId: string, orgId: string): Prom
   return seasons.sort((a, b) => b.localeCompare(a));
 }
 
-/** Fetch all available crop names for irrigated fields */
+/** Fetch all available crop names for a given operation type and set of fields */
 export async function fetchAvailableCrops(
   userId: string,
   orgId: string,
   fieldIds: string[],
+  operationType: string = 'harvest',
 ): Promise<string[]> {
   const { data, error } = await (supabase
     .from('field_operations') as any)
     .select('crop_name')
     .eq('user_id', userId)
     .eq('org_id', orgId)
-    .eq('operation_type', 'harvest')
+    .eq('operation_type', operationType)
     .in('jd_field_id', fieldIds)
     .not('crop_name', 'is', null);
 
