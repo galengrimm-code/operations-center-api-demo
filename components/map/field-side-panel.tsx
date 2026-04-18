@@ -9,6 +9,7 @@ import { fetchStoredOperations } from '@/lib/john-deere-client';
 import { formatArea } from '@/lib/area-utils';
 import { X, MapPin, Wheat, Sprout, Droplets, ArrowRight, Loader2, Map as MapIcon } from 'lucide-react';
 import type { StoredFieldOperation } from '@/types/john-deere';
+import { filterHiddenOperations } from '@/lib/crop-filter';
 
 export function FieldSidePanel() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export function FieldSidePanel() {
 
   const field = fields.find(f => f.jd_field_id === selectedFieldId);
   const preferredUnit = johnDeereConnection?.preferred_area_unit || 'ac';
+  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
   const isOpen = !!selectedFieldId && !!field;
 
   useEffect(() => {
@@ -30,10 +32,11 @@ export function FieldSidePanel() {
     setOpsLoading(true);
     setSelectedOperation(null);
     fetchStoredOperations(selectedFieldId)
-      .then(data => setOperations(data.operations || []))
+      .then(data => setOperations(filterHiddenOperations(data.operations || [], hiddenCrops)))
       .catch(() => setOperations([]))
       .finally(() => setOpsLoading(false));
-  }, [selectedFieldId, refreshKey, setSelectedOperation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFieldId, refreshKey, setSelectedOperation, hiddenCrops.join(',')]);
 
   const handleClose = () => {
     setSelectedFieldId(null);

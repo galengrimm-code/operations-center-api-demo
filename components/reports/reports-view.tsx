@@ -37,6 +37,7 @@ export function ReportsView() {
   const { user, johnDeereConnection } = useAuth();
   const { selectedFarm: globalFarm } = useClientFilter();
   const orgId = johnDeereConnection?.selected_org_id;
+  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
 
   const [activeTab, setActiveTab] = useState<ReportTab>('harvest');
 
@@ -250,7 +251,7 @@ export function ReportsView() {
       const fieldIds = fields.map((f) => f.jd_field_id);
       const [seasonList, cropList] = await Promise.all([
         fetchAvailableSeasons(user.id, orgId, activeTab),
-        fetchAvailableCrops(user.id, orgId, fieldIds, activeTab),
+        fetchAvailableCrops(user.id, orgId, fieldIds, activeTab, hiddenCrops),
       ]);
 
       setSeasons(seasonList);
@@ -266,6 +267,7 @@ export function ReportsView() {
         season || undefined,
         selectedCrop || undefined,
         activeTab,
+        hiddenCrops,
       );
 
       const opIds = ops.map((o) => o.jd_operation_id);
@@ -283,7 +285,7 @@ export function ReportsView() {
     } finally {
       setLoading(false);
     }
-  }, [user, orgId, activeTab, selectedSeason, selectedCrop, selectedField, globalFarm]);
+  }, [user, orgId, activeTab, selectedSeason, selectedCrop, selectedField, globalFarm, hiddenCrops.join(',')]);
 
   useEffect(() => {
     loadData();

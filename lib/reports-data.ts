@@ -69,6 +69,7 @@ export async function fetchHarvestOperations(
   season?: string,
   cropName?: string,
   operationType: string = 'harvest',
+  hiddenCrops: string[] = [],
 ): Promise<StoredFieldOperation[]> {
   let query = (supabase
     .from('field_operations') as any)
@@ -83,7 +84,9 @@ export async function fetchHarvestOperations(
 
   const { data, error } = await query.order('crop_season', { ascending: false });
   if (error) throw new Error(`Failed to load operations: ${(error as any).message}`);
-  return (data as StoredFieldOperation[]) || [];
+  const rows = (data as StoredFieldOperation[]) || [];
+  if (hiddenCrops.length === 0) return rows;
+  return rows.filter((r) => !r.crop_name || !hiddenCrops.includes(r.crop_name));
 }
 
 /** Fetch all available crop seasons for a given operation type */
@@ -112,6 +115,7 @@ export async function fetchAvailableCrops(
   orgId: string,
   fieldIds: string[],
   operationType: string = 'harvest',
+  hiddenCrops: string[] = [],
 ): Promise<string[]> {
   const { data, error } = await (supabase
     .from('field_operations') as any)
@@ -124,7 +128,8 @@ export async function fetchAvailableCrops(
 
   if (error) return [];
   const rows = (data || []) as Array<{ crop_name: string }>;
-  const crops = Array.from(new Set(rows.map(d => d.crop_name)));
+  const crops = Array.from(new Set(rows.map(d => d.crop_name)))
+    .filter((c) => !hiddenCrops.includes(c));
   return crops.sort();
 }
 

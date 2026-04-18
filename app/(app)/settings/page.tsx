@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { fetchOrganizations, selectOrganization, disconnectJohnDeere } from '@/lib/john-deere-client';
 import { Building2, Ruler, Unlink, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { JohnDeereOrganization } from '@/types/john-deere';
+import { HiddenCropsSection } from '@/components/settings/hidden-crops-section';
 
 export default function SettingsPage() {
   const { user, johnDeereConnection, refreshJohnDeereConnection, updatePreferredAreaUnit } = useAuth();
@@ -145,6 +146,9 @@ export default function SettingsPage() {
             ))}
           </div>
         </div>
+
+        {/* Hide Crops */}
+        <HiddenCropsSection />
 
         {/* Disconnect */}
         {johnDeereConnection && (

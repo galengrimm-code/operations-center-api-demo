@@ -9,6 +9,7 @@ import {
 } from '@/lib/reports-data';
 import type { StoredField } from '@/types/john-deere';
 import { TrendingUp, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 interface ReportsTrendsProps {
   userId: string;
@@ -32,6 +33,8 @@ interface TrendRow {
 }
 
 export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsProps) {
+  const { johnDeereConnection } = useAuth();
+  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
   const [selectedField, setSelectedField] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,7 +50,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
     if (!field) return;
 
     const loadCrops = async () => {
-      const ops = await fetchHarvestOperations(userId, orgId, [field.jd_field_id]);
+      const ops = await fetchHarvestOperations(userId, orgId, [field.jd_field_id], undefined, undefined, 'harvest', hiddenCrops);
       const crops = Array.from(new Set(ops.map((o) => o.crop_name).filter(Boolean) as string[])).sort();
       setAvailableCrops(crops);
       if (crops.length > 0 && !crops.includes(selectedCrop)) {
@@ -55,7 +58,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
       }
     };
     loadCrops();
-  }, [selectedField, userId, orgId, irrigatedFields]);
+  }, [selectedField, userId, orgId, irrigatedFields, hiddenCrops.join(',')]);
 
   // Load trend data when field+crop changes
   useEffect(() => {
@@ -76,6 +79,8 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
           [field.jd_field_id],
           undefined,
           selectedCrop,
+          'harvest',
+          hiddenCrops,
         );
 
         const opIds = ops.map((o) => o.jd_operation_id);

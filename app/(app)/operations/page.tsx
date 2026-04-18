@@ -10,6 +10,7 @@ import { formatArea } from '@/lib/area-utils';
 import { IrrigationAnalysis } from '@/components/dashboard/irrigation-analysis';
 import { Wheat, Sprout, Droplets, Loader2, RefreshCw, Calendar } from 'lucide-react';
 import type { StoredFieldOperation } from '@/types/john-deere';
+import { filterHiddenOperations } from '@/lib/crop-filter';
 
 function OperationImage({ imagePath }: { imagePath: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -51,17 +52,19 @@ export default function OperationsPage() {
 
   const { fields } = useFields();
   const preferredUnit = johnDeereConnection?.preferred_area_unit || 'ac';
+  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
 
   useEffect(() => {
     if (johnDeereConnection?.selected_org_id && activeTab !== 'irrigation') loadOps();
-  }, [johnDeereConnection?.selected_org_id, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [johnDeereConnection?.selected_org_id, activeTab, hiddenCrops.join(',')]);
 
   const loadOps = async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await fetchStoredOperations(undefined, activeTab);
-      setOperations(data.operations || []);
+      setOperations(filterHiddenOperations(data.operations || [], hiddenCrops));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load operations');
     } finally {

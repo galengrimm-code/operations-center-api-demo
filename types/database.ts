@@ -11,6 +11,7 @@ export interface Database {
           selected_org_id: string | null;
           selected_org_name: string | null;
           preferred_area_unit: string;
+          hidden_crop_names: string[];
           created_at: string;
           updated_at: string;
         };
@@ -23,6 +24,7 @@ export interface Database {
           selected_org_id?: string | null;
           selected_org_name?: string | null;
           preferred_area_unit?: string;
+          hidden_crop_names?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -35,6 +37,7 @@ export interface Database {
           selected_org_id?: string | null;
           selected_org_name?: string | null;
           preferred_area_unit?: string;
+          hidden_crop_names?: string[];
           created_at?: string;
           updated_at?: string;
         };

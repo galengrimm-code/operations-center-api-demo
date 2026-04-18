@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { fetchIrrigationAnalysis, pollForShapefileUrl, fetchStoredOperations } from '@/lib/john-deere-client';
+import { filterHiddenOperations } from '@/lib/crop-filter';
+import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import { processShapefile, classifyHarvestPolygons, classifySeedingPolygons, type HarvestZoneStats, type SeedingZoneStats } from '@/lib/shapefile-analysis';
 import { Button } from '@/components/ui/button';
@@ -270,6 +272,9 @@ function OperationSection({
 // --- Main component ---
 
 export function IrrigationAnalysis({ fields, preferredUnit }: Props) {
+  const { johnDeereConnection } = useAuth();
+  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
+
   const [selectedFieldId, setSelectedFieldId] = useState<string>('');
   const [analysis, setAnalysis] = useState<IrrigationAnalysisType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -310,8 +315,10 @@ export function IrrigationAnalysis({ fields, preferredUnit }: Props) {
             fieldName: '',
           }));
 
-        setHarvestOps(toOpEntry(harvestData.operations || []));
-        setSeedingOps(toOpEntry(seedingData.operations || []));
+        const harvestOpsRaw = (harvestData.operations || []) as Array<{ jd_operation_id: string; start_date?: string | null; crop_name?: string | null }>;
+        const seedingOpsRaw = (seedingData.operations || []) as Array<{ jd_operation_id: string; start_date?: string | null; crop_name?: string | null }>;
+        setHarvestOps(toOpEntry(harvestOpsRaw.filter((op) => !op.crop_name || !hiddenCrops.includes(op.crop_name))));
+        setSeedingOps(toOpEntry(seedingOpsRaw.filter((op) => !op.crop_name || !hiddenCrops.includes(op.crop_name))));
       } catch (_) {
         // Non-critical
       } finally {

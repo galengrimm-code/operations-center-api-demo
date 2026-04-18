@@ -15,6 +15,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshJohnDeereConnection: () => Promise<void>;
   updatePreferredAreaUnit: (unit: string) => Promise<void>;
+  updateHiddenCrops: (cropNames: string[]) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -83,6 +84,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setJohnDeereConnection((prev) => prev ? { ...prev, preferred_area_unit: unit } : prev);
   };
 
+  const updateHiddenCrops = async (cropNames: string[]) => {
+    if (!user) return;
+    await supabase
+      .from('john_deere_connections')
+      .update({ hidden_crop_names: cropNames, updated_at: new Date().toISOString() } as never)
+      .eq('user_id', user.id);
+    setJohnDeereConnection((prev) => prev ? { ...prev, hidden_crop_names: cropNames } : prev);
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setJohnDeereConnection(null);
@@ -99,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       refreshJohnDeereConnection,
       updatePreferredAreaUnit,
+      updateHiddenCrops,
     }}>
       {children}
     </AuthContext.Provider>
