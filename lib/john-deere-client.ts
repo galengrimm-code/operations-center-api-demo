@@ -217,8 +217,17 @@ export async function pollForShapefileUrl(
   onProgress?: (attempt: number, status: string) => void,
 ): Promise<string> {
   const headers = await getAuthHeaders();
-  const maxAttempts = 50;
-  const pollIntervalMs = 8000;
+  // Budget: up to ~20 minutes total. JD usually finishes in 1-3 min, but
+  // some large / dense operations take 10-15 min. Backoff starts fast
+  // (5s) and ramps to 20s so we don't spam when it's clearly going to be slow.
+  const maxAttempts = 120;
+  const startedAt = Date.now();
+
+  const backoffMs = (attempt: number): number => {
+    if (attempt <= 6) return 5_000;    // first 30s: poll every 5s
+    if (attempt <= 20) return 10_000;  // next ~2.5 min: every 10s
+    return 20_000;                      // after that: every 20s
+  };
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     onProgress?.(attempt, 'polling');
@@ -229,13 +238,17 @@ export async function pollForShapefileUrl(
     );
 
     if (response.status === 202) {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)));
       continue;
     }
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to check shapefile status');
+      let errorMsg = 'Failed to check shapefile status';
+      try {
+        const error = await response.json();
+        errorMsg = error.error || errorMsg;
+      } catch { /* response not JSON */ }
+      throw new Error(errorMsg);
     }
 
     const data = await response.json();
@@ -246,7 +259,10 @@ export async function pollForShapefileUrl(
     throw new Error('Unexpected shapefile status response');
   }
 
-  throw new Error('Shapefile processing timed out. Try again in a few minutes.');
+  const elapsedMin = Math.round((Date.now() - startedAt) / 60_000);
+  throw new Error(
+    `Shapefile still processing after ${elapsedMin} min. John Deere is taking unusually long on this operation — try again in a few minutes (the next attempt will pick up where this one left off).`,
+  );
 }
 
 export function getJohnDeereAuthUrl(redirectUri: string, state: string) {
