@@ -98,6 +98,7 @@ export interface StoredField {
   irrigated_boundary_area_value: number | null;
   irrigated_boundary_area_unit: string | null;
   has_irrigated_boundary: boolean;
+  irrigation_start_year: number | null;
   client_name: string | null;
   client_id: string | null;
   farm_name: string | null;

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useClientFilter } from '@/contexts/client-filter-context';
 import { fetchStoredFields, importFieldsWithBoundaries } from '@/lib/john-deere-client';
+import { supabase } from '@/lib/supabase';
 import type { StoredField } from '@/types/john-deere';
 
 export function useFields() {
@@ -35,6 +36,18 @@ export function useFields() {
     }
   }, [orgId]);
 
+  const updateIrrigationStartYear = useCallback(async (fieldId: string, year: number | null) => {
+    setAllFields(prev => prev.map(f => f.id === fieldId ? { ...f, irrigation_start_year: year } : f));
+    const { error: updateError } = await supabase
+      .from('fields')
+      .update({ irrigation_start_year: year, updated_at: new Date().toISOString() } as never)
+      .eq('id', fieldId);
+    if (updateError) {
+      setError(updateError.message);
+      await refresh();
+    }
+  }, [refresh]);
+
   const importFields = useCallback(async () => {
     setIsImporting(true);
     setError(null);
@@ -64,5 +77,5 @@ export function useFields() {
     return Array.from(set).sort();
   }, [fields]);
 
-  return { fields, loading, error, refresh, importFields, isImporting, clients, farms };
+  return { fields, loading, error, refresh, importFields, isImporting, clients, farms, updateIrrigationStartYear };
 }

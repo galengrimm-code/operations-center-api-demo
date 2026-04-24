@@ -6,12 +6,13 @@ import { useAuth } from '@/contexts/auth-context';
 import { useClientFilter } from '@/contexts/client-filter-context';
 import { useFields } from '@/hooks/use-fields';
 import { formatArea } from '@/lib/area-utils';
-import { MapPin, Loader2, Download, Search, X } from 'lucide-react';
+import { MapPin, Loader2, Download, Search, X, Droplets } from 'lucide-react';
+import type { StoredField } from '@/types/john-deere';
 
 export default function FieldsPage() {
   const { johnDeereConnection } = useAuth();
   const { selectedFarm: globalFarm } = useClientFilter();
-  const { fields, loading, error, importFields, isImporting } = useFields();
+  const { fields, loading, error, importFields, isImporting, updateIrrigationStartYear } = useFields();
   const [search, setSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
 
@@ -118,41 +119,49 @@ export default function FieldsPage() {
         {filtered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filtered.map(field => (
-              <Link
+              <div
                 key={field.id}
-                href={`/map/field/${field.jd_field_id}`}
                 className="group glass rounded-xl p-4 hover:bg-white/[0.06] transition-all hover:border-emerald-500/20"
               >
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <h3 className="text-sm font-medium text-white group-hover:text-emerald-300 transition-colors truncate">
-                    {field.name}
-                  </h3>
-                  {field.boundary_geojson && (
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
-                  )}
-                </div>
+                <Link
+                  href={`/map/field/${field.jd_field_id}`}
+                  className="block"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <h3 className="text-sm font-medium text-white group-hover:text-emerald-300 transition-colors truncate">
+                      {field.name}
+                    </h3>
+                    {field.boundary_geojson && (
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                    )}
+                  </div>
 
-                {field.boundary_area_value && (
-                  <p className="text-sm font-mono-data text-emerald-400 mb-2">
-                    {formatArea(field.boundary_area_value, field.boundary_area_unit, preferredUnit)}
-                  </p>
+                  {field.boundary_area_value && (
+                    <p className="text-sm font-mono-data text-emerald-400 mb-2">
+                      {formatArea(field.boundary_area_value, field.boundary_area_unit, preferredUnit)}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {field.client_name && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/10 text-[11px] text-sky-300">
+                        <span className="w-1 h-1 rounded-full bg-sky-400" />
+                        {field.client_name}
+                      </span>
+                    )}
+                    {field.farm_name && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-[11px] text-amber-300">
+                        <span className="w-1 h-1 rounded-full bg-amber-400" />
+                        {field.farm_name}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+
+                {field.has_irrigated_boundary && (
+                  <IrrigationYearEditor field={field} onSave={updateIrrigationStartYear} />
                 )}
-
-                <div className="flex flex-wrap gap-1.5">
-                  {field.client_name && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/10 text-[11px] text-sky-300">
-                      <span className="w-1 h-1 rounded-full bg-sky-400" />
-                      {field.client_name}
-                    </span>
-                  )}
-                  {field.farm_name && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-[11px] text-amber-300">
-                      <span className="w-1 h-1 rounded-full bg-amber-400" />
-                      {field.farm_name}
-                    </span>
-                  )}
-                </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
@@ -164,6 +173,53 @@ export default function FieldsPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function IrrigationYearEditor({
+  field,
+  onSave,
+}: {
+  field: StoredField;
+  onSave: (fieldId: string, year: number | null) => Promise<void>;
+}) {
+  const [value, setValue] = useState<string>(
+    field.irrigation_start_year != null ? String(field.irrigation_start_year) : ''
+  );
+
+  const commit = async () => {
+    const trimmed = value.trim();
+    const next = trimmed === '' ? null : Number(trimmed);
+    if (next !== null && (!Number.isInteger(next) || next < 1900 || next > 2100)) {
+      setValue(field.irrigation_start_year != null ? String(field.irrigation_start_year) : '');
+      return;
+    }
+    if (next === field.irrigation_start_year) return;
+    await onSave(field.id, next);
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center gap-2">
+      <Droplets className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+      <label className="text-[11px] text-slate-400 flex-1">Irrigated since</label>
+      <input
+        type="number"
+        inputMode="numeric"
+        placeholder="—"
+        min={1900}
+        max={2100}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        onBlur={commit}
+        className="w-16 px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-md text-[11px] text-cyan-200 text-center font-mono-data focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
+      />
     </div>
   );
 }

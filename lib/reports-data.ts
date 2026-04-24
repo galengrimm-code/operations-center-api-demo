@@ -189,7 +189,16 @@ export function buildReportRows(
     .filter(op => fieldMap.has(op.jd_field_id))
     .map(op => {
       const field = fieldMap.get(op.jd_field_id)!;
-      const analysis = analysisMap.get(op.jd_operation_id) || null;
+      let analysis = analysisMap.get(op.jd_operation_id) || null;
+
+      // If this op's crop season predates the field's irrigation install year,
+      // treat the field as 100% dryland — any pivots shown on the current
+      // boundary didn't exist yet, so cached analysis splits are wrong.
+      const opYear = op.crop_season ? parseInt(op.crop_season, 10) : NaN;
+      const preIrrigation =
+        field.irrigation_start_year != null &&
+        Number.isFinite(opYear) &&
+        opYear < field.irrigation_start_year;
 
       // Compute acreage from actual GeoJSON boundaries using turf
       const SQM_TO_AC = 0.000247105;
@@ -200,7 +209,7 @@ export function buildReportRows(
         const totalSqm = turfArea({ type: 'Feature', geometry: field.boundary_geojson as any, properties: {} });
         totalAcres = totalSqm * SQM_TO_AC;
 
-        if (field.has_irrigated_boundary && field.irrigated_boundary_geojson) {
+        if (!preIrrigation && field.has_irrigated_boundary && field.irrigated_boundary_geojson) {
           // Intersect the entire irrigated MultiPolygon with the field boundary
           // in a single call — handles overlapping pivots without double-counting
           let irrigatedSqm = 0;
@@ -228,6 +237,12 @@ export function buildReportRows(
       }
 
       const drylandAcres = Math.max(0, totalAcres - irrigatedAcres);
+
+      if (preIrrigation) {
+        // Suppress cached shapefile analysis: it was computed with the current
+        // irrigated boundary and would misattribute yield on pre-pivot years.
+        analysis = null;
+      }
 
       return {
         field,
