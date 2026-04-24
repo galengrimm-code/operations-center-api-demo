@@ -198,6 +198,7 @@ JOHN_DEERE_CLIENT_SECRET=<client-secret>
 
 ## Architecture decisions
 
+- **Supabase project: shared with Farm Budget / Fin Health.** This app does NOT have its own Supabase project. It shares the `Farm Budget / Fin Health` project (ref: `nuxofsjzrgdauzriraze`) and lives entirely inside the `operations_center` schema. The `public` schema belongs to the Farm Budget app — never put Operations Center tables there. All migrations must target `operations_center.<table>` explicitly, and the edge function Supabase client sets `db: { schema: 'operations_center' }` (see `supabase/functions/_shared/auth.ts:8`). When running `supabase db push`, confirm the linked project ref is `nuxofsjzrgdauzriraze` before pushing.
 - **No direct browser → John Deere API calls.** All calls go through Supabase Edge Functions so the client secret stays server-side.
 - **One DB row per user** in `john_deere_connections`. RLS ensures users can only see their own row. Edge Functions use the service role key (bypasses RLS) to read/write tokens on the user's behalf.
 - **Auto token refresh** happens inside `getValidToken()` in `_shared/john-deere.ts` — if the token expires within 5 minutes, it refreshes before making the API call. Callers never need to trigger this manually.
