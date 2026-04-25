@@ -110,6 +110,12 @@ function buildPrintHtml(
   const fmtYield = (v: number | null) =>
     v == null ? '—' : v.toFixed(1) + ' bu';
 
+  const avg = (vals: Array<number | null>): number | null => {
+    const xs = vals.filter((v): v is number => v != null);
+    return xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length;
+  };
+  const sum = (vals: number[]): number => vals.reduce((a, b) => a + b, 0);
+
   const sectionHtml = sections.map(({ crop, points, stats, svgHtml }) => {
     const tableRows = points.map((p) => `
       <tr>
@@ -120,6 +126,12 @@ function buildPrintHtml(
         <td style="text-align:right">${p.irrigatedAcres.toFixed(1)}</td>
         <td style="text-align:right">${p.drylandAcres.toFixed(1)}</td>
       </tr>`).join('');
+
+    const avgIrr = avg(points.map((p) => p.irrigated));
+    const avgDry = avg(points.map((p) => p.dryland));
+    const avgGain = avg(points.map((p) => p.pivotGainPerAcre));
+    const totalIrrAc = sum(points.map((p) => p.irrigatedAcres));
+    const totalDryAc = sum(points.map((p) => p.drylandAcres));
 
     return `
     <section class="crop">
@@ -135,6 +147,16 @@ function buildPrintHtml(
           <tr><th>Year</th><th style="text-align:right">Irr Yield</th><th style="text-align:right">Dry Yield</th><th style="text-align:right">Pivot Gain</th><th style="text-align:right">Irr Ac</th><th style="text-align:right">Dry Ac</th></tr>
         </thead>
         <tbody>${tableRows}</tbody>
+        <tfoot>
+          <tr class="totals">
+            <td><strong>Average</strong></td>
+            <td style="text-align:right"><strong>${fmtYield(avgIrr)}</strong></td>
+            <td style="text-align:right"><strong>${fmtYield(avgDry)}</strong></td>
+            <td style="text-align:right"><strong>${fmtBu(avgGain)}/ac</strong></td>
+            <td style="text-align:right"><strong>${totalIrrAc.toFixed(1)}</strong></td>
+            <td style="text-align:right"><strong>${totalDryAc.toFixed(1)}</strong></td>
+          </tr>
+        </tfoot>
       </table>
     </section>`;
   }).join('');
@@ -163,6 +185,7 @@ function buildPrintHtml(
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th, td { border: 1px solid #e5e7eb; padding: 5px 8px; }
     th { background: #f3f4f6; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #4b5563; }
+    tfoot tr.totals td { background: #f9fafb; border-top: 2px solid #d1d5db; }
     @media print {
       body { padding: 0.5in 0.6in; }
       section.crop { page-break-inside: avoid; }
