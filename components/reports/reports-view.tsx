@@ -21,7 +21,7 @@ import { ReportsYieldCharts } from './reports-yield-charts';
 import { Loader2, FileBarChart, Wheat, Sprout, FlaskConical, Table as TableIcon, BarChart3 } from 'lucide-react';
 import { AnalysisRunner } from './analysis-runner';
 import { ReportsExport } from './reports-export';
-import { saveAnalysisResult, deleteAnalysisResult, formatCropName } from '@/lib/reports-data';
+import { saveAnalysisResult, deleteAnalysisResult, effectiveCropName, formatCropName } from '@/lib/reports-data';
 import { pollForShapefileUrl, importFieldOperations } from '@/lib/john-deere-client';
 import { processShapefile, classifyHarvestPolygons, classifySeedingPolygons } from '@/lib/shapefile-analysis';
 import { supabase } from '@/lib/supabase';
@@ -171,7 +171,7 @@ export function ReportsView() {
       setBatchProgress({
         current: i + 1,
         total: unanalyzed.length,
-        fieldName: `${row.field.name} - ${formatCropName(row.operation.crop_name)}`,
+        fieldName: `${row.field.name} - ${formatCropName(effectiveCropName(row.operation))}`,
       });
       await runAnalysisForRow(row);
 
@@ -197,7 +197,7 @@ export function ReportsView() {
         setBatchProgress({
           current: i + 1,
           total: failed.length,
-          fieldName: `Retry: ${row.field.name} - ${formatCropName(row.operation.crop_name)}`,
+          fieldName: `Retry: ${row.field.name} - ${formatCropName(effectiveCropName(row.operation))}`,
         });
         await runAnalysisForRow(row);
 

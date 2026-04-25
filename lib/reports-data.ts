@@ -25,6 +25,11 @@ export function formatCropName(raw: string | null): string {
   return CROP_DISPLAY_NAMES[raw] || raw;
 }
 
+/** Returns the effective crop name, preferring the user override over the JD-imported value. */
+export function effectiveCropName(op: { crop_name: string | null; crop_name_override?: string | null }): string | null {
+  return op.crop_name_override ?? op.crop_name;
+}
+
 /** Standard moisture for dry yield conversion */
 const STANDARD_MOISTURE: Record<string, number> = {
   CORN_WET: 0.155,    // 15.5% for corn
@@ -61,7 +66,8 @@ export async function fetchIrrigatedFields(userId: string, orgId: string): Promi
   return (data as StoredField[]) || [];
 }
 
-/** Fetch operations (harvest, seeding, etc.) for a set of fields, optionally filtered by season and crop */
+/** Fetch operations (harvest, seeding, etc.) for a set of fields, optionally filtered by season and crop.
+ * Crop filtering and hidden-crop filtering both respect crop_name_override. */
 export async function fetchHarvestOperations(
   userId: string,
   orgId: string,
@@ -80,13 +86,18 @@ export async function fetchHarvestOperations(
     .in('jd_field_id', fieldIds);
 
   if (season) query = query.eq('crop_season', season);
-  if (cropName) query = query.eq('crop_name', cropName);
 
   const { data, error } = await query.order('crop_season', { ascending: false });
   if (error) throw new Error(`Failed to load operations: ${(error as any).message}`);
-  const rows = (data as StoredFieldOperation[]) || [];
-  if (hiddenCrops.length === 0) return rows;
-  return rows.filter((r) => !r.crop_name || !hiddenCrops.includes(r.crop_name));
+  let rows = (data as StoredFieldOperation[]) || [];
+  if (cropName) rows = rows.filter((r) => effectiveCropName(r) === cropName);
+  if (hiddenCrops.length > 0) {
+    rows = rows.filter((r) => {
+      const eff = effectiveCropName(r);
+      return !eff || !hiddenCrops.includes(eff);
+    });
+  }
+  return rows;
 }
 
 /** Fetch all available crop seasons for a given operation type */
@@ -109,7 +120,8 @@ export async function fetchAvailableSeasons(
   return seasons.sort((a, b) => b.localeCompare(a));
 }
 
-/** Fetch all available crop names for a given operation type and set of fields */
+/** Fetch all available crop names for a given operation type and set of fields.
+ * Returns the effective crop name (override if set, else crop_name). */
 export async function fetchAvailableCrops(
   userId: string,
   orgId: string,
@@ -119,17 +131,17 @@ export async function fetchAvailableCrops(
 ): Promise<string[]> {
   const { data, error } = await (supabase
     .from('field_operations') as any)
-    .select('crop_name')
+    .select('crop_name, crop_name_override')
     .eq('user_id', userId)
     .eq('org_id', orgId)
     .eq('operation_type', operationType)
-    .in('jd_field_id', fieldIds)
-    .not('crop_name', 'is', null);
+    .in('jd_field_id', fieldIds);
 
   if (error) return [];
-  const rows = (data || []) as Array<{ crop_name: string }>;
-  const crops = Array.from(new Set(rows.map(d => d.crop_name)))
-    .filter((c) => !hiddenCrops.includes(c));
+  const rows = (data || []) as Array<{ crop_name: string | null; crop_name_override: string | null }>;
+  const crops = Array.from(new Set(
+    rows.map((d) => effectiveCropName(d)).filter((c): c is string => !!c),
+  )).filter((c) => !hiddenCrops.includes(c));
   return crops.sort();
 }
 

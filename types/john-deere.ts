@@ -123,6 +123,7 @@ export interface StoredFieldOperation {
   operation_type: string;
   crop_season: string | null;
   crop_name: string | null;
+  crop_name_override: string | null;
   start_date: string | null;
   end_date: string | null;
   variety_name: string | null;

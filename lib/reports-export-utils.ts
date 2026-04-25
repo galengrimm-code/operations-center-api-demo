@@ -1,4 +1,4 @@
-import { type ReportRow, formatCropName, toDryYield } from './reports-data';
+import { type ReportRow, effectiveCropName, formatCropName, toDryYield } from './reports-data';
 
 function fmt(value: number | null | undefined, decimals = 1): string {
   if (value == null) return '';
@@ -16,7 +16,7 @@ export function generateCSV(rows: ReportRow[], season: string): string {
   const csvRows = [headers.join(',')];
 
   for (const row of rows) {
-    const cropName = row.operation.crop_name;
+    const cropName = effectiveCropName(row.operation);
     const irrYieldDry = row.analysis
       ? toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, cropName)
       : null;
@@ -53,7 +53,7 @@ export function downloadCSV(csv: string, filename: string): void {
 
 export function generatePDFHtml(rows: ReportRow[], season: string, title: string): string {
   const tableRows = rows.map((row) => {
-    const cropName = row.operation.crop_name;
+    const cropName = effectiveCropName(row.operation);
     const irrYieldDry = row.analysis
       ? toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, cropName)
       : null;

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import {
   fetchHarvestOperations,
   fetchAnalysisResults,
+  buildReportRows,
+  effectiveCropName,
   formatCropName,
   toDryYield,
 } from '@/lib/reports-data';
@@ -31,6 +33,8 @@ interface ChartPoint {
   season: string;
   irrigated: number | null;
   dryland: number | null;
+  irrigatedAcres: number;
+  drylandAcres: number;
 }
 
 // Only chart the major harvested grain crops. Cover crops, grasses, etc.
@@ -41,6 +45,32 @@ interface CropStats {
   avgDiff: number | null;
   bestYear: { season: string; yield: number } | null;
   biggestGap: { season: string; diff: number } | null;
+}
+
+function YieldTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartPoint }>;
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const p = payload[0].payload;
+  const fmtNum = (v: number | null, suffix = '') =>
+    v == null ? '—' : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}${suffix}`;
+  return (
+    <div className="rounded-lg border border-slate-700 bg-slate-900/95 px-3 py-2 text-xs shadow-lg">
+      <div className="font-semibold text-slate-100 mb-1.5">{label}</div>
+      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+        <span className="text-emerald-400">Irrigated</span>
+        <span className="text-slate-200 text-right font-mono-data">
+          {fmtNum(p.irrigated, ' bu')} <span className="text-slate-500">·</span> {fmtNum(p.irrigatedAcres, ' ac')}
+        </span>
+        <span className="text-amber-400">Dryland</span>
+        <span className="text-slate-200 text-right font-mono-data">
+          {fmtNum(p.dryland, ' bu')} <span className="text-slate-500">·</span> {fmtNum(p.drylandAcres, ' ac')}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function computeStats(points: ChartPoint[]): CropStats {
@@ -89,34 +119,57 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
         );
         const opIds = ops.map((o) => o.jd_operation_id);
         const results = await fetchAnalysisResults(userId, opIds);
-        const byOpId = new Map(results.map((r) => [r.jd_operation_id, r]));
 
-        type Acc = { irrBu: number; irrAc: number; dryBu: number; dryAc: number };
+        // Use buildReportRows so irrigation_start_year is honored — pre-pivot
+        // ops have analysis nulled and acres flipped to 100% dryland.
+        const rows = buildReportRows(irrigatedFields, ops, results);
+
+        type Acc = {
+          irrBu: number; irrYieldWeight: number;
+          dryBu: number; dryYieldWeight: number;
+          irrAc: number; dryAc: number;
+        };
         const groups = new Map<string, Map<string, Acc>>();
 
-        for (const op of ops) {
-          const r = byOpId.get(op.jd_operation_id);
-          if (!r) continue;
-          const crop = op.crop_name;
-          const season = op.crop_season;
+        for (const row of rows) {
+          const crop = effectiveCropName(row.operation);
+          const season = row.operation.crop_season;
           if (!crop || !season) continue;
           if (!CHART_CROPS.has(crop)) continue;
-
-          const irrYieldDry = toDryYield(r.irrigated_yield, r.irrigated_moisture, crop);
-          const dryYieldDry = toDryYield(r.dryland_yield, r.dryland_moisture, crop);
 
           let cropMap = groups.get(crop);
           if (!cropMap) { cropMap = new Map(); groups.set(crop, cropMap); }
           let acc = cropMap.get(season);
-          if (!acc) { acc = { irrBu: 0, irrAc: 0, dryBu: 0, dryAc: 0 }; cropMap.set(season, acc); }
-          if (irrYieldDry != null && r.irrigated_acres > 0) {
-            acc.irrBu += irrYieldDry * r.irrigated_acres;
-            acc.irrAc += r.irrigated_acres;
+          if (!acc) {
+            acc = { irrBu: 0, irrYieldWeight: 0, dryBu: 0, dryYieldWeight: 0, irrAc: 0, dryAc: 0 };
+            cropMap.set(season, acc);
           }
-          if (dryYieldDry != null && r.dryland_acres > 0) {
-            acc.dryBu += dryYieldDry * r.dryland_acres;
-            acc.dryAc += r.dryland_acres;
+
+          if (row.analysis) {
+            // Field had its current pivot during this op — use the per-zone analysis
+            const irrYieldDry = toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, crop);
+            const dryYieldDry = toDryYield(row.analysis.dryland_yield, row.analysis.dryland_moisture, crop);
+            acc.irrAc += row.analysis.irrigated_acres || 0;
+            acc.dryAc += row.analysis.dryland_acres || 0;
+            if (irrYieldDry != null && row.analysis.irrigated_acres > 0) {
+              acc.irrBu += irrYieldDry * row.analysis.irrigated_acres;
+              acc.irrYieldWeight += row.analysis.irrigated_acres;
+            }
+            if (dryYieldDry != null && row.analysis.dryland_acres > 0) {
+              acc.dryBu += dryYieldDry * row.analysis.dryland_acres;
+              acc.dryYieldWeight += row.analysis.dryland_acres;
+            }
+          } else if (row.drylandAcres > 0 && row.irrigatedAcres === 0) {
+            // Pre-irrigation op (or 100%-dryland field): whole-field yield is
+            // dryland yield. Use op's avg_yield_value with toDryYield.
+            const wholeFieldDry = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, crop);
+            acc.dryAc += row.drylandAcres;
+            if (wholeFieldDry != null) {
+              acc.dryBu += wholeFieldDry * row.drylandAcres;
+              acc.dryYieldWeight += row.drylandAcres;
+            }
           }
+          // else: post-pivot op without analysis — split unknown, skip.
         }
 
         const next = new Map<string, ChartPoint[]>();
@@ -125,8 +178,10 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
           seasons.forEach((acc, season) => {
             points.push({
               season,
-              irrigated: acc.irrAc > 0 ? acc.irrBu / acc.irrAc : null,
-              dryland: acc.dryAc > 0 ? acc.dryBu / acc.dryAc : null,
+              irrigated: acc.irrYieldWeight > 0 ? acc.irrBu / acc.irrYieldWeight : null,
+              dryland: acc.dryYieldWeight > 0 ? acc.dryBu / acc.dryYieldWeight : null,
+              irrigatedAcres: acc.irrAc,
+              drylandAcres: acc.dryAc,
             });
           });
           points.sort((a, b) => a.season.localeCompare(b.season));
@@ -191,11 +246,7 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
                   fontSize={12}
                   label={{ value: 'bu/ac', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: 11 }}
                 />
-                <Tooltip
-                  contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: '#e2e8f0' }}
-                  formatter={(value) => typeof value === 'number' ? value.toFixed(1) + ' bu/ac' : '—'}
-                />
+                <Tooltip content={<YieldTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line
                   type="monotone"
@@ -231,7 +282,7 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
               <div className="flex items-start gap-2">
                 <Trophy className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Best Year</div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Best Irr Year</div>
                   <div className="text-sm font-mono-data text-emerald-300">
                     {stats.bestYear ? `${stats.bestYear.season} · ${stats.bestYear.yield.toFixed(1)} bu` : '—'}
                   </div>

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { type ReportRow, formatCropName, toDryYield } from '@/lib/reports-data';
+import { type ReportRow, effectiveCropName, formatCropName, toDryYield } from '@/lib/reports-data';
 import { ReportsSummaryRow } from './reports-summary-row';
-import { Play, RotateCcw, Loader2, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Play, RotateCcw, Loader2, AlertCircle, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface ReportsTableProps {
   rows: ReportRow[];
@@ -29,13 +30,13 @@ type SortDir = 'asc' | 'desc';
 function getSortValue(row: ReportRow, key: SortKey): number | string {
   switch (key) {
     case 'field': return row.field.name;
-    case 'crop': return formatCropName(row.operation.crop_name);
+    case 'crop': return formatCropName(effectiveCropName(row.operation));
     case 'irrigatedAcres': return row.irrigatedAcres;
     case 'drylandAcres': return row.drylandAcres;
     case 'totalAcres': return row.totalAcres;
-    case 'irrYield': return toDryYield(row.analysis?.irrigated_yield ?? null, row.analysis?.irrigated_moisture ?? null, row.operation.crop_name) ?? -1;
-    case 'dryYield': return toDryYield(row.analysis?.dryland_yield ?? null, row.analysis?.dryland_moisture ?? null, row.operation.crop_name) ?? -1;
-    case 'totalBuAc': return toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, row.operation.crop_name) ?? -1;
+    case 'irrYield': return toDryYield(row.analysis?.irrigated_yield ?? null, row.analysis?.irrigated_moisture ?? null, effectiveCropName(row.operation)) ?? -1;
+    case 'dryYield': return toDryYield(row.analysis?.dryland_yield ?? null, row.analysis?.dryland_moisture ?? null, effectiveCropName(row.operation)) ?? -1;
+    case 'totalBuAc': return toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, effectiveCropName(row.operation)) ?? -1;
     default: return 0;
   }
 }
@@ -123,7 +124,7 @@ export function ReportsTable({
             const isRunning = runningOperationId === opId;
             const isFailed = failedOperationIds.has(opId);
             const hasAnalysis = !!row.analysis;
-            const cropName = row.operation.crop_name;
+            const cropName = effectiveCropName(row.operation);
             const irrYieldDry = hasAnalysis
               ? toDryYield(row.analysis!.irrigated_yield, row.analysis!.irrigated_moisture, cropName)
               : null;
@@ -138,7 +139,9 @@ export function ReportsTable({
                 className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors"
               >
                 <td className="px-4 py-3 text-slate-200 font-medium">{row.field.name}</td>
-                <td className="px-4 py-3 text-slate-300">{formatCropName(row.operation.crop_name)}</td>
+                <td className="px-4 py-3 text-slate-300">
+                  <CropCell row={row} />
+                </td>
                 <td className="px-4 py-3 text-right text-emerald-400">{fmt(row.irrigatedAcres)}</td>
                 <td className="px-4 py-3 text-right text-amber-400">{fmt(row.drylandAcres)}</td>
                 <td className="px-4 py-3 text-right text-slate-300">{fmt(row.totalAcres)}</td>
@@ -189,5 +192,71 @@ export function ReportsTable({
         <ReportsSummaryRow rows={rows} />
       </table>
     </div>
+  );
+}
+
+const CROP_OPTIONS = [
+  { value: '', label: 'Use JD default' },
+  { value: 'CORN_WET', label: 'Corn' },
+  { value: 'CORN_EURO', label: 'Amylose' },
+  { value: 'SOYBEANS', label: 'Soybeans' },
+];
+
+function CropCell({ row }: { row: ReportRow }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Track override locally so the cell updates immediately after save without
+  // waiting for a parent reload.
+  const [override, setOverride] = useState<string | null>(row.operation.crop_name_override);
+
+  const effective = override ?? row.operation.crop_name;
+  const isOverridden = override != null && override !== row.operation.crop_name;
+
+  const onChange = async (next: string) => {
+    const value = next === '' ? null : next;
+    setSaving(true);
+    const { error } = await (supabase.from('field_operations') as any)
+      .update({ crop_name_override: value, updated_at: new Date().toISOString() })
+      .eq('id', row.operation.id);
+    setSaving(false);
+    if (error) {
+      console.error('Failed to save crop override:', error);
+      return;
+    }
+    setOverride(value);
+    row.operation.crop_name_override = value;
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <select
+          autoFocus
+          defaultValue={override ?? ''}
+          disabled={saving}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={() => setEditing(false)}
+          className="px-2 py-1 text-xs bg-slate-800 border border-emerald-500/40 rounded-md text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+        >
+          {CROP_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {saving && <Loader2 className="w-3 h-3 animate-spin text-emerald-500" />}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="group inline-flex items-center gap-1.5 hover:text-emerald-300 transition-colors"
+      title={isOverridden ? `Originally: ${formatCropName(row.operation.crop_name)} (overridden)` : 'Click to override crop type'}
+    >
+      <span>{formatCropName(effective)}</span>
+      {isOverridden && <span className="text-[9px] uppercase tracking-wider text-cyan-400">override</span>}
+      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+    </button>
   );
 }

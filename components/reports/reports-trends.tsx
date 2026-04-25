@@ -5,6 +5,7 @@ import {
   fetchHarvestOperations,
   fetchAnalysisResults,
   buildReportRows,
+  effectiveCropName,
   formatCropName,
   toDryYield,
   type ReportRow,
@@ -53,7 +54,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
 
     const loadCrops = async () => {
       const ops = await fetchHarvestOperations(userId, orgId, [field.jd_field_id], undefined, undefined, 'harvest', hiddenCrops);
-      const crops = Array.from(new Set(ops.map((o) => o.crop_name).filter(Boolean) as string[])).sort();
+      const crops = Array.from(new Set(ops.map((o) => effectiveCropName(o)).filter((c): c is string => !!c))).sort();
       setAvailableCrops(crops);
       if (crops.length > 0 && !crops.includes(selectedCrop)) {
         setSelectedCrop(crops[0]);
@@ -99,7 +100,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
 
         const trends: TrendRow[] = [];
         bySeasonMap.forEach((row, season) => {
-          const cropName = row.operation.crop_name;
+          const cropName = effectiveCropName(row.operation);
           trends.push({
             season,
             irrigatedAcres: row.analysis?.irrigated_acres || row.irrigatedAcres,

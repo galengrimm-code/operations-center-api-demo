@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReportRow, toDryYield } from '@/lib/reports-data';
+import { type ReportRow, effectiveCropName, toDryYield } from '@/lib/reports-data';
 
 interface ReportsSummaryRowProps {
   rows: ReportRow[];
@@ -42,17 +42,17 @@ export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
 
   const avgIrrYield = weightedAvg(
     rows,
-    (r) => toDryYield(r.analysis?.irrigated_yield ?? null, r.analysis?.irrigated_moisture ?? null, r.operation.crop_name),
+    (r) => toDryYield(r.analysis?.irrigated_yield ?? null, r.analysis?.irrigated_moisture ?? null, effectiveCropName(r.operation)),
     (r) => r.analysis?.irrigated_acres || 0,
   );
   const avgDryYield = weightedAvg(
     rows,
-    (r) => toDryYield(r.analysis?.dryland_yield ?? null, r.analysis?.dryland_moisture ?? null, r.operation.crop_name),
+    (r) => toDryYield(r.analysis?.dryland_yield ?? null, r.analysis?.dryland_moisture ?? null, effectiveCropName(r.operation)),
     (r) => r.analysis?.dryland_acres || 0,
   );
   const avgTotalBuAc = weightedAvg(
     rows,
-    (r) => toDryYield(r.operation.avg_yield_value, r.operation.avg_moisture, r.operation.crop_name),
+    (r) => toDryYield(r.operation.avg_yield_value, r.operation.avg_moisture, effectiveCropName(r.operation)),
     (r) => r.totalAcres,
   );
   const avgTotalMst = weightedAvg(
