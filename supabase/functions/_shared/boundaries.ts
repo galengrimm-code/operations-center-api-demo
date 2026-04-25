@@ -12,6 +12,7 @@ export interface JdBoundary {
   workableArea?: JdMeasurement;
   active: boolean;
   irrigated?: boolean;
+  archived?: boolean;
   links?: JdLink[];
 }
 export interface JdClient { id: string; name: string; links?: JdLink[]; }

@@ -60,12 +60,14 @@ async function fetchIrrigatedBoundaries(
       console.log(`[import]   - name="${b.name || '(none)'}" active=${b.active} irrigated=${b.irrigated} area=${b.area?.valueAsDouble?.toFixed(1)} ${b.area?.unit || ''}`);
     }
 
-    // Filter for irrigated boundaries that are NOT the active field boundary.
-    // The active boundary may also be marked irrigated=true, but it represents
-    // the full field — the actual irrigated polygons (pivot circles) are the
-    // inactive boundaries marked irrigated=true.
-    const irrigated = boundaries.filter((b) => b.irrigated === true && b.active !== true);
-    console.log(`[import] Field ${fieldId}: ${irrigated.length} irrigated (non-active) boundaries found`);
+    // Filter for irrigated boundaries that are NOT the active field boundary
+    // and NOT archived. ?recordFilter=all returns historical/archived
+    // boundaries (old pivot shapes from prior years) that JD's UI hides;
+    // including them double-counts irrigated acreage.
+    const irrigated = boundaries.filter(
+      (b) => b.irrigated === true && b.active !== true && b.archived !== true,
+    );
+    console.log(`[import] Field ${fieldId}: ${irrigated.length} irrigated (non-active, non-archived) boundaries found`);
     return irrigated;
   } catch (_) {
     return [];
@@ -562,6 +564,52 @@ Deno.serve(async (req: Request) => {
       }
 
       return jsonResponse({ totalImported, fieldId });
+    }
+
+    // Diagnostic: show ALL boundaries (active + irrigated + others) for a field
+    // so we can see what JD has for fields with bogus irrigated splits.
+    if (action === "debug-field-boundaries") {
+      const fieldId = url.searchParams.get("fieldId");
+      if (!fieldId) {
+        return errorResponse("Missing fieldId parameter", 400);
+      }
+
+      const response = await callJohnDeereApi(
+        accessToken,
+        `/organizations/${orgId}/fields/${fieldId}/boundaries?recordFilter=all`,
+      );
+      if (!response.ok) {
+        return errorResponse(`John Deere API error: ${response.status}`, response.status);
+      }
+      const data = await response.json();
+      const boundaries: JdBoundary[] = data.values || [];
+
+      const summary = boundaries.map((b) => {
+        let polyCount = 0;
+        let totalRings = 0;
+        let totalPoints = 0;
+        for (const p of b.multipolygons || []) {
+          polyCount++;
+          for (const r of p.rings || []) {
+            totalRings++;
+            totalPoints += (r.points || []).length;
+          }
+        }
+        return {
+          id: b.id,
+          name: b.name || null,
+          active: b.active,
+          irrigated: b.irrigated ?? null,
+          area_value: b.area?.valueAsDouble ?? null,
+          area_unit: b.area?.unit ?? null,
+          workable_value: b.workableArea?.valueAsDouble ?? null,
+          polygon_count: polyCount,
+          ring_count: totalRings,
+          point_count: totalPoints,
+        };
+      });
+
+      return jsonResponse({ fieldId, count: boundaries.length, boundaries: summary });
     }
 
     // Diagnostic: show what JD returns for a field's operations
