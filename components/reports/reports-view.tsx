@@ -17,7 +17,8 @@ import type { StoredField } from '@/types/john-deere';
 import { ReportsTable } from './reports-table';
 import { SeedingReportsTable } from './reports-table-seeding';
 import { ReportsTrends } from './reports-trends';
-import { Loader2, FileBarChart, Wheat, Sprout, FlaskConical } from 'lucide-react';
+import { ReportsYieldCharts } from './reports-yield-charts';
+import { Loader2, FileBarChart, Wheat, Sprout, FlaskConical, Table as TableIcon, BarChart3 } from 'lucide-react';
 import { AnalysisRunner } from './analysis-runner';
 import { ReportsExport } from './reports-export';
 import { saveAnalysisResult, deleteAnalysisResult, formatCropName } from '@/lib/reports-data';
@@ -26,6 +27,7 @@ import { processShapefile, classifyHarvestPolygons, classifySeedingPolygons } fr
 import { supabase } from '@/lib/supabase';
 
 type ReportTab = 'harvest' | 'seeding' | 'application';
+type HarvestView = 'table' | 'charts';
 
 const TABS: { id: ReportTab; label: string; icon: typeof Wheat; disabled?: boolean }[] = [
   { id: 'harvest', label: 'Harvest', icon: Wheat },
@@ -40,6 +42,7 @@ export function ReportsView() {
   const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
 
   const [activeTab, setActiveTab] = useState<ReportTab>('harvest');
+  const [harvestView, setHarvestView] = useState<HarvestView>('table');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -413,18 +416,50 @@ export function ReportsView() {
             <div className="space-y-6">
               {activeTab === 'harvest' ? (
                 <>
-                  <ReportsTable
-                    rows={rows}
-                    runningOperationId={runningOperationId}
-                    failedOperationIds={failedOperationIds}
-                    onRunAnalysis={handleRunAnalysis}
-                    onRerunAnalysis={handleRerunAnalysis}
-                  />
-                  <ReportsTrends
-                    userId={user!.id}
-                    orgId={orgId}
-                    irrigatedFields={irrigatedFields}
-                  />
+                  <div className="flex gap-1 p-1 glass rounded-xl w-fit">
+                    {([
+                      { id: 'table', label: 'Table', Icon: TableIcon },
+                      { id: 'charts', label: 'Charts', Icon: BarChart3 },
+                    ] as const).map(({ id, label, Icon }) => {
+                      const isActive = harvestView === id;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setHarvestView(id)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                            ${isActive
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {harvestView === 'table' ? (
+                    <>
+                      <ReportsTable
+                        rows={rows}
+                        runningOperationId={runningOperationId}
+                        failedOperationIds={failedOperationIds}
+                        onRunAnalysis={handleRunAnalysis}
+                        onRerunAnalysis={handleRerunAnalysis}
+                      />
+                      <ReportsTrends
+                        userId={user!.id}
+                        orgId={orgId}
+                        irrigatedFields={irrigatedFields}
+                      />
+                    </>
+                  ) : (
+                    <ReportsYieldCharts
+                      userId={user!.id}
+                      orgId={orgId}
+                      irrigatedFields={irrigatedFields}
+                    />
+                  )}
                 </>
               ) : (
                 <SeedingReportsTable

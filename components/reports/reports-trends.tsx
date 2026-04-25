@@ -5,6 +5,8 @@ import {
   fetchHarvestOperations,
   fetchAnalysisResults,
   buildReportRows,
+  formatCropName,
+  toDryYield,
   type ReportRow,
 } from '@/lib/reports-data';
 import type { StoredField } from '@/types/john-deere';
@@ -29,7 +31,7 @@ interface TrendRow {
   totalAcres: number;
   irrigatedYield: number | null;
   drylandYield: number | null;
-  totalYield: number | null;
+  totalBuAc: number | null;
 }
 
 export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsProps) {
@@ -97,14 +99,15 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
 
         const trends: TrendRow[] = [];
         bySeasonMap.forEach((row, season) => {
+          const cropName = row.operation.crop_name;
           trends.push({
             season,
             irrigatedAcres: row.analysis?.irrigated_acres || row.irrigatedAcres,
             drylandAcres: row.analysis?.dryland_acres || row.drylandAcres,
             totalAcres: row.totalAcres,
-            irrigatedYield: row.analysis?.irrigated_yield ?? null,
-            drylandYield: row.analysis?.dryland_yield ?? null,
-            totalYield: row.operation.avg_yield_value,
+            irrigatedYield: toDryYield(row.analysis?.irrigated_yield ?? null, row.analysis?.irrigated_moisture ?? null, cropName),
+            drylandYield: toDryYield(row.analysis?.dryland_yield ?? null, row.analysis?.dryland_moisture ?? null, cropName),
+            totalBuAc: toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, cropName),
           });
         });
 
@@ -130,12 +133,12 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
 
     let irrYieldSum = 0, irrYieldWeight = 0;
     let dryYieldSum = 0, dryYieldWeight = 0;
-    let totalYieldSum = 0, totalYieldWeight = 0;
+    let totalBuAcSum = 0, totalBuAcWeight = 0;
 
     for (const r of trendRows) {
       if (r.irrigatedYield != null) { irrYieldSum += r.irrigatedYield * r.irrigatedAcres; irrYieldWeight += r.irrigatedAcres; }
       if (r.drylandYield != null) { dryYieldSum += r.drylandYield * r.drylandAcres; dryYieldWeight += r.drylandAcres; }
-      if (r.totalYield != null) { totalYieldSum += r.totalYield * r.totalAcres; totalYieldWeight += r.totalAcres; }
+      if (r.totalBuAc != null) { totalBuAcSum += r.totalBuAc * r.totalAcres; totalBuAcWeight += r.totalAcres; }
     }
 
     return {
@@ -144,7 +147,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
       totalAcres: totalAc / trendRows.length,
       irrigatedYield: irrYieldWeight > 0 ? irrYieldSum / irrYieldWeight : null,
       drylandYield: dryYieldWeight > 0 ? dryYieldSum / dryYieldWeight : null,
-      totalYield: totalYieldWeight > 0 ? totalYieldSum / totalYieldWeight : null,
+      totalBuAc: totalBuAcWeight > 0 ? totalBuAcSum / totalBuAcWeight : null,
     };
   })();
 
@@ -170,7 +173,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
           <label className="block text-xs font-medium text-slate-400 mb-1">Crop</label>
           <select value={selectedCrop} onChange={(e) => setSelectedCrop(e.target.value)} className={selectClass}>
             {availableCrops.length === 0 && <option value="">Select a field first</option>}
-            {availableCrops.map((c) => <option key={c} value={c}>{c}</option>)}
+            {availableCrops.map((c) => <option key={c} value={c}>{formatCropName(c)}</option>)}
           </select>
         </div>
       </div>
@@ -190,7 +193,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
                 <th className="px-4 py-3 text-right">Total Ac</th>
                 <th className="px-4 py-3 text-right">Irr Yield</th>
                 <th className="px-4 py-3 text-right">Dry Yield</th>
-                <th className="px-4 py-3 text-right">Total Yield</th>
+                <th className="px-4 py-3 text-right">Total Bu/Ac</th>
               </tr>
             </thead>
             <tbody>
@@ -202,7 +205,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
                   <td className="px-4 py-3 text-right text-slate-300">{fmt(r.totalAcres)}</td>
                   <td className="px-4 py-3 text-right text-emerald-400">{fmt(r.irrigatedYield)}</td>
                   <td className="px-4 py-3 text-right text-amber-400">{fmt(r.drylandYield)}</td>
-                  <td className="px-4 py-3 text-right text-slate-300">{fmt(r.totalYield)}</td>
+                  <td className="px-4 py-3 text-right text-cyan-400 font-medium">{fmt(r.totalBuAc)}</td>
                 </tr>
               ))}
             </tbody>
@@ -215,7 +218,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
                   <td className="px-4 py-3 text-right">{fmt(avgRow.totalAcres)}</td>
                   <td className="px-4 py-3 text-right text-emerald-400">{fmt(avgRow.irrigatedYield)}</td>
                   <td className="px-4 py-3 text-right text-amber-400">{fmt(avgRow.drylandYield)}</td>
-                  <td className="px-4 py-3 text-right">{fmt(avgRow.totalYield)}</td>
+                  <td className="px-4 py-3 text-right text-cyan-400">{fmt(avgRow.totalBuAc)}</td>
                 </tr>
               </tfoot>
             )}

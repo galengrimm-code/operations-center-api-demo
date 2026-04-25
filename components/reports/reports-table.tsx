@@ -23,7 +23,7 @@ function fmtPct(value: number | null | undefined): string {
   return value.toFixed(1) + '%';
 }
 
-type SortKey = 'field' | 'crop' | 'irrigatedAcres' | 'drylandAcres' | 'totalAcres' | 'irrYield' | 'dryYield' | 'totalYield' | 'dryBuYield';
+type SortKey = 'field' | 'crop' | 'irrigatedAcres' | 'drylandAcres' | 'totalAcres' | 'irrYield' | 'dryYield' | 'totalBuAc';
 type SortDir = 'asc' | 'desc';
 
 function getSortValue(row: ReportRow, key: SortKey): number | string {
@@ -33,10 +33,9 @@ function getSortValue(row: ReportRow, key: SortKey): number | string {
     case 'irrigatedAcres': return row.irrigatedAcres;
     case 'drylandAcres': return row.drylandAcres;
     case 'totalAcres': return row.totalAcres;
-    case 'irrYield': return row.analysis?.irrigated_yield ?? -1;
-    case 'dryYield': return row.analysis?.dryland_yield ?? -1;
-    case 'totalYield': return row.operation.avg_yield_value ?? -1;
-    case 'dryBuYield': return toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, row.operation.crop_name) ?? -1;
+    case 'irrYield': return toDryYield(row.analysis?.irrigated_yield ?? null, row.analysis?.irrigated_moisture ?? null, row.operation.crop_name) ?? -1;
+    case 'dryYield': return toDryYield(row.analysis?.dryland_yield ?? null, row.analysis?.dryland_moisture ?? null, row.operation.crop_name) ?? -1;
+    case 'totalBuAc': return toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, row.operation.crop_name) ?? -1;
     default: return 0;
   }
 }
@@ -113,8 +112,7 @@ export function ReportsTable({
             <SortHeader label="Total Ac" sortKey="totalAcres" align="right" {...hp} />
             <SortHeader label="Irr Yield" sortKey="irrYield" align="right" {...hp} />
             <SortHeader label="Dry Yield" sortKey="dryYield" align="right" {...hp} />
-            <SortHeader label="Dry Bu/Ac" sortKey="dryBuYield" align="right" {...hp} />
-            <SortHeader label="Total Yield" sortKey="totalYield" align="right" {...hp} />
+            <SortHeader label="Total Bu/Ac" sortKey="totalBuAc" align="right" {...hp} />
             <th className="px-4 py-3 text-right">Mst %</th>
             <th className="px-4 py-3 text-center">Action</th>
           </tr>
@@ -125,7 +123,14 @@ export function ReportsTable({
             const isRunning = runningOperationId === opId;
             const isFailed = failedOperationIds.has(opId);
             const hasAnalysis = !!row.analysis;
-            const dryBuYield = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, row.operation.crop_name);
+            const cropName = row.operation.crop_name;
+            const irrYieldDry = hasAnalysis
+              ? toDryYield(row.analysis!.irrigated_yield, row.analysis!.irrigated_moisture, cropName)
+              : null;
+            const dryYieldDry = hasAnalysis
+              ? toDryYield(row.analysis!.dryland_yield, row.analysis!.dryland_moisture, cropName)
+              : null;
+            const totalBuAc = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, cropName);
 
             return (
               <tr
@@ -138,16 +143,13 @@ export function ReportsTable({
                 <td className="px-4 py-3 text-right text-amber-400">{fmt(row.drylandAcres)}</td>
                 <td className="px-4 py-3 text-right text-slate-300">{fmt(row.totalAcres)}</td>
                 <td className="px-4 py-3 text-right text-emerald-400">
-                  {hasAnalysis ? fmt(row.analysis!.irrigated_yield) : '--'}
+                  {hasAnalysis ? fmt(irrYieldDry) : '--'}
                 </td>
                 <td className="px-4 py-3 text-right text-amber-400">
-                  {hasAnalysis ? fmt(row.analysis!.dryland_yield) : '--'}
+                  {hasAnalysis ? fmt(dryYieldDry) : '--'}
                 </td>
                 <td className="px-4 py-3 text-right text-cyan-400 font-medium">
-                  {fmt(dryBuYield)}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-300">
-                  {fmt(row.operation.avg_yield_value)}
+                  {fmt(totalBuAc)}
                 </td>
                 <td className="px-4 py-3 text-right text-slate-400">
                   {fmtPct(row.operation.avg_moisture)}

@@ -10,24 +10,30 @@ export function generateCSV(rows: ReportRow[], season: string): string {
     'Field', 'Crop', 'Season',
     'Irrigated Acres', 'Dryland Acres', 'Total Acres',
     'Irrigated Yield (bu/ac)', 'Dryland Yield (bu/ac)',
-    'Dry Bu/Ac', 'Total Yield (bu/ac)', 'Moisture %',
+    'Total Bu/Ac', 'Moisture %',
   ];
 
   const csvRows = [headers.join(',')];
 
   for (const row of rows) {
-    const dryBu = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, row.operation.crop_name);
+    const cropName = row.operation.crop_name;
+    const irrYieldDry = row.analysis
+      ? toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, cropName)
+      : null;
+    const dryYieldDry = row.analysis
+      ? toDryYield(row.analysis.dryland_yield, row.analysis.dryland_moisture, cropName)
+      : null;
+    const totalBuAc = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, cropName);
     csvRows.push([
       `"${row.field.name}"`,
-      formatCropName(row.operation.crop_name),
+      formatCropName(cropName),
       row.operation.crop_season || season,
       fmt(row.irrigatedAcres),
       fmt(row.drylandAcres),
       fmt(row.totalAcres),
-      row.analysis ? fmt(row.analysis.irrigated_yield) : '',
-      row.analysis ? fmt(row.analysis.dryland_yield) : '',
-      fmt(dryBu),
-      fmt(row.operation.avg_yield_value),
+      fmt(irrYieldDry),
+      fmt(dryYieldDry),
+      fmt(totalBuAc),
       fmt(row.operation.avg_moisture),
     ].join(','));
   }
@@ -47,18 +53,24 @@ export function downloadCSV(csv: string, filename: string): void {
 
 export function generatePDFHtml(rows: ReportRow[], season: string, title: string): string {
   const tableRows = rows.map((row) => {
-    const dryBu = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, row.operation.crop_name);
+    const cropName = row.operation.crop_name;
+    const irrYieldDry = row.analysis
+      ? toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, cropName)
+      : null;
+    const dryYieldDry = row.analysis
+      ? toDryYield(row.analysis.dryland_yield, row.analysis.dryland_moisture, cropName)
+      : null;
+    const totalBuAc = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, cropName);
     return `
     <tr>
       <td>${row.field.name}</td>
-      <td>${formatCropName(row.operation.crop_name)}</td>
+      <td>${formatCropName(cropName)}</td>
       <td style="text-align:right">${fmt(row.irrigatedAcres)}</td>
       <td style="text-align:right">${fmt(row.drylandAcres)}</td>
       <td style="text-align:right">${fmt(row.totalAcres)}</td>
-      <td style="text-align:right">${row.analysis ? fmt(row.analysis.irrigated_yield) : '--'}</td>
-      <td style="text-align:right">${row.analysis ? fmt(row.analysis.dryland_yield) : '--'}</td>
-      <td style="text-align:right;font-weight:bold">${fmt(dryBu)}</td>
-      <td style="text-align:right">${fmt(row.operation.avg_yield_value)}</td>
+      <td style="text-align:right">${row.analysis ? fmt(irrYieldDry) : '--'}</td>
+      <td style="text-align:right">${row.analysis ? fmt(dryYieldDry) : '--'}</td>
+      <td style="text-align:right;font-weight:bold">${fmt(totalBuAc)}</td>
       <td style="text-align:right">${row.operation.avg_moisture != null ? fmt(row.operation.avg_moisture, 1) + '%' : '--'}</td>
     </tr>
   `;
@@ -88,7 +100,7 @@ export function generatePDFHtml(rows: ReportRow[], season: string, title: string
         <th>Field</th><th>Crop</th>
         <th style="text-align:right">Irr Ac</th><th style="text-align:right">Dry Ac</th><th style="text-align:right">Total Ac</th>
         <th style="text-align:right">Irr Yield</th><th style="text-align:right">Dry Yield</th>
-        <th style="text-align:right">Dry Bu/Ac</th><th style="text-align:right">Total Yield</th>
+        <th style="text-align:right">Total Bu/Ac</th>
         <th style="text-align:right">Mst %</th>
       </tr>
     </thead>

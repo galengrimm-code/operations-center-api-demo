@@ -42,20 +42,15 @@ export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
 
   const avgIrrYield = weightedAvg(
     rows,
-    (r) => r.analysis?.irrigated_yield,
+    (r) => toDryYield(r.analysis?.irrigated_yield ?? null, r.analysis?.irrigated_moisture ?? null, r.operation.crop_name),
     (r) => r.analysis?.irrigated_acres || 0,
   );
   const avgDryYield = weightedAvg(
     rows,
-    (r) => r.analysis?.dryland_yield,
+    (r) => toDryYield(r.analysis?.dryland_yield ?? null, r.analysis?.dryland_moisture ?? null, r.operation.crop_name),
     (r) => r.analysis?.dryland_acres || 0,
   );
-  const avgTotalYield = weightedAvg(
-    rows,
-    (r) => r.operation.avg_yield_value,
-    (r) => r.totalAcres,
-  );
-  const avgDryBuYield = weightedAvg(
+  const avgTotalBuAc = weightedAvg(
     rows,
     (r) => toDryYield(r.operation.avg_yield_value, r.operation.avg_moisture, r.operation.crop_name),
     (r) => r.totalAcres,
@@ -76,8 +71,7 @@ export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
         <td className="px-4 py-3 text-right">{fmt(totalAc)}</td>
         <td className="px-4 py-3 text-right text-emerald-400">{fmt(avgIrrYield)}</td>
         <td className="px-4 py-3 text-right text-amber-400">{fmt(avgDryYield)}</td>
-        <td className="px-4 py-3 text-right text-cyan-400">{fmt(avgDryBuYield)}</td>
-        <td className="px-4 py-3 text-right">{fmt(avgTotalYield)}</td>
+        <td className="px-4 py-3 text-right text-cyan-400">{fmt(avgTotalBuAc)}</td>
         <td className="px-4 py-3 text-right">{fmtPct(avgTotalMst)}</td>
         <td className="px-4 py-3"></td>
       </tr>
