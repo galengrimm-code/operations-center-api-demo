@@ -18,7 +18,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { BarChart3, Loader2 } from 'lucide-react';
+import { BarChart3, Loader2, TrendingUp, Trophy, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
 interface ReportsYieldChartsProps {
@@ -31,6 +31,41 @@ interface ChartPoint {
   season: string;
   irrigated: number | null;
   dryland: number | null;
+}
+
+// Only chart the major harvested grain crops. Cover crops, grasses, etc.
+// produce noisy single-year panels that aren't useful here.
+const CHART_CROPS = new Set(['CORN_WET', 'CORN_EURO', 'SOYBEANS']);
+
+interface CropStats {
+  avgDiff: number | null;
+  bestYear: { season: string; yield: number } | null;
+  biggestGap: { season: string; diff: number } | null;
+}
+
+function computeStats(points: ChartPoint[]): CropStats {
+  const diffs: number[] = [];
+  let bestYear: { season: string; yield: number } | null = null;
+  let biggestGap: { season: string; diff: number } | null = null;
+
+  for (const p of points) {
+    if (p.irrigated != null && p.dryland != null) {
+      const d = p.irrigated - p.dryland;
+      diffs.push(d);
+      if (!biggestGap || d > biggestGap.diff) {
+        biggestGap = { season: p.season, diff: d };
+      }
+    }
+    if (p.irrigated != null && (!bestYear || p.irrigated > bestYear.yield)) {
+      bestYear = { season: p.season, yield: p.irrigated };
+    }
+  }
+
+  return {
+    avgDiff: diffs.length > 0 ? diffs.reduce((a, b) => a + b, 0) / diffs.length : null,
+    bestYear,
+    biggestGap,
+  };
 }
 
 export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYieldChartsProps) {
@@ -65,6 +100,7 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
           const crop = op.crop_name;
           const season = op.crop_season;
           if (!crop || !season) continue;
+          if (!CHART_CROPS.has(crop)) continue;
 
           const irrYieldDry = toDryYield(r.irrigated_yield, r.irrigated_moisture, crop);
           const dryYieldDry = toDryYield(r.dryland_yield, r.dryland_moisture, crop);
@@ -141,7 +177,9 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {cropEntries.map(([crop, points]) => (
+        {cropEntries.map(([crop, points]) => {
+          const stats = computeStats(points);
+          return (
           <div key={crop} className="glass rounded-xl p-6">
             <h4 className="text-base font-semibold text-white mb-4">{formatCropName(crop)}</h4>
             <ResponsiveContainer width="100%" height={280}>
@@ -179,8 +217,39 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
                 />
               </LineChart>
             </ResponsiveContainer>
+
+            <div className="mt-4 pt-4 border-t border-white/[0.05] grid grid-cols-3 gap-3">
+              <div className="flex items-start gap-2">
+                <TrendingUp className="w-3.5 h-3.5 text-cyan-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Avg Irr Bonus</div>
+                  <div className="text-sm font-mono-data text-cyan-300">
+                    {stats.avgDiff != null ? `${stats.avgDiff >= 0 ? '+' : ''}${stats.avgDiff.toFixed(1)} bu` : '—'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Trophy className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Best Year</div>
+                  <div className="text-sm font-mono-data text-emerald-300">
+                    {stats.bestYear ? `${stats.bestYear.season} · ${stats.bestYear.yield.toFixed(1)} bu` : '—'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Biggest Gap</div>
+                  <div className="text-sm font-mono-data text-amber-300">
+                    {stats.biggestGap ? `${stats.biggestGap.season} · ${stats.biggestGap.diff >= 0 ? '+' : ''}${stats.biggestGap.diff.toFixed(1)} bu` : '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );
