@@ -144,8 +144,8 @@ function buildPrintHtml(
 <head>
   <title>Yield Report — ${today}</title>
   <style>
-    @page { margin: 0.5in; }
-    body { font-family: -apple-system, Arial, sans-serif; color: #111827; margin: 0; padding: 24px; }
+    @page { margin: 0; size: auto; }
+    body { font-family: -apple-system, Arial, sans-serif; color: #111827; margin: 0; padding: 0.5in 0.6in; }
     h1 { font-size: 22px; margin: 0 0 4px; }
     .subtitle { font-size: 12px; color: #6b7280; margin-bottom: 24px; }
     section.crop { page-break-inside: avoid; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
@@ -163,7 +163,10 @@ function buildPrintHtml(
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th, td { border: 1px solid #e5e7eb; padding: 5px 8px; }
     th { background: #f3f4f6; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #4b5563; }
-    @media print { body { padding: 0; } }
+    @media print {
+      body { padding: 0.5in 0.6in; }
+      section.crop { page-break-inside: avoid; }
+    }
   </style>
 </head>
 <body>
