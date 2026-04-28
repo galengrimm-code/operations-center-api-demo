@@ -54,6 +54,13 @@ export default function OperationsPage() {
   const preferredUnit = johnDeereConnection?.preferred_area_unit || 'ac';
   const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
 
+  // useFields() already applies the global farm filter. Use the resulting
+  // jd_field_id set to filter operations down to the active farm.
+  const allowedFieldIds = useMemo(
+    () => new Set(fields.map((f) => f.jd_field_id)),
+    [fields]
+  );
+
   useEffect(() => {
     if (johnDeereConnection?.selected_org_id && activeTab !== 'irrigation') loadOps();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,6 +79,16 @@ export default function OperationsPage() {
     }
   };
 
+  // Apply the global farm filter on the rendered operations. We don't filter
+  // setOperations directly so toggling the global filter doesn't refetch.
+  const visibleOperations = useMemo(() => {
+    // No filter active = no fields loaded yet OR no farm selected.
+    // useFields returns ALL fields when no farm is selected, so the set will
+    // contain every jd_field_id and the filter is a no-op.
+    if (allowedFieldIds.size === 0) return operations;
+    return operations.filter((op) => allowedFieldIds.has(op.jd_field_id));
+  }, [operations, allowedFieldIds]);
+
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -85,19 +102,19 @@ export default function OperationsPage() {
   };
 
   const fieldGroups = useMemo(() => {
-    return operations.reduce((acc, op) => {
+    return visibleOperations.reduce((acc, op) => {
       const key = op.jd_field_id;
       if (!acc[key]) acc[key] = [];
       acc[key].push(op);
       return acc;
     }, {} as Record<string, StoredFieldOperation[]>);
-  }, [operations]);
+  }, [visibleOperations]);
 
   const fieldEntries = Object.entries(fieldGroups);
 
   const subtitleText = activeTab === 'irrigation'
     ? 'Irrigated vs dryland analysis'
-    : `${operations.length} ${activeTab === 'harvest' ? 'harvest' : 'planting'} operations`;
+    : `${visibleOperations.length} ${activeTab === 'harvest' ? 'harvest' : 'planting'} operations`;
 
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">
@@ -152,7 +169,7 @@ export default function OperationsPage() {
         {/* Harvest/Planting content */}
         {activeTab !== 'irrigation' && (
           <>
-            {loading && operations.length === 0 ? (
+            {loading && visibleOperations.length === 0 ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
               </div>
@@ -160,7 +177,7 @@ export default function OperationsPage() {
               <div className="glass rounded-xl p-4 border-red-500/20 bg-red-500/10">
                 <p className="text-sm text-red-400">{error}</p>
               </div>
-            ) : operations.length === 0 ? (
+            ) : visibleOperations.length === 0 ? (
               <div className="text-center py-20">
                 {activeTab === 'harvest' ? (
                   <Wheat className="w-10 h-10 text-slate-600 mx-auto mb-3" />

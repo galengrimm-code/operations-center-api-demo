@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Map, Grid3X3, BarChart3, FileBarChart } from 'lucide-react';
+import { Map, Grid3X3, BarChart3, FileBarChart, TrendingUp } from 'lucide-react';
 
 const links = [
   { href: '/map', label: 'Map', icon: Map },
   { href: '/fields', label: 'Fields', icon: Grid3X3 },
   { href: '/operations', label: 'Operations', icon: BarChart3 },
+  { href: '/progress', label: 'Progress', icon: TrendingUp },
   { href: '/reports', label: 'Reports', icon: FileBarChart },
 ];
 

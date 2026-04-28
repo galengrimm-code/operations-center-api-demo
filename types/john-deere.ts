@@ -177,6 +177,20 @@ export interface HarvestIrrigationAnalysis extends IrrigationAnalysis {
   drylandAvgMoisture: number | null;
 }
 
+export interface FieldSeason {
+  id: string;
+  user_id: string;
+  field_id: string;
+  season_year: number;
+  intended_crop: string | null;
+  intended_acres: number | null;
+  planted_date: string | null;
+  planted_acres: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface IrrigationAnalysisResult {
   id: string;
   user_id: string;
