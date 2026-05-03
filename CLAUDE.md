@@ -91,24 +91,16 @@ SUPABASE_SERVICE_ROLE_KEY     (auto-injected)
 
 | Severity | Category | Confidence | Description |
 |----------|----------|------------|-------------|
-| P1 | npm-cve-critical | 1.00 | Next.js 13.5.1 has critical Authorization Bypass CVE (GHSA-f82v-jwr5-mffw, CVSS 9.1) — fix available with `npm audit fix` to 13.5.11 (no breaking change). 18 vulnerabilities total: 1 critical, 8 high, 9 moderate. Upgrade path: 13.5.11 patches all known Next.js CVEs without major version bump. |
+| P1 | npm-cve-critical | 1.00 | Next.js 13.5.1 still has critical Authorization Bypass CVE (GHSA-f82v-jwr5-mffw, CVSS 9.1) — `npm audit fix` (without --force) was applied 2026-05-02 and resolved 12 of 18 CVEs, but the Next.js 13.5.1 → 13.5.11 patch bump requires `npm audit fix --force` because package.json pins `"next": "13.5.1"` (exact pin, no caret). 6 vulnerabilities remain (1 critical, 3 high, 2 moderate) — all in Next.js or its bundled deps (postcss, zod). Recommended next step: bump pin to `"next": "^13.5.11"` then `npm install`, or run `npm audit fix --force` after confirming. |
 | P1 | cors-open | 1.00 | CORS wildcard (`Access-Control-Allow-Origin: *`) on ALL 4 edge functions in `_shared/cors.ts`. Confirmed serving on deployed surface (`curl -I https://operations-center-api-demo.vercel.app` returns `Access-Control-Allow-Origin: *`). Any origin can make cross-origin requests to authenticated endpoints. |
 | P2 | error-response-leakage | 1.00 | All 4 edge functions forward `error.message` to HTTP responses. `john-deere-import` also returns `error.stack` (lines 656). `john-deere-irrigation` returns full JD response body + internal URL (lines 240-245). |
 | P3 | no-input-validation | 0.95 | No Zod/schema validation on request bodies in any edge function — `req.json()` parsed and used directly in `john-deere-auth/index.ts:20`, `john-deere-api/index.ts:41`. |
 | P3 | no-rate-limiting | 0.95 | No rate limiting on any edge function endpoint. Notable risk: shapefile polling (`john-deere-irrigation` `shapefile-status`) issues paid JD API calls per request. |
-| P3 | missing-csp | 1.00 | No Content-Security-Policy header in `next.config.js` or middleware. Verified missing on deployed surface. |
 | P3 | route-protection-gap | 0.90 | Auth protection is client-side only (`useEffect` redirect in `(app)` pages). No `middleware.ts` for server-side route protection — page HTML loads before client-side redirect. |
 | P3 | oauth-broad-scopes | 0.85 | John Deere OAuth requests `ag1 ag2 ag3 org1 org2 work1 work2 offline_access` (`lib/john-deere-client.ts:273`) — full read/write across all four ag scopes when current functionality only reads fields/operations. Trim to read-only scopes (`ag1 org1 work1 offline_access`) unless write is required. |
 | P4 | formatting-inconsistency | 1.00 | 129 files need Prettier formatting (`npx prettier --check .` reported "Code style issues found in 129 files"). No `.prettierrc` config found. |
-| P4 | missing-env-example | 1.00 | No `.env.example` or `.env.local.example` file (README references `cp .env.local.example .env.local` — file is missing). |
-| P4 | missing-x-content-type | 1.00 | Missing `X-Content-Type-Options: nosniff` header on deployed surface. |
-| P4 | missing-x-frame | 1.00 | Missing `X-Frame-Options` header on deployed surface (clickjacking risk). |
-| P4 | missing-referrer-policy | 1.00 | Missing `Referrer-Policy` header on deployed surface. |
 | P4 | file-over-500 | 1.00 | `supabase/functions/john-deere-import/index.ts` is now 658 lines (was 610 last scan, growing). `app/(app)/progress/page.tsx` is 614 lines. |
-| P4 | debug-logging | 1.00 | Auth token partial values logged in production: `lib/john-deere-client.ts:12` (Supabase access token first 20 chars), `john-deere-irrigation/index.ts:183` (JD access token first 30), `john-deere-import/index.ts:447,467` (auth header first 30, token length). |
-| P4 | npm-cve-moderate | 1.00 | 9 moderate npm CVEs (postcss XSS via stringify, zod ReDoS, ajv ReDoS, nanoid predictable, lodash prototype pollution, etc.). All have fixes available. |
-| P4 | no-security-contact | 1.00 | No `/.well-known/security.txt` on deployed surface (returns 404). |
-| P4 | missing-robots-txt | 1.00 | No `/robots.txt` on deployed surface (returns 404). |
+| P4 | npm-cve-residual | 1.00 | 6 vulnerabilities remain after `npm audit fix` (1 critical, 3 high, 2 moderate) — all blocked by the strict `next@13.5.1` pin. See `npm-cve-critical` row above for fix path. |
 
 ### Watch List (confidence < 0.8)
 
@@ -122,6 +114,15 @@ _None_
 
 | Date | Category | Note |
 |---|---|---|
+| 2026-05-02 | missing-csp | Added Content-Security-Policy via `next.config.js` `headers()` — allows mapbox + supabase + JD origins, frame-ancestors 'none', form-action limited to self + JD signin. |
+| 2026-05-02 | missing-x-frame | Added `X-Frame-Options: DENY` via `next.config.js` `headers()`. |
+| 2026-05-02 | missing-x-content-type | Added `X-Content-Type-Options: nosniff` via `next.config.js` `headers()`. |
+| 2026-05-02 | missing-referrer-policy | Added `Referrer-Policy: strict-origin-when-cross-origin` via `next.config.js` `headers()`. Permissions-Policy added at the same time. |
+| 2026-05-02 | no-security-contact | Added `public/.well-known/security.txt` with mailto:galengrimm@gmail.com, expires 2027-12-31. |
+| 2026-05-02 | missing-robots-txt | Added `public/robots.txt` (allow all). |
+| 2026-05-02 | missing-env-example | Added `.env.local.example` listing the 4 NEXT_PUBLIC_* var names without values. |
+| 2026-05-02 | debug-logging | Removed partial-token console logs in `lib/john-deere-client.ts:12`, `supabase/functions/john-deere-irrigation/index.ts:183`, `supabase/functions/john-deere-import/index.ts:447,467`. |
+| 2026-05-02 | npm-cve-moderate | `npm audit fix` (no --force) bumped 16 transitive deps and resolved 12 of 18 CVEs (postcss, zod, ajv, nanoid, lodash, brace-expansion, minimatch, glob, cross-spawn, flatted, yaml, picomatch, protocol-buffers-schema, js-yaml, @babel/runtime). Remaining 6 are bundled inside next@13.5.1 and require the Next bump. |
 | 2026-05-01 | missing-hsts | Now served on deployed surface: `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (Vercel default). |
 
 ## Guardrails
@@ -143,13 +144,12 @@ _None_
 - **Errors:** Edge function catch blocks must return generic messages only — log full errors server-side, never forward `error.message` or `error.stack` to HTTP responses (currently happens in all 4 functions).
 - **Rate limiting:** Add rate limiting to any new edge function endpoints (especially anything that triggers paid JD API calls).
 - **Input validation:** All edge function request bodies must be validated with Zod before use.
-- **Debug logs:** Remove all auth token logging before production deploy (`john-deere-client.ts:12`, `irrigation/index.ts:183`, `import/index.ts:447,467`).
-- **Security headers:** Add CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy via `next.config.js` `headers()` — HSTS is already provided by Vercel.
+- **Debug logs:** Resolved 2026-05-02 — partial token logs removed. Keep new `console.log` calls free of token/secret material.
+- **Security headers:** Resolved 2026-05-02 via `next.config.js` `headers()` (CSP, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy). HSTS comes from Vercel.
 - **Server-side auth:** Add `middleware.ts` at the project root using `@supabase/ssr` to protect authenticated routes server-side.
 - **OAuth scopes:** Drop `ag2 ag3 org2 work2` from `getJohnDeereAuthUrl` until write is needed — broader scopes than current features require.
 - **Do not add to `supabase/functions/john-deere-import/index.ts`** (658 lines) — split into per-action modules before adding features.
-- **Create `.env.local.example`** — README references it; users hit a missing-file error.
-- **Run `npm audit fix`** to bump Next.js to 13.5.11 — patches the critical auth-bypass CVE without a major version bump.
+- **Next.js bump still pending:** package.json pins `"next": "13.5.1"` exactly. Bump pin to `^13.5.11` (or run `npm audit fix --force` after confirming) to clear the critical auth-bypass CVE and the 5 other Next-bundled CVEs.
 
 <!-- SCAN:AUTO:END -->
 
