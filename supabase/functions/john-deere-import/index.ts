@@ -444,7 +444,6 @@ Deno.serve(async (req: Request) => {
   try {
     console.log("[import] Request method:", req.method);
     console.log("[import] Auth header present:", !!req.headers.get("Authorization"));
-    console.log("[import] Auth header value (first 30):", req.headers.get("Authorization")?.substring(0, 30));
 
     const authResult = await getAuthenticatedUser(req);
     console.log("[import] authResult type:", typeof authResult, "isResponse:", isResponse(authResult));
@@ -464,7 +463,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const accessToken = await getValidToken(supabase, connection);
-    console.log("[import] Got valid token, length:", accessToken.length);
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 

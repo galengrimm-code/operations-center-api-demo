@@ -180,7 +180,6 @@ Deno.serve(async (req: Request) => {
 
       const shapefileUrl = `${JOHN_DEERE_API_BASE}/fieldOps/${operationId}?shapeType=Polygon&resolution=EachSensor`;
       console.log(`[irrigation] Requesting shapefile from: ${shapefileUrl}`);
-      console.log(`[irrigation] Token (first 30): ${accessToken.substring(0, 30)}...`);
 
       const response = await fetch(shapefileUrl, {
         headers: {

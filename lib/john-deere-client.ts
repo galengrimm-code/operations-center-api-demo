@@ -9,7 +9,6 @@ async function getAuthHeaders() {
   if (!session) {
     throw new Error('Not authenticated');
   }
-  console.log('[john-deere-client] Access token (first 20 chars):', session.access_token.substring(0, 20) + '...');
   return {
     'Authorization': `Bearer ${session.access_token}`,
     'apikey': SUPABASE_ANON_KEY,
