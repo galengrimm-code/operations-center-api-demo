@@ -6,6 +6,7 @@ import { useClientFilter } from '@/contexts/client-filter-context';
 import {
   loadSeasonProgress,
   seriesKey,
+  seriesKeyAcres,
   type SeasonProgress,
   type FieldProgressRow,
 } from '@/lib/season-progress';
@@ -267,7 +268,8 @@ function ChartTooltip({
             </div>
             <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 pl-3.5">
               {yearsIncluded.map((y) => {
-                const v = Number(point[seriesKey(crop, y)] ?? 0);
+                const pctVal = Number(point[seriesKey(crop, y)] ?? 0);
+                const acVal = Number(point[seriesKeyAcres(crop, y)] ?? 0);
                 return (
                   <span key={y} className="contents">
                     <span className={y === activeYear ? 'text-slate-200' : 'text-slate-500'}>
@@ -278,7 +280,7 @@ function ChartTooltip({
                         y === activeYear ? 'text-slate-200' : 'text-slate-500'
                       }`}
                     >
-                      {fmtAcres(v)} ac
+                      {pctVal.toFixed(0)}% <span className="opacity-60">({fmtAcres(acVal)} ac)</span>
                     </span>
                   </span>
                 );
@@ -310,9 +312,9 @@ function CumulativeChart({ data }: { data: SeasonProgress }) {
     <div className="glass rounded-xl p-5 mb-6">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-white">Cumulative acres planted</h3>
+          <h3 className="text-sm font-semibold text-white">Planting pace</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            {data.year} solid · prior years dashed for pace comparison
+            % of season · {data.year} vs target, prior years vs that year&rsquo;s realized total
           </p>
         </div>
         <div className="flex items-center gap-3 text-xs flex-wrap justify-end">
@@ -349,7 +351,8 @@ function CumulativeChart({ data }: { data: SeasonProgress }) {
             <YAxis
               stroke="#64748b"
               fontSize={11}
-              tickFormatter={(v) => `${(v as number).toLocaleString()}`}
+              domain={[0, (max: number) => Math.max(100, Math.ceil(max / 10) * 10)]}
+              tickFormatter={(v) => `${v}%`}
             />
             <Tooltip
               content={

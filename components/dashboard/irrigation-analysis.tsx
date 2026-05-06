@@ -315,10 +315,10 @@ export function IrrigationAnalysis({ fields, preferredUnit }: Props) {
             fieldName: '',
           }));
 
-        const harvestOpsRaw = (harvestData.operations || []) as Array<{ jd_operation_id: string; start_date?: string | null; crop_name?: string | null }>;
-        const seedingOpsRaw = (seedingData.operations || []) as Array<{ jd_operation_id: string; start_date?: string | null; crop_name?: string | null }>;
-        setHarvestOps(toOpEntry(harvestOpsRaw.filter((op) => !op.crop_name || !hiddenCrops.includes(op.crop_name))));
-        setSeedingOps(toOpEntry(seedingOpsRaw.filter((op) => !op.crop_name || !hiddenCrops.includes(op.crop_name))));
+        const harvestOpsRaw = (harvestData.operations || []) as Array<{ jd_operation_id: string; start_date: string | null; crop_name: string | null }>;
+        const seedingOpsRaw = (seedingData.operations || []) as Array<{ jd_operation_id: string; start_date: string | null; crop_name: string | null }>;
+        setHarvestOps(toOpEntry(filterHiddenOperations(harvestOpsRaw, hiddenCrops)));
+        setSeedingOps(toOpEntry(filterHiddenOperations(seedingOpsRaw, hiddenCrops)));
       } catch (_) {
         // Non-critical
       } finally {

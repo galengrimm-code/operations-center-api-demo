@@ -1,22 +1,32 @@
 /**
  * Global crop filter. User can hide certain crop names (cover crops like
  * RYE, GRASSLAND, etc.) from all views by managing a list on their connection.
+ *
+ * Crops in GLOBALLY_EXCLUDED_CROPS are *always* hidden — not user-toggleable.
+ * Treat these as off the platform entirely.
  */
+export const GLOBALLY_EXCLUDED_CROPS = ['RYE'] as const;
+
+function mergedHidden(hidden: string[] | null | undefined): Set<string> {
+  const set = new Set<string>(GLOBALLY_EXCLUDED_CROPS);
+  (hidden || []).forEach((c) => set.add(c));
+  return set;
+}
 
 export function isCropHidden(
   cropName: string | null | undefined,
   hidden: string[] | null | undefined,
 ): boolean {
-  if (!cropName || !hidden || hidden.length === 0) return false;
-  return hidden.includes(cropName);
+  if (!cropName) return false;
+  return mergedHidden(hidden).has(cropName);
 }
 
 export function filterHiddenOperations<T extends { crop_name: string | null }>(
   items: T[],
   hidden: string[] | null | undefined,
 ): T[] {
-  if (!hidden || hidden.length === 0) return items;
-  return items.filter((it) => !isCropHidden(it.crop_name, hidden));
+  const merged = mergedHidden(hidden);
+  return items.filter((it) => !it.crop_name || !merged.has(it.crop_name));
 }
 
 /**

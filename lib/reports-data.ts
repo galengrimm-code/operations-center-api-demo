@@ -1,8 +1,12 @@
 import { supabase } from './supabase';
 import { convertArea } from './area-utils';
+import { GLOBALLY_EXCLUDED_CROPS } from './crop-filter';
 import turfArea from '@turf/area';
 import turfIntersect from '@turf/intersect';
 import type { StoredField, StoredFieldOperation, IrrigationAnalysisResult } from '@/types/john-deere';
+
+const mergedHiddenList = (user: string[]): string[] =>
+  Array.from(new Set<string>([...GLOBALLY_EXCLUDED_CROPS, ...user]));
 
 export interface ReportRow {
   field: StoredField;
@@ -91,12 +95,11 @@ export async function fetchHarvestOperations(
   if (error) throw new Error(`Failed to load operations: ${(error as any).message}`);
   let rows = (data as StoredFieldOperation[]) || [];
   if (cropName) rows = rows.filter((r) => effectiveCropName(r) === cropName);
-  if (hiddenCrops.length > 0) {
-    rows = rows.filter((r) => {
-      const eff = effectiveCropName(r);
-      return !eff || !hiddenCrops.includes(eff);
-    });
-  }
+  const merged = mergedHiddenList(hiddenCrops);
+  rows = rows.filter((r) => {
+    const eff = effectiveCropName(r);
+    return !eff || !merged.includes(eff);
+  });
   return rows;
 }
 
@@ -139,9 +142,10 @@ export async function fetchAvailableCrops(
 
   if (error) return [];
   const rows = (data || []) as Array<{ crop_name: string | null; crop_name_override: string | null }>;
+  const merged = mergedHiddenList(hiddenCrops);
   const crops = Array.from(new Set(
     rows.map((d) => effectiveCropName(d)).filter((c): c is string => !!c),
-  )).filter((c) => !hiddenCrops.includes(c));
+  )).filter((c) => !merged.includes(c));
   return crops.sort();
 }
 

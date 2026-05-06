@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { convertArea } from '@/lib/area-utils';
+import { GLOBALLY_EXCLUDED_CROPS } from '@/lib/crop-filter';
 import type { StoredField, StoredFieldOperation, FieldSeason } from '@/types/john-deere';
 
 export interface FieldProgressRow {
@@ -25,6 +26,10 @@ export interface CropProgress {
 // monthDay = "MM-DD" so all years share the same x-axis. Recharts plots each
 // `${crop}__${year}` series as its own line; the page styles current-year
 // crops as filled areas and prior-year crops as faded reference lines.
+//
+// Values are *percentages* (0-100, one decimal): current year normalized to
+// target, prior years normalized to that year's realized total. Raw acres
+// are kept under `${seriesKey}_ac` for the tooltip.
 export interface CumulativePoint {
   monthDay: string;
   [seriesKey: string]: number | string;
@@ -74,6 +79,7 @@ const monthDayKey = (iso: string | null): string | null => {
 };
 
 export const seriesKey = (crop: string, year: number): string => `${crop}__${year}`;
+export const seriesKeyAcres = (crop: string, year: number): string => `${crop}__${year}__ac`;
 
 export async function loadSeasonProgress(opts: {
   userId: string;
@@ -84,7 +90,10 @@ export async function loadSeasonProgress(opts: {
   priorYears?: number;
 }): Promise<SeasonProgress> {
   const { userId, orgId, year, hiddenCrops = [], farmFilter = null, priorYears = 2 } = opts;
-  const hidden = new Set(hiddenCrops.map((c) => c.toUpperCase()));
+  const hidden = new Set<string>([
+    ...hiddenCrops.map((c) => c.toUpperCase()),
+    ...GLOBALLY_EXCLUDED_CROPS,
+  ]);
 
   const yearsIncluded: number[] = [];
   for (let i = 0; i <= priorYears; i++) yearsIncluded.push(year - i);
@@ -136,7 +145,13 @@ export async function loadSeasonProgress(opts: {
   seasons.forEach((s) => seasonByField.set(s.field_id, s));
 
   // For the current-year fields table: keep largest seeding op per field (current year only).
-  const currentYearOps = ops.filter((op) => op.crop_season === String(year));
+  // Skip ops whose crop is hidden (incl. globals like RYE) so RYE-only fields show
+  // as unplanted rather than "200 ac of nothing."
+  const currentYearOps = ops.filter((op) => {
+    if (op.crop_season !== String(year)) return false;
+    const c = normalizeCrop(op.crop_name_override || op.crop_name);
+    return !!c && !hidden.has(c);
+  });
   const opByField = new Map<string, typeof ops[number]>();
   currentYearOps.forEach((op) => {
     const existing = opByField.get(op.jd_field_id);
@@ -149,8 +164,10 @@ export async function loadSeasonProgress(opts: {
     const season = seasonByField.get(f.id);
     const op = opByField.get(f.jd_field_id);
 
-    const cropFromSeason = normalizeCrop(season?.intended_crop);
-    const cropFromOp = normalizeCrop(op?.crop_name_override || op?.crop_name);
+    const cfs = normalizeCrop(season?.intended_crop);
+    const cfo = normalizeCrop(op?.crop_name_override || op?.crop_name);
+    const cropFromSeason = cfs && !hidden.has(cfs) ? cfs : null;
+    const cropFromOp = cfo && !hidden.has(cfo) ? cfo : null;
     const crop = cropFromSeason || cropFromOp;
 
     const target =
@@ -268,7 +285,24 @@ export async function loadSeasonProgress(opts: {
   });
   const sortedMonthDays = Array.from(allMonthDays).sort();
 
-  // Running totals per (year, crop)
+  // Denominators per (crop, year):
+  //   - Prior years: realized year-end total (sum of all bucket values for that
+  //     series) — so the curve hits 100% at season end.
+  //   - Current year: target_acres from the crops aggregation, so the curve
+  //     reads as "% of plan." Falls back to YTD total if no target was set.
+  const denominator = new Map<string, number>();
+  yearCropDay.forEach((cropMap, y) => {
+    cropMap.forEach((dayMap, crop) => {
+      let total = 0;
+      dayMap.forEach((v) => (total += v));
+      denominator.set(seriesKey(crop, y), total);
+    });
+  });
+  crops.forEach((c) => {
+    if (c.target_acres > 0) denominator.set(seriesKey(c.crop, year), c.target_acres);
+  });
+
+  // Running totals per (year, crop) — stored as raw acres; emitted as percentage.
   const running = new Map<string, number>();
   yearsIncluded.forEach((y) => {
     currentYearCrops.forEach((c) => running.set(seriesKey(c, y), 0));
@@ -285,7 +319,10 @@ export async function loadSeasonProgress(opts: {
         const key = seriesKey(c, y);
         const next = (running.get(key) ?? 0) + added;
         running.set(key, next);
-        point[key] = Math.round(next * 10) / 10;
+        const denom = denominator.get(key) ?? 0;
+        const pct = denom > 0 ? Math.round((next / denom) * 1000) / 10 : 0;
+        point[key] = pct;
+        point[seriesKeyAcres(c, y)] = Math.round(next * 10) / 10;
       });
     });
     return point;
