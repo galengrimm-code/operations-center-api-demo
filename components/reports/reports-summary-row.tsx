@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { type ReportRow, effectiveCropName, toDryYield } from '@/lib/reports-data';
+import { type ReportRow, effectiveCropName, toDryYield } from "@/lib/reports-data";
 
 interface ReportsSummaryRowProps {
   rows: ReportRow[];
@@ -26,13 +26,13 @@ function weightedAvg(
 }
 
 function fmt(value: number | null, decimals = 1): string {
-  if (value == null) return '--';
+  if (value == null) return "--";
   return value.toLocaleString(undefined, { maximumFractionDigits: decimals });
 }
 
 function fmtPct(value: number | null): string {
-  if (value == null) return '--';
-  return value.toFixed(1) + '%';
+  if (value == null) return "--";
+  return value.toFixed(1) + "%";
 }
 
 export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
@@ -42,17 +42,32 @@ export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
 
   const avgIrrYield = weightedAvg(
     rows,
-    (r) => toDryYield(r.analysis?.irrigated_yield ?? null, r.analysis?.irrigated_moisture ?? null, effectiveCropName(r.operation)),
+    (r) =>
+      toDryYield(
+        r.analysis?.irrigated_yield ?? null,
+        r.analysis?.irrigated_moisture ?? null,
+        effectiveCropName(r.operation),
+      ),
     (r) => r.analysis?.irrigated_acres || 0,
   );
   const avgDryYield = weightedAvg(
     rows,
-    (r) => toDryYield(r.analysis?.dryland_yield ?? null, r.analysis?.dryland_moisture ?? null, effectiveCropName(r.operation)),
+    (r) =>
+      toDryYield(
+        r.analysis?.dryland_yield ?? null,
+        r.analysis?.dryland_moisture ?? null,
+        effectiveCropName(r.operation),
+      ),
     (r) => r.analysis?.dryland_acres || 0,
   );
   const avgTotalBuAc = weightedAvg(
     rows,
-    (r) => toDryYield(r.operation.avg_yield_value, r.operation.avg_moisture, effectiveCropName(r.operation)),
+    (r) =>
+      toDryYield(
+        r.operation.avg_yield_value,
+        r.operation.avg_moisture,
+        effectiveCropName(r.operation),
+      ),
     (r) => r.totalAcres,
   );
   const avgTotalMst = weightedAvg(

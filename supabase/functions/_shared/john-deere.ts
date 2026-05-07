@@ -1,7 +1,8 @@
 import { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 export const JOHN_DEERE_API_BASE = "https://api.deere.com/platform";
-export const JOHN_DEERE_TOKEN_URL = "https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token";
+export const JOHN_DEERE_TOKEN_URL =
+  "https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token";
 export const JOHN_DEERE_CLIENT_ID = Deno.env.get("JOHN_DEERE_CLIENT_ID") || "";
 export const JOHN_DEERE_CLIENT_SECRET = Deno.env.get("JOHN_DEERE_CLIENT_SECRET") || "";
 
@@ -23,7 +24,10 @@ export interface Connection {
   selected_org_name: string | null;
 }
 
-export async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenResponse> {
+export async function exchangeCodeForTokens(
+  code: string,
+  redirectUri: string,
+): Promise<TokenResponse> {
   const params = new URLSearchParams({
     grant_type: "authorization_code",
     code,
@@ -36,7 +40,7 @@ export async function exchangeCodeForTokens(code: string, redirectUri: string): 
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "application/json",
+      Accept: "application/json",
     },
     body: params.toString(),
   });
@@ -61,7 +65,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "application/json",
+      Accept: "application/json",
     },
     body: params.toString(),
   });
@@ -74,7 +78,10 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
   return response.json();
 }
 
-export async function getValidToken(supabase: SupabaseClient, connection: Connection): Promise<string> {
+export async function getValidToken(
+  supabase: SupabaseClient,
+  connection: Connection,
+): Promise<string> {
   const expiresAt = new Date(connection.token_expires_at);
   const now = new Date();
   const bufferMs = 5 * 60 * 1000;
@@ -102,8 +109,8 @@ export async function getValidToken(supabase: SupabaseClient, connection: Connec
 export async function callJohnDeereApi(accessToken: string, endpoint: string): Promise<Response> {
   return fetch(`${JOHN_DEERE_API_BASE}${endpoint}`, {
     headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Accept": "application/vnd.deere.axiom.v3+json",
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/vnd.deere.axiom.v3+json",
     },
   });
 }
@@ -111,13 +118,16 @@ export async function callJohnDeereApi(accessToken: string, endpoint: string): P
 export async function callJohnDeereUrl(accessToken: string, fullUrl: string): Promise<Response> {
   return fetch(fullUrl, {
     headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Accept": "application/vnd.deere.axiom.v3+json",
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/vnd.deere.axiom.v3+json",
     },
   });
 }
 
-export async function getUserConnection(supabase: SupabaseClient, userId: string): Promise<Connection | null> {
+export async function getUserConnection(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Connection | null> {
   const { data, error } = await supabase
     .from("john_deere_connections")
     .select("*")

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/auth-context';
-import { useClientFilter } from '@/contexts/client-filter-context';
-import { ReportsFilters } from './reports-filters';
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { useClientFilter } from "@/contexts/client-filter-context";
+import { ReportsFilters } from "./reports-filters";
 import {
   fetchIrrigatedFields,
   fetchHarvestOperations,
@@ -12,27 +12,44 @@ import {
   fetchAnalysisResults,
   buildReportRows,
   type ReportRow,
-} from '@/lib/reports-data';
-import type { StoredField } from '@/types/john-deere';
-import { ReportsTable } from './reports-table';
-import { SeedingReportsTable } from './reports-table-seeding';
-import { ReportsTrends } from './reports-trends';
-import { ReportsYieldCharts } from './reports-yield-charts';
-import { Loader2, FileBarChart, Wheat, Sprout, FlaskConical, Table as TableIcon, BarChart3 } from 'lucide-react';
-import { AnalysisRunner } from './analysis-runner';
-import { ReportsExport } from './reports-export';
-import { saveAnalysisResult, deleteAnalysisResult, effectiveCropName, formatCropName } from '@/lib/reports-data';
-import { pollForShapefileUrl, importFieldOperations } from '@/lib/john-deere-client';
-import { processShapefile, classifyHarvestPolygons, classifySeedingPolygons } from '@/lib/shapefile-analysis';
-import { supabase } from '@/lib/supabase';
+} from "@/lib/reports-data";
+import type { StoredField } from "@/types/john-deere";
+import { ReportsTable } from "./reports-table";
+import { SeedingReportsTable } from "./reports-table-seeding";
+import { ReportsTrends } from "./reports-trends";
+import { ReportsYieldCharts } from "./reports-yield-charts";
+import {
+  Loader2,
+  FileBarChart,
+  Wheat,
+  Sprout,
+  FlaskConical,
+  Table as TableIcon,
+  BarChart3,
+} from "lucide-react";
+import { AnalysisRunner } from "./analysis-runner";
+import { ReportsExport } from "./reports-export";
+import {
+  saveAnalysisResult,
+  deleteAnalysisResult,
+  effectiveCropName,
+  formatCropName,
+} from "@/lib/reports-data";
+import { pollForShapefileUrl, importFieldOperations } from "@/lib/john-deere-client";
+import {
+  processShapefile,
+  classifyHarvestPolygons,
+  classifySeedingPolygons,
+} from "@/lib/shapefile-analysis";
+import { supabase } from "@/lib/supabase";
 
-type ReportTab = 'harvest' | 'seeding' | 'application';
-type HarvestView = 'table' | 'charts';
+type ReportTab = "harvest" | "seeding" | "application";
+type HarvestView = "table" | "charts";
 
 const TABS: { id: ReportTab; label: string; icon: typeof Wheat; disabled?: boolean }[] = [
-  { id: 'harvest', label: 'Harvest', icon: Wheat },
-  { id: 'seeding', label: 'Seeding', icon: Sprout },
-  { id: 'application', label: 'Application', icon: FlaskConical, disabled: true },
+  { id: "harvest", label: "Harvest", icon: Wheat },
+  { id: "seeding", label: "Seeding", icon: Sprout },
+  { id: "application", label: "Application", icon: FlaskConical, disabled: true },
 ];
 
 export function ReportsView() {
@@ -41,8 +58,8 @@ export function ReportsView() {
   const orgId = johnDeereConnection?.selected_org_id;
   const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
 
-  const [activeTab, setActiveTab] = useState<ReportTab>('harvest');
-  const [harvestView, setHarvestView] = useState<HarvestView>('table');
+  const [activeTab, setActiveTab] = useState<ReportTab>("harvest");
+  const [harvestView, setHarvestView] = useState<HarvestView>("table");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +69,9 @@ export function ReportsView() {
   const [crops, setCrops] = useState<string[]>([]);
   const [rows, setRows] = useState<ReportRow[]>([]);
 
-  const [selectedSeason, setSelectedSeason] = useState('');
-  const [selectedCrop, setSelectedCrop] = useState('');
-  const [selectedField, setSelectedField] = useState('');
+  const [selectedSeason, setSelectedSeason] = useState("");
+  const [selectedCrop, setSelectedCrop] = useState("");
+  const [selectedField, setSelectedField] = useState("");
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
@@ -62,41 +79,55 @@ export function ReportsView() {
   const [runningOperationId, setRunningOperationId] = useState<string | null>(null);
   const [failedOperationIds, setFailedOperationIds] = useState<Set<string>>(new Set());
   const [isBatchRunning, setIsBatchRunning] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fieldName: string } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+    fieldName: string;
+  } | null>(null);
 
   const runAnalysisForRow = async (row: ReportRow): Promise<void> => {
     const opId = row.operation.jd_operation_id;
     setRunningOperationId(opId);
-    setFailedOperationIds((prev) => { const next = new Set(prev); next.delete(opId); return next; });
+    setFailedOperationIds((prev) => {
+      const next = new Set(prev);
+      next.delete(opId);
+      return next;
+    });
 
     try {
       const storagePath = await pollForShapefileUrl(opId, () => {});
 
       const { data: blob, error: downloadError } = await supabase.storage
-        .from('shapefiles')
+        .from("shapefiles")
         .download(storagePath);
 
       if (downloadError || !blob) {
-        throw new Error(`Failed to download shapefile: ${downloadError?.message || 'No data'}`);
+        throw new Error(`Failed to download shapefile: ${downloadError?.message || "No data"}`);
       }
 
       const zipBuffer = await blob.arrayBuffer();
       const geojson = await processShapefile(zipBuffer);
 
-      const irrigatedBoundary = (row.field.irrigated_boundary_geojson || null) as
-        { type: 'MultiPolygon'; coordinates: number[][][][] } | null;
+      const irrigatedBoundary = (row.field.irrigated_boundary_geojson || null) as {
+        type: "MultiPolygon";
+        coordinates: number[][][][];
+      } | null;
 
       let result;
-      if (activeTab === 'seeding') {
-        const stats = classifySeedingPolygons(geojson, irrigatedBoundary, row.field.has_irrigated_boundary);
+      if (activeTab === "seeding") {
+        const stats = classifySeedingPolygons(
+          geojson,
+          irrigatedBoundary,
+          row.field.has_irrigated_boundary,
+        );
         result = {
           user_id: user!.id,
           field_id: row.field.id,
           jd_field_id: row.field.jd_field_id,
           jd_operation_id: opId,
           operation_type: row.operation.operation_type,
-          crop_name: row.operation.crop_name || '',
-          crop_season: row.operation.crop_season || '',
+          crop_name: row.operation.crop_name || "",
+          crop_season: row.operation.crop_season || "",
           irrigated_acres: stats.irrigatedSeededAcres,
           dryland_acres: stats.drylandSeededAcres,
           total_acres: stats.irrigatedSeededAcres + stats.drylandSeededAcres,
@@ -113,15 +144,19 @@ export function ReportsView() {
           analyzed_at: new Date().toISOString(),
         };
       } else {
-        const stats = classifyHarvestPolygons(geojson, irrigatedBoundary, row.field.has_irrigated_boundary);
+        const stats = classifyHarvestPolygons(
+          geojson,
+          irrigatedBoundary,
+          row.field.has_irrigated_boundary,
+        );
         result = {
           user_id: user!.id,
           field_id: row.field.id,
           jd_field_id: row.field.jd_field_id,
           jd_operation_id: opId,
           operation_type: row.operation.operation_type,
-          crop_name: row.operation.crop_name || '',
-          crop_season: row.operation.crop_season || '',
+          crop_name: row.operation.crop_name || "",
+          crop_season: row.operation.crop_season || "",
           irrigated_acres: stats.irrigatedHarvestedAcres,
           dryland_acres: stats.drylandHarvestedAcres,
           total_acres: stats.irrigatedHarvestedAcres + stats.drylandHarvestedAcres,
@@ -161,7 +196,7 @@ export function ReportsView() {
     const unanalyzed = rows.filter((r) => !r.analysis);
     if (unanalyzed.length === 0) return;
 
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const failed: ReportRow[] = [];
 
     setIsBatchRunning(true);
@@ -233,7 +268,7 @@ export function ReportsView() {
 
   const loadData = useCallback(async () => {
     if (!user || !orgId) return;
-    if (activeTab === 'application') {
+    if (activeTab === "application") {
       setRows([]);
       setSeasons([]);
       setCrops([]);
@@ -260,7 +295,7 @@ export function ReportsView() {
       setSeasons(seasonList);
       setCrops(cropList);
 
-      const season = selectedSeason || seasonList[0] || '';
+      const season = selectedSeason || seasonList[0] || "";
       if (!selectedSeason && season) setSelectedSeason(season);
 
       const ops = await fetchHarvestOperations(
@@ -284,11 +319,20 @@ export function ReportsView() {
 
       setRows(reportRows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data');
+      setError(err instanceof Error ? err.message : "Failed to load report data");
     } finally {
       setLoading(false);
     }
-  }, [user, orgId, activeTab, selectedSeason, selectedCrop, selectedField, globalFarm, hiddenCrops.join(',')]);
+  }, [
+    user,
+    orgId,
+    activeTab,
+    selectedSeason,
+    selectedCrop,
+    selectedField,
+    globalFarm,
+    hiddenCrops.join(","),
+  ]);
 
   useEffect(() => {
     loadData();
@@ -296,8 +340,8 @@ export function ReportsView() {
 
   // Reset season/crop when switching tabs — harvest and seeding can have different sets
   useEffect(() => {
-    setSelectedSeason('');
-    setSelectedCrop('');
+    setSelectedSeason("");
+    setSelectedCrop("");
   }, [activeTab]);
 
   const fieldNames = irrigatedFields.map((f) => f.name).sort();
@@ -311,21 +355,21 @@ export function ReportsView() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 p-6 space-y-6">
+    <div className="min-h-screen space-y-6 bg-slate-950 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <FileBarChart className="w-6 h-6 text-emerald-500" />
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
+            <FileBarChart className="h-6 w-6 text-emerald-500" />
             Reports
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="mt-1 text-sm text-slate-400">
             Irrigated vs dryland breakdown by operation type
           </p>
         </div>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 p-1 glass rounded-xl w-fit">
+      <div className="glass flex w-fit gap-1 rounded-xl p-1">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -334,15 +378,16 @@ export function ReportsView() {
               key={tab.id}
               onClick={() => !tab.disabled && setActiveTab(tab.id)}
               disabled={tab.disabled}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
-                ${isActive
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                isActive
+                  ? "bg-emerald-500/15 border border-emerald-500/20 text-emerald-400"
                   : tab.disabled
-                    ? 'text-slate-600 cursor-not-allowed'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
-              title={tab.disabled ? 'Coming soon — application data not yet imported' : undefined}
+                    ? "cursor-not-allowed text-slate-600"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              }`}
+              title={tab.disabled ? "Coming soon — application data not yet imported" : undefined}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="h-4 w-4" />
               {tab.label}
               {tab.disabled && <span className="text-[10px] uppercase opacity-70">soon</span>}
             </button>
@@ -350,19 +395,21 @@ export function ReportsView() {
         })}
       </div>
 
-      {activeTab === 'application' ? (
+      {activeTab === "application" ? (
         <div className="glass rounded-xl p-12 text-center">
-          <FlaskConical className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-300 mb-2">Application Reports — Coming Soon</h3>
-          <p className="text-sm text-slate-500 max-w-md mx-auto">
-            Application (chemical / fertilizer) operations aren&rsquo;t yet imported from John Deere.
-            Once the import pipeline is extended, this tab will show product-by-field-by-year breakdowns
-            with the same irrigated / dryland split as Harvest and Seeding.
+          <FlaskConical className="mx-auto mb-4 h-12 w-12 text-slate-600" />
+          <h3 className="mb-2 text-lg font-medium text-slate-300">
+            Application Reports — Coming Soon
+          </h3>
+          <p className="mx-auto max-w-md text-sm text-slate-500">
+            Application (chemical / fertilizer) operations aren&rsquo;t yet imported from John
+            Deere. Once the import pipeline is extended, this tab will show product-by-field-by-year
+            breakdowns with the same irrigated / dryland split as Harvest and Seeding.
           </p>
         </div>
       ) : (
         <>
-          <div className="glass rounded-xl p-4 flex flex-wrap items-end justify-between gap-4">
+          <div className="glass flex flex-wrap items-end justify-between gap-4 rounded-xl p-4">
             <ReportsFilters
               seasons={seasons}
               crops={crops}
@@ -380,16 +427,16 @@ export function ReportsView() {
               batchProgress={batchProgress}
               onRunAll={handleRunAll}
             />
-            {activeTab === 'harvest' && <ReportsExport rows={rows} season={selectedSeason} />}
+            {activeTab === "harvest" && <ReportsExport rows={rows} season={selectedSeason} />}
             {isSyncing ? (
               <div className="flex items-center gap-2 text-sm text-emerald-400">
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 <span>{syncProgress}</span>
               </div>
             ) : (
               <button
                 onClick={handleSyncOperations}
-                className="text-xs text-slate-500 hover:text-slate-300 underline"
+                className="text-xs text-slate-500 underline hover:text-slate-300"
               >
                 Sync Missing Operations
               </button>
@@ -398,47 +445,51 @@ export function ReportsView() {
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+              <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
             </div>
           ) : error ? (
-            <div className="glass rounded-xl p-6 text-red-400 text-center">{error}</div>
+            <div className="glass rounded-xl p-6 text-center text-red-400">{error}</div>
           ) : rows.length === 0 ? (
             <div className="glass rounded-xl p-12 text-center">
-              <FileBarChart className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <FileBarChart className="mx-auto mb-4 h-12 w-12 text-slate-600" />
               <p className="text-slate-400">No {activeTab} data found for the selected filters.</p>
-              {activeTab === 'seeding' && (
-                <p className="text-xs text-slate-500 mt-2">
-                  Tip: click &ldquo;Sync Missing Operations&rdquo; to pull planting operations from John Deere.
+              {activeTab === "seeding" && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Tip: click &ldquo;Sync Missing Operations&rdquo; to pull planting operations from
+                  John Deere.
                 </p>
               )}
             </div>
           ) : (
             <div className="space-y-6">
-              {activeTab === 'harvest' ? (
+              {activeTab === "harvest" ? (
                 <>
-                  <div className="flex gap-1 p-1 glass rounded-xl w-fit">
-                    {([
-                      { id: 'table', label: 'Table', Icon: TableIcon },
-                      { id: 'charts', label: 'Charts', Icon: BarChart3 },
-                    ] as const).map(({ id, label, Icon }) => {
+                  <div className="glass flex w-fit gap-1 rounded-xl p-1">
+                    {(
+                      [
+                        { id: "table", label: "Table", Icon: TableIcon },
+                        { id: "charts", label: "Charts", Icon: BarChart3 },
+                      ] as const
+                    ).map(({ id, label, Icon }) => {
                       const isActive = harvestView === id;
                       return (
                         <button
                           key={id}
                           onClick={() => setHarvestView(id)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
-                            ${isActive
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                            isActive
+                              ? "bg-emerald-500/15 border border-emerald-500/20 text-emerald-400"
+                              : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                          }`}
                         >
-                          <Icon className="w-4 h-4" />
+                          <Icon className="h-4 w-4" />
                           {label}
                         </button>
                       );
                     })}
                   </div>
 
-                  {harvestView === 'table' ? (
+                  {harvestView === "table" ? (
                     <>
                       <ReportsTable
                         rows={rows}

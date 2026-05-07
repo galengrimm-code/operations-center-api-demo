@@ -1,11 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { optionsResponse, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getAuthenticatedUser, isResponse } from "../_shared/auth.ts";
-import {
-  callJohnDeereApi,
-  getValidToken,
-  getUserConnection,
-} from "../_shared/john-deere.ts";
+import { callJohnDeereApi, getValidToken, getUserConnection } from "../_shared/john-deere.ts";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -31,7 +27,11 @@ Deno.serve(async (req: Request) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        return errorResponse(`John Deere API error: ${response.status}`, response.status, errorText);
+        return errorResponse(
+          `John Deere API error: ${response.status}`,
+          response.status,
+          errorText,
+        );
       }
 
       return jsonResponse(await response.json());
@@ -65,7 +65,11 @@ Deno.serve(async (req: Request) => {
       const response = await callJohnDeereApi(accessToken, `/organizations/${orgId}/fields`);
       if (!response.ok) {
         const errorText = await response.text();
-        return errorResponse(`John Deere API error: ${response.status}`, response.status, errorText);
+        return errorResponse(
+          `John Deere API error: ${response.status}`,
+          response.status,
+          errorText,
+        );
       }
 
       return jsonResponse(await response.json());

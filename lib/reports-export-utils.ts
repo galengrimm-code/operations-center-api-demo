@@ -1,19 +1,25 @@
-import { type ReportRow, effectiveCropName, formatCropName, toDryYield } from './reports-data';
+import { type ReportRow, effectiveCropName, formatCropName, toDryYield } from "./reports-data";
 
 function fmt(value: number | null | undefined, decimals = 1): string {
-  if (value == null) return '';
+  if (value == null) return "";
   return value.toFixed(decimals);
 }
 
 export function generateCSV(rows: ReportRow[], season: string): string {
   const headers = [
-    'Field', 'Crop', 'Season',
-    'Irrigated Acres', 'Dryland Acres', 'Total Acres',
-    'Irrigated Yield (bu/ac)', 'Dryland Yield (bu/ac)',
-    'Total Bu/Ac', 'Moisture %',
+    "Field",
+    "Crop",
+    "Season",
+    "Irrigated Acres",
+    "Dryland Acres",
+    "Total Acres",
+    "Irrigated Yield (bu/ac)",
+    "Dryland Yield (bu/ac)",
+    "Total Bu/Ac",
+    "Moisture %",
   ];
 
-  const csvRows = [headers.join(',')];
+  const csvRows = [headers.join(",")];
 
   for (const row of rows) {
     const cropName = effectiveCropName(row.operation);
@@ -23,28 +29,34 @@ export function generateCSV(rows: ReportRow[], season: string): string {
     const dryYieldDry = row.analysis
       ? toDryYield(row.analysis.dryland_yield, row.analysis.dryland_moisture, cropName)
       : null;
-    const totalBuAc = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, cropName);
-    csvRows.push([
-      `"${row.field.name}"`,
-      formatCropName(cropName),
-      row.operation.crop_season || season,
-      fmt(row.irrigatedAcres),
-      fmt(row.drylandAcres),
-      fmt(row.totalAcres),
-      fmt(irrYieldDry),
-      fmt(dryYieldDry),
-      fmt(totalBuAc),
-      fmt(row.operation.avg_moisture),
-    ].join(','));
+    const totalBuAc = toDryYield(
+      row.operation.avg_yield_value,
+      row.operation.avg_moisture,
+      cropName,
+    );
+    csvRows.push(
+      [
+        `"${row.field.name}"`,
+        formatCropName(cropName),
+        row.operation.crop_season || season,
+        fmt(row.irrigatedAcres),
+        fmt(row.drylandAcres),
+        fmt(row.totalAcres),
+        fmt(irrYieldDry),
+        fmt(dryYieldDry),
+        fmt(totalBuAc),
+        fmt(row.operation.avg_moisture),
+      ].join(","),
+    );
   }
 
-  return csvRows.join('\n');
+  return csvRows.join("\n");
 }
 
 export function downloadCSV(csv: string, filename: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   link.click();
@@ -52,29 +64,35 @@ export function downloadCSV(csv: string, filename: string): void {
 }
 
 export function generatePDFHtml(rows: ReportRow[], season: string, title: string): string {
-  const tableRows = rows.map((row) => {
-    const cropName = effectiveCropName(row.operation);
-    const irrYieldDry = row.analysis
-      ? toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, cropName)
-      : null;
-    const dryYieldDry = row.analysis
-      ? toDryYield(row.analysis.dryland_yield, row.analysis.dryland_moisture, cropName)
-      : null;
-    const totalBuAc = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, cropName);
-    return `
+  const tableRows = rows
+    .map((row) => {
+      const cropName = effectiveCropName(row.operation);
+      const irrYieldDry = row.analysis
+        ? toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, cropName)
+        : null;
+      const dryYieldDry = row.analysis
+        ? toDryYield(row.analysis.dryland_yield, row.analysis.dryland_moisture, cropName)
+        : null;
+      const totalBuAc = toDryYield(
+        row.operation.avg_yield_value,
+        row.operation.avg_moisture,
+        cropName,
+      );
+      return `
     <tr>
       <td>${row.field.name}</td>
       <td>${formatCropName(cropName)}</td>
       <td style="text-align:right">${fmt(row.irrigatedAcres)}</td>
       <td style="text-align:right">${fmt(row.drylandAcres)}</td>
       <td style="text-align:right">${fmt(row.totalAcres)}</td>
-      <td style="text-align:right">${row.analysis ? fmt(irrYieldDry) : '--'}</td>
-      <td style="text-align:right">${row.analysis ? fmt(dryYieldDry) : '--'}</td>
+      <td style="text-align:right">${row.analysis ? fmt(irrYieldDry) : "--"}</td>
+      <td style="text-align:right">${row.analysis ? fmt(dryYieldDry) : "--"}</td>
       <td style="text-align:right;font-weight:bold">${fmt(totalBuAc)}</td>
-      <td style="text-align:right">${row.operation.avg_moisture != null ? fmt(row.operation.avg_moisture, 1) + '%' : '--'}</td>
+      <td style="text-align:right">${row.operation.avg_moisture != null ? fmt(row.operation.avg_moisture, 1) + "%" : "--"}</td>
     </tr>
   `;
-  }).join('');
+    })
+    .join("");
 
   return `<!DOCTYPE html>
 <html>
@@ -111,9 +129,11 @@ export function generatePDFHtml(rows: ReportRow[], season: string, title: string
 }
 
 export function printPDF(html: string): void {
-  const win = window.open('', '_blank');
+  const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(html);
   win.document.close();
-  win.onload = () => { win.print(); };
+  win.onload = () => {
+    win.print();
+  };
 }

@@ -27,39 +27,39 @@ User authenticates via Supabase Auth → auth-context provides session → compo
 
 ## Key files
 
-| File | Purpose |
-|------|---------|
-| `app/layout.tsx` | Root layout; wraps everything in `<AuthProvider>` |
-| `app/login/page.tsx` | Sign-in / sign-up form |
-| `app/(app)/map/page.tsx` | Main map view; auth-gated |
-| `app/(app)/map/field/[fieldId]/page.tsx` | Field detail view on map |
-| `app/(app)/fields/page.tsx` | Fields grid list with client/farm filters |
-| `app/(app)/operations/page.tsx` | Operations list with irrigation analysis |
-| `app/(app)/settings/page.tsx` | User settings (area unit preference) |
-| `app/auth/callback/page.tsx` | John Deere OAuth redirect handler |
-| `contexts/auth-context.tsx` | Provides `user`, `session`, `johnDeereConnection` to the whole app |
-| `contexts/map-context.tsx` | Map state: fields, selection, operations, filters |
-| `lib/supabase.ts` | Supabase browser client |
-| `lib/john-deere-client.ts` | `fetch()` wrappers calling Supabase Edge Functions |
-| `lib/area-utils.ts` | Area unit conversion (ha ↔ ac) |
-| `lib/shapefile-analysis.ts` | Shapefile parsing + irrigated/dryland polygon classification |
-| `supabase/functions/_shared/john-deere.ts` | Shared: JD API helpers, token refresh, `JOHN_DEERE_API_BASE` |
-| `supabase/functions/_shared/boundaries.ts` | Shared: boundary conversion (JD → GeoJSON), client/farm extraction |
-| `supabase/functions/john-deere-auth/index.ts` | Edge Function: token exchange, refresh, disconnect |
-| `supabase/functions/john-deere-api/index.ts` | Edge Function: organizations, stored fields/operations |
-| `supabase/functions/john-deere-import/index.ts` | Edge Function: import fields (with boundaries) + operations from JD API (658 lines — split before adding more) |
-| `supabase/functions/john-deere-irrigation/index.ts` | Edge Function: irrigation analysis, shapefile proxying |
-| `components/map/full-map.tsx` | Mapbox GL map showing field + irrigated boundary layers |
-| `components/map/field-side-panel.tsx` | Field detail slide-in panel with operations |
-| `components/dashboard/irrigation-analysis.tsx` | Irrigation analysis with shapefile-based breakdown |
-| `types/john-deere.ts` | TypeScript types for John Deere API responses and stored data |
+| File                                                | Purpose                                                                                                        |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `app/layout.tsx`                                    | Root layout; wraps everything in `<AuthProvider>`                                                              |
+| `app/login/page.tsx`                                | Sign-in / sign-up form                                                                                         |
+| `app/(app)/map/page.tsx`                            | Main map view; auth-gated                                                                                      |
+| `app/(app)/map/field/[fieldId]/page.tsx`            | Field detail view on map                                                                                       |
+| `app/(app)/fields/page.tsx`                         | Fields grid list with client/farm filters                                                                      |
+| `app/(app)/operations/page.tsx`                     | Operations list with irrigation analysis                                                                       |
+| `app/(app)/settings/page.tsx`                       | User settings (area unit preference)                                                                           |
+| `app/auth/callback/page.tsx`                        | John Deere OAuth redirect handler                                                                              |
+| `contexts/auth-context.tsx`                         | Provides `user`, `session`, `johnDeereConnection` to the whole app                                             |
+| `contexts/map-context.tsx`                          | Map state: fields, selection, operations, filters                                                              |
+| `lib/supabase.ts`                                   | Supabase browser client                                                                                        |
+| `lib/john-deere-client.ts`                          | `fetch()` wrappers calling Supabase Edge Functions                                                             |
+| `lib/area-utils.ts`                                 | Area unit conversion (ha ↔ ac)                                                                                 |
+| `lib/shapefile-analysis.ts`                         | Shapefile parsing + irrigated/dryland polygon classification                                                   |
+| `supabase/functions/_shared/john-deere.ts`          | Shared: JD API helpers, token refresh, `JOHN_DEERE_API_BASE`                                                   |
+| `supabase/functions/_shared/boundaries.ts`          | Shared: boundary conversion (JD → GeoJSON), client/farm extraction                                             |
+| `supabase/functions/john-deere-auth/index.ts`       | Edge Function: token exchange, refresh, disconnect                                                             |
+| `supabase/functions/john-deere-api/index.ts`        | Edge Function: organizations, stored fields/operations                                                         |
+| `supabase/functions/john-deere-import/index.ts`     | Edge Function: import fields (with boundaries) + operations from JD API (658 lines — split before adding more) |
+| `supabase/functions/john-deere-irrigation/index.ts` | Edge Function: irrigation analysis, shapefile proxying                                                         |
+| `components/map/full-map.tsx`                       | Mapbox GL map showing field + irrigated boundary layers                                                        |
+| `components/map/field-side-panel.tsx`               | Field detail slide-in panel with operations                                                                    |
+| `components/dashboard/irrigation-analysis.tsx`      | Irrigation analysis with shapefile-based breakdown                                                             |
+| `types/john-deere.ts`                               | TypeScript types for John Deere API responses and stored data                                                  |
 
 ## Doc map
 
-| File | When to read |
-|---|---|
-| `CLAUDE.md` | Universal context, security scan output, project guardrails | Auto-loaded every session |
-| `.claude/rules/architecture.md` | This file — shared Supabase, decisions, key files | Auto-loaded every session |
-| `.claude/rules/database.md` | Database schema (3 tables) | Auto-loaded every session |
-| `.claude/rules/conventions.md` | Coding conventions + common task recipes | Auto-loaded every session |
-| `.claude/rules/edge-functions.md` | Edge Functions deployment + verifyJWT rule | Auto-loaded when editing `supabase/functions/**` |
+| File                              | When to read                                                |
+| --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------ |
+| `CLAUDE.md`                       | Universal context, security scan output, project guardrails | Auto-loaded every session                        |
+| `.claude/rules/architecture.md`   | This file — shared Supabase, decisions, key files           | Auto-loaded every session                        |
+| `.claude/rules/database.md`       | Database schema (3 tables)                                  | Auto-loaded every session                        |
+| `.claude/rules/conventions.md`    | Coding conventions + common task recipes                    | Auto-loaded every session                        |
+| `.claude/rules/edge-functions.md` | Edge Functions deployment + verifyJWT rule                  | Auto-loaded when editing `supabase/functions/**` |

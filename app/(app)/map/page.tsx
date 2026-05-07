@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 // The map page is intentionally empty.
 // The map, controls, and side panel are rendered by the map layout.

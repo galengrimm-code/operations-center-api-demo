@@ -1,11 +1,23 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
-import { useAuth } from '@/contexts/auth-context';
-import { useClientFilter } from '@/contexts/client-filter-context';
-import { fetchStoredFields, importFieldsWithBoundaries, importOperations } from '@/lib/john-deere-client';
-import type { StoredField, StoredFieldOperation } from '@/types/john-deere';
-import type mapboxgl from 'mapbox-gl';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  ReactNode,
+} from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { useClientFilter } from "@/contexts/client-filter-context";
+import {
+  fetchStoredFields,
+  importFieldsWithBoundaries,
+  importOperations,
+} from "@/lib/john-deere-client";
+import type { StoredField, StoredFieldOperation } from "@/types/john-deere";
+import type mapboxgl from "mapbox-gl";
 
 interface MapContextType {
   // Map instance
@@ -70,7 +82,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
       const data = await fetchStoredFields();
       setFields(data.fields || []);
     } catch (err) {
-      setFieldsError(err instanceof Error ? err.message : 'Failed to load fields');
+      setFieldsError(err instanceof Error ? err.message : "Failed to load fields");
     } finally {
       setFieldsLoading(false);
     }
@@ -84,7 +96,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
       setFields(data.fields || []);
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      setFieldsError(err instanceof Error ? err.message : 'Failed to import fields');
+      setFieldsError(err instanceof Error ? err.message : "Failed to import fields");
     } finally {
       setIsImporting(false);
     }
@@ -96,7 +108,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
       await importOperations();
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      setFieldsError(err instanceof Error ? err.message : 'Failed to sync operations');
+      setFieldsError(err instanceof Error ? err.message : "Failed to sync operations");
     } finally {
       setIsSyncingOps(false);
     }
@@ -117,35 +129,37 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const filteredFields = useMemo(() => {
     let result = fields;
     // Apply global farm filter first, then per-page filters
-    if (globalFarm) result = result.filter(f => f.farm_name === globalFarm);
-    if (selectedClient) result = result.filter(f => f.client_name === selectedClient);
-    if (selectedFarm) result = result.filter(f => f.farm_name === selectedFarm);
+    if (globalFarm) result = result.filter((f) => f.farm_name === globalFarm);
+    if (selectedClient) result = result.filter((f) => f.client_name === selectedClient);
+    if (selectedFarm) result = result.filter((f) => f.farm_name === selectedFarm);
     return result;
   }, [fields, globalFarm, selectedClient, selectedFarm]);
 
   return (
-    <MapContext.Provider value={{
-      mapInstance,
-      setMapInstance,
-      fields,
-      fieldsLoading,
-      fieldsError,
-      refreshFields,
-      importFields,
-      isImporting,
-      isSyncingOps,
-      syncOperations,
-      selectedFieldId,
-      setSelectedFieldId,
-      selectedOperation,
-      setSelectedOperation,
-      selectedClient,
-      setSelectedClient,
-      selectedFarm,
-      setSelectedFarm,
-      filteredFields,
-      refreshKey,
-    }}>
+    <MapContext.Provider
+      value={{
+        mapInstance,
+        setMapInstance,
+        fields,
+        fieldsLoading,
+        fieldsError,
+        refreshFields,
+        importFields,
+        isImporting,
+        isSyncingOps,
+        syncOperations,
+        selectedFieldId,
+        setSelectedFieldId,
+        selectedOperation,
+        setSelectedOperation,
+        selectedClient,
+        setSelectedClient,
+        selectedFarm,
+        setSelectedFarm,
+        filteredFields,
+        refreshKey,
+      }}
+    >
       {children}
     </MapContext.Provider>
   );
@@ -154,7 +168,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
 export function useMapContext() {
   const context = useContext(MapContext);
   if (context === undefined) {
-    throw new Error('useMapContext must be used within a MapProvider');
+    throw new Error("useMapContext must be used within a MapProvider");
   }
   return context;
 }

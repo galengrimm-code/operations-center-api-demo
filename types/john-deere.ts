@@ -6,25 +6,25 @@ export interface JohnDeereOrganization {
 }
 
 export interface JohnDeereBoundaryPoint {
-  '@type': 'Point';
+  "@type": "Point";
   lat: number;
   lon: number;
 }
 
 export interface JohnDeereRing {
-  '@type': 'Ring';
+  "@type": "Ring";
   points: JohnDeereBoundaryPoint[];
   type: string;
   passable: boolean;
 }
 
 export interface JohnDeerePolygon {
-  '@type': 'Polygon';
+  "@type": "Polygon";
   rings: JohnDeereRing[];
 }
 
 export interface JohnDeereMeasurement {
-  '@type': 'MeasurementAsDouble';
+  "@type": "MeasurementAsDouble";
   valueAsDouble: number;
   unit: string;
 }
@@ -137,8 +137,19 @@ export interface StoredFieldOperation {
   total_wet_mass_value: number | null;
   total_wet_mass_unit: string | null;
   map_image_path: string | null;
-  map_image_extent: { minimumLatitude: number; maximumLatitude: number; minimumLongitude: number; maximumLongitude: number } | null;
-  map_image_legends: Array<{ label?: string; hexColor?: string; minimum?: number; maximum?: number; percent?: number }> | null;
+  map_image_extent: {
+    minimumLatitude: number;
+    maximumLatitude: number;
+    minimumLongitude: number;
+    maximumLongitude: number;
+  } | null;
+  map_image_legends: Array<{
+    label?: string;
+    hexColor?: string;
+    minimum?: number;
+    maximum?: number;
+    percent?: number;
+  }> | null;
   measurement_type: string | null;
   imported_at: string;
   created_at: string;

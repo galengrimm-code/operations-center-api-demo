@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Button } from '@/components/ui/button';
-import { Loader2, PlayCircle } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Loader2, PlayCircle } from "lucide-react";
 
 interface AnalysisRunnerProps {
   unanalyzedCount: number;
@@ -22,17 +22,14 @@ export function AnalysisRunner({
     <div className="flex items-center gap-4">
       {isBatchRunning && batchProgress ? (
         <div className="flex items-center gap-2 text-sm text-emerald-400">
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
           <span>
             Analyzing {batchProgress.fieldName}... {batchProgress.current} of {batchProgress.total}
           </span>
         </div>
       ) : unanalyzedCount > 0 ? (
-        <Button
-          onClick={onRunAll}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          <PlayCircle className="w-4 h-4 mr-2" />
+        <Button onClick={onRunAll} className="bg-emerald-600 text-white hover:bg-emerald-700">
+          <PlayCircle className="mr-2 h-4 w-4" />
           Run All Analysis ({unanalyzedCount})
         </Button>
       ) : null}

@@ -5,7 +5,7 @@ export function createServiceClient(): SupabaseClient {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   return createClient(supabaseUrl, supabaseServiceKey, {
-    db: { schema: 'operations_center' }
+    db: { schema: "operations_center" },
   });
 }
 
@@ -22,7 +22,10 @@ export async function getAuthenticatedUser(req: Request): Promise<AuthResult | R
 
   const supabase = createServiceClient();
   const token = authHeader.replace("Bearer ", "");
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(token);
 
   if (userError || !user) {
     return errorResponse("Invalid user token", 401);

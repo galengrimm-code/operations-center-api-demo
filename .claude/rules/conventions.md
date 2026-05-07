@@ -13,7 +13,7 @@
   try {
     // ...
   } catch (err) {
-    setError(err instanceof Error ? err.message : '...')
+    setError(err instanceof Error ? err.message : "...");
   }
   ```
 - New John Deere data types go in `types/john-deere.ts`.

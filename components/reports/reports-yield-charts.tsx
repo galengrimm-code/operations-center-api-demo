@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from "react";
 import {
   fetchHarvestOperations,
   fetchAnalysisResults,
@@ -8,8 +8,8 @@ import {
   effectiveCropName,
   formatCropName,
   toDryYield,
-} from '@/lib/reports-data';
-import type { StoredField } from '@/types/john-deere';
+} from "@/lib/reports-data";
+import type { StoredField } from "@/types/john-deere";
 import {
   LineChart,
   Line,
@@ -19,9 +19,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from 'recharts';
-import { BarChart3, Loader2, TrendingUp, Trophy, Sparkles, Printer } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
+} from "recharts";
+import { BarChart3, Loader2, TrendingUp, Trophy, Sparkles, Printer } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 
 interface ReportsYieldChartsProps {
   userId: string;
@@ -43,7 +43,7 @@ interface ChartPoint {
 
 // Only chart the major harvested grain crops. Cover crops, grasses, etc.
 // produce noisy single-year panels that aren't useful here.
-const CHART_CROPS = new Set(['CORN_WET', 'CORN_EURO', 'SOYBEANS']);
+const CHART_CROPS = new Set(["CORN_WET", "CORN_EURO", "SOYBEANS"]);
 
 interface CropStats {
   avgDiff: number | null;
@@ -51,26 +51,32 @@ interface CropStats {
   biggestGap: { season: string; diff: number } | null;
 }
 
-function YieldTooltip({ active, payload, label }: {
+function YieldTooltip({
+  active,
+  payload,
+  label,
+}: {
   active?: boolean;
   payload?: Array<{ payload: ChartPoint }>;
   label?: string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const p = payload[0].payload;
-  const fmtNum = (v: number | null, suffix = '') =>
-    v == null ? '—' : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}${suffix}`;
+  const fmtNum = (v: number | null, suffix = "") =>
+    v == null ? "—" : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}${suffix}`;
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-900/95 px-3 py-2 text-xs shadow-lg">
-      <div className="font-semibold text-slate-100 mb-1.5">{label}</div>
+      <div className="mb-1.5 font-semibold text-slate-100">{label}</div>
       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
         <span className="text-emerald-400">Irrigated</span>
-        <span className="text-slate-200 text-right font-mono-data">
-          {fmtNum(p.irrigated, ' bu')} <span className="text-slate-500">·</span> {fmtNum(p.irrigatedAcres, ' ac')}
+        <span className="font-mono-data text-right text-slate-200">
+          {fmtNum(p.irrigated, " bu")} <span className="text-slate-500">·</span>{" "}
+          {fmtNum(p.irrigatedAcres, " ac")}
         </span>
         <span className="text-amber-400">Dryland</span>
-        <span className="text-slate-200 text-right font-mono-data">
-          {fmtNum(p.dryland, ' bu')} <span className="text-slate-500">·</span> {fmtNum(p.drylandAcres, ' ac')}
+        <span className="font-mono-data text-right text-slate-200">
+          {fmtNum(p.dryland, " bu")} <span className="text-slate-500">·</span>{" "}
+          {fmtNum(p.drylandAcres, " ac")}
         </span>
       </div>
     </div>
@@ -104,11 +110,13 @@ function computeStats(points: ChartPoint[]): CropStats {
 function buildPrintHtml(
   sections: Array<{ crop: string; points: ChartPoint[]; stats: CropStats; svgHtml: string }>,
 ): string {
-  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const fmtBu = (v: number | null) =>
-    v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)} bu`;
-  const fmtYield = (v: number | null) =>
-    v == null ? '—' : v.toFixed(1) + ' bu';
+  const today = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const fmtBu = (v: number | null) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} bu`);
+  const fmtYield = (v: number | null) => (v == null ? "—" : v.toFixed(1) + " bu");
 
   const avg = (vals: Array<number | null>): number | null => {
     const xs = vals.filter((v): v is number => v != null);
@@ -116,8 +124,11 @@ function buildPrintHtml(
   };
   const sum = (vals: number[]): number => vals.reduce((a, b) => a + b, 0);
 
-  const sectionHtml = sections.map(({ crop, points, stats, svgHtml }) => {
-    const tableRows = points.map((p) => `
+  const sectionHtml = sections
+    .map(({ crop, points, stats, svgHtml }) => {
+      const tableRows = points
+        .map(
+          (p) => `
       <tr>
         <td>${p.season}</td>
         <td style="text-align:right">${fmtYield(p.irrigated)}</td>
@@ -125,21 +136,23 @@ function buildPrintHtml(
         <td style="text-align:right">${fmtBu(p.pivotGainPerAcre)}</td>
         <td style="text-align:right">${p.irrigatedAcres.toFixed(1)}</td>
         <td style="text-align:right">${p.drylandAcres.toFixed(1)}</td>
-      </tr>`).join('');
+      </tr>`,
+        )
+        .join("");
 
-    const avgIrr = avg(points.map((p) => p.irrigated));
-    const avgDry = avg(points.map((p) => p.dryland));
-    const avgGain = avg(points.map((p) => p.pivotGainPerAcre));
-    const totalIrrAc = sum(points.map((p) => p.irrigatedAcres));
-    const totalDryAc = sum(points.map((p) => p.drylandAcres));
+      const avgIrr = avg(points.map((p) => p.irrigated));
+      const avgDry = avg(points.map((p) => p.dryland));
+      const avgGain = avg(points.map((p) => p.pivotGainPerAcre));
+      const totalIrrAc = sum(points.map((p) => p.irrigatedAcres));
+      const totalDryAc = sum(points.map((p) => p.drylandAcres));
 
-    return `
+      return `
     <section class="crop">
       <h2>${formatCropName(crop)}</h2>
       <div class="stats">
         <div><span class="label">Avg Pivot Gain</span><span class="value">${fmtBu(stats.avgDiff)}/ac</span></div>
-        <div><span class="label">Best Irr Year</span><span class="value">${stats.bestYear ? `${stats.bestYear.season} · ${stats.bestYear.yield.toFixed(1)} bu` : '—'}</span></div>
-        <div><span class="label">Biggest Gap</span><span class="value">${stats.biggestGap ? `${stats.biggestGap.season} · ${fmtBu(stats.biggestGap.diff)}/ac` : '—'}</span></div>
+        <div><span class="label">Best Irr Year</span><span class="value">${stats.bestYear ? `${stats.bestYear.season} · ${stats.bestYear.yield.toFixed(1)} bu` : "—"}</span></div>
+        <div><span class="label">Biggest Gap</span><span class="value">${stats.biggestGap ? `${stats.biggestGap.season} · ${fmtBu(stats.biggestGap.diff)}/ac` : "—"}</span></div>
       </div>
       <div class="chart">${svgHtml}</div>
       <table>
@@ -159,7 +172,8 @@ function buildPrintHtml(
         </tfoot>
       </table>
     </section>`;
-  }).join('');
+    })
+    .join("");
 
   return `<!DOCTYPE html>
 <html>
@@ -218,7 +232,13 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
         }
 
         const ops = await fetchHarvestOperations(
-          userId, orgId, fieldIds, undefined, undefined, 'harvest', hiddenCrops,
+          userId,
+          orgId,
+          fieldIds,
+          undefined,
+          undefined,
+          "harvest",
+          hiddenCrops,
         );
         const opIds = ops.map((o) => o.jd_operation_id);
         const results = await fetchAnalysisResults(userId, opIds);
@@ -228,13 +248,17 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
         const rows = buildReportRows(irrigatedFields, ops, results);
 
         type Acc = {
-          irrBu: number; irrYieldWeight: number;
-          dryBu: number; dryYieldWeight: number;
-          irrAc: number; dryAc: number;
+          irrBu: number;
+          irrYieldWeight: number;
+          dryBu: number;
+          dryYieldWeight: number;
+          irrAc: number;
+          dryAc: number;
           // For pivot-gain-per-acre stat (Option 2). Sum across fields of
           // (per-field gap × that field's pivot acres), and the matching
           // pivot-acre weight.
-          gainBuSum: number; gainAcWeight: number;
+          gainBuSum: number;
+          gainAcWeight: number;
         };
         const groups = new Map<string, Map<string, Acc>>();
 
@@ -245,21 +269,37 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
           if (!CHART_CROPS.has(crop)) continue;
 
           let cropMap = groups.get(crop);
-          if (!cropMap) { cropMap = new Map(); groups.set(crop, cropMap); }
+          if (!cropMap) {
+            cropMap = new Map();
+            groups.set(crop, cropMap);
+          }
           let acc = cropMap.get(season);
           if (!acc) {
             acc = {
-              irrBu: 0, irrYieldWeight: 0, dryBu: 0, dryYieldWeight: 0,
-              irrAc: 0, dryAc: 0,
-              gainBuSum: 0, gainAcWeight: 0,
+              irrBu: 0,
+              irrYieldWeight: 0,
+              dryBu: 0,
+              dryYieldWeight: 0,
+              irrAc: 0,
+              dryAc: 0,
+              gainBuSum: 0,
+              gainAcWeight: 0,
             };
             cropMap.set(season, acc);
           }
 
           if (row.analysis) {
             // Field had its current pivot during this op — use the per-zone analysis
-            const irrYieldDry = toDryYield(row.analysis.irrigated_yield, row.analysis.irrigated_moisture, crop);
-            const dryYieldDry = toDryYield(row.analysis.dryland_yield, row.analysis.dryland_moisture, crop);
+            const irrYieldDry = toDryYield(
+              row.analysis.irrigated_yield,
+              row.analysis.irrigated_moisture,
+              crop,
+            );
+            const dryYieldDry = toDryYield(
+              row.analysis.dryland_yield,
+              row.analysis.dryland_moisture,
+              crop,
+            );
             acc.irrAc += row.analysis.irrigated_acres || 0;
             acc.dryAc += row.analysis.dryland_acres || 0;
             if (irrYieldDry != null && row.analysis.irrigated_acres > 0) {
@@ -273,15 +313,23 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
             // Per-field gap × pivot acres (Option 2). Only when this field
             // has BOTH zones with valid yields — same field, same weather,
             // apples to apples.
-            if (irrYieldDry != null && dryYieldDry != null
-                && row.analysis.irrigated_acres > 0 && row.analysis.dryland_acres > 0) {
+            if (
+              irrYieldDry != null &&
+              dryYieldDry != null &&
+              row.analysis.irrigated_acres > 0 &&
+              row.analysis.dryland_acres > 0
+            ) {
               acc.gainBuSum += (irrYieldDry - dryYieldDry) * row.analysis.irrigated_acres;
               acc.gainAcWeight += row.analysis.irrigated_acres;
             }
           } else if (row.drylandAcres > 0 && row.irrigatedAcres === 0) {
             // Pre-irrigation op (or 100%-dryland field): whole-field yield is
             // dryland yield. Use op's avg_yield_value with toDryYield.
-            const wholeFieldDry = toDryYield(row.operation.avg_yield_value, row.operation.avg_moisture, crop);
+            const wholeFieldDry = toDryYield(
+              row.operation.avg_yield_value,
+              row.operation.avg_moisture,
+              crop,
+            );
             acc.dryAc += row.drylandAcres;
             if (wholeFieldDry != null) {
               acc.dryBu += wholeFieldDry * row.drylandAcres;
@@ -310,18 +358,18 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
         });
         setByCrop(next);
       } catch (err) {
-        console.error('Failed to load yield charts:', err);
+        console.error("Failed to load yield charts:", err);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [userId, orgId, irrigatedFields, hiddenCrops.join(',')]);
+  }, [userId, orgId, irrigatedFields, hiddenCrops.join(",")]);
 
   if (loading) {
     return (
-      <div className="glass rounded-xl p-12 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+      <div className="glass flex items-center justify-center rounded-xl p-12">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
       </div>
     );
   }
@@ -333,9 +381,11 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
   if (cropEntries.length === 0) {
     return (
       <div className="glass rounded-xl p-12 text-center">
-        <BarChart3 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+        <BarChart3 className="mx-auto mb-4 h-12 w-12 text-slate-600" />
         <p className="text-slate-400">No analysis results yet.</p>
-        <p className="text-xs text-slate-500 mt-2">Run shapefile analysis on harvest operations to populate charts.</p>
+        <p className="mt-2 text-xs text-slate-500">
+          Run shapefile analysis on harvest operations to populate charts.
+        </p>
       </div>
     );
   }
@@ -343,19 +393,19 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
   const handlePrint = () => {
     const sections = cropEntries.map(([crop, points]) => {
       const container = chartRefs.current.get(crop);
-      const svgEl = container?.querySelector('svg');
-      let svgHtml = '';
+      const svgEl = container?.querySelector("svg");
+      let svgHtml = "";
       if (svgEl) {
         const cloned = svgEl.cloneNode(true) as SVGSVGElement;
-        cloned.removeAttribute('width');
-        cloned.removeAttribute('height');
-        cloned.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        cloned.removeAttribute("width");
+        cloned.removeAttribute("height");
+        cloned.setAttribute("preserveAspectRatio", "xMidYMid meet");
         svgHtml = cloned.outerHTML;
       }
       return { crop, points, stats: computeStats(points), svgHtml };
     });
     const html = buildPrintHtml(sections);
-    const win = window.open('', '_blank');
+    const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(html);
     win.document.close();
@@ -364,96 +414,118 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
 
   return (
     <div className="space-y-6">
-      <div className="glass rounded-xl p-6 flex items-start justify-between gap-4">
+      <div className="glass flex items-start justify-between gap-4 rounded-xl p-6">
         <div>
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-emerald-500" />
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+            <BarChart3 className="h-5 w-5 text-emerald-500" />
             Irrigated vs Dryland Yield by Crop
           </h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="mt-1 text-xs text-slate-400">
             Moisture-adjusted bu/ac, area-weighted across all fields, by year
           </p>
         </div>
         <button
           onClick={handlePrint}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-white/5 transition-colors flex-shrink-0"
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
         >
-          <Printer className="w-4 h-4" />
+          <Printer className="h-4 w-4" />
           Print PDF
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {cropEntries.map(([crop, points]) => {
           const stats = computeStats(points);
           return (
-          <div key={crop} className="glass rounded-xl p-6">
-            <h4 className="text-base font-semibold text-white mb-4">{formatCropName(crop)}</h4>
-            <div ref={(el) => { chartRefs.current.set(crop, el); }}>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={points} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="season" stroke="#94a3b8" fontSize={12} />
-                <YAxis
-                  stroke="#94a3b8"
-                  fontSize={12}
-                  label={{ value: 'bu/ac', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: 11 }}
-                />
-                <Tooltip content={<YieldTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line
-                  type="monotone"
-                  dataKey="irrigated"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  name="Irrigated"
-                  dot={{ r: 4 }}
-                  connectNulls
-                />
-                <Line
-                  type="monotone"
-                  dataKey="dryland"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  name="Dryland"
-                  dot={{ r: 4 }}
-                  connectNulls
-                />
-              </LineChart>
-            </ResponsiveContainer>
-            </div>
+            <div key={crop} className="glass rounded-xl p-6">
+              <h4 className="mb-4 text-base font-semibold text-white">{formatCropName(crop)}</h4>
+              <div
+                ref={(el) => {
+                  chartRefs.current.set(crop, el);
+                }}
+              >
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={points} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="season" stroke="#94a3b8" fontSize={12} />
+                    <YAxis
+                      stroke="#94a3b8"
+                      fontSize={12}
+                      label={{
+                        value: "bu/ac",
+                        angle: -90,
+                        position: "insideLeft",
+                        fill: "#94a3b8",
+                        fontSize: 11,
+                      }}
+                    />
+                    <Tooltip content={<YieldTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="irrigated"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      name="Irrigated"
+                      dot={{ r: 4 }}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="dryland"
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      name="Dryland"
+                      dot={{ r: 4 }}
+                      connectNulls
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
 
-            <div className="mt-4 pt-4 border-t border-white/[0.05] grid grid-cols-3 gap-3">
-              <div className="flex items-start gap-2">
-                <TrendingUp className="w-3.5 h-3.5 text-cyan-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Avg Pivot Gain</div>
-                  <div className="text-sm font-mono-data text-cyan-300">
-                    {stats.avgDiff != null ? `${stats.avgDiff >= 0 ? '+' : ''}${stats.avgDiff.toFixed(1)} bu` : '—'}
+              <div className="mt-4 grid grid-cols-3 gap-3 border-t border-white/[0.05] pt-4">
+                <div className="flex items-start gap-2">
+                  <TrendingUp className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-cyan-400" />
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                      Avg Pivot Gain
+                    </div>
+                    <div className="font-mono-data text-sm text-cyan-300">
+                      {stats.avgDiff != null
+                        ? `${stats.avgDiff >= 0 ? "+" : ""}${stats.avgDiff.toFixed(1)} bu`
+                        : "—"}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Trophy className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Best Irr Year</div>
-                  <div className="text-sm font-mono-data text-emerald-300">
-                    {stats.bestYear ? `${stats.bestYear.season} · ${stats.bestYear.yield.toFixed(1)} bu` : '—'}
+                <div className="flex items-start gap-2">
+                  <Trophy className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-400" />
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                      Best Irr Year
+                    </div>
+                    <div className="font-mono-data text-sm text-emerald-300">
+                      {stats.bestYear
+                        ? `${stats.bestYear.season} · ${stats.bestYear.yield.toFixed(1)} bu`
+                        : "—"}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Biggest Gap</div>
-                  <div className="text-sm font-mono-data text-amber-300">
-                    {stats.biggestGap ? `${stats.biggestGap.season} · ${stats.biggestGap.diff >= 0 ? '+' : ''}${stats.biggestGap.diff.toFixed(1)} bu` : '—'}
+                <div className="flex items-start gap-2">
+                  <Sparkles className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                      Biggest Gap
+                    </div>
+                    <div className="font-mono-data text-sm text-amber-300">
+                      {stats.biggestGap
+                        ? `${stats.biggestGap.season} · ${stats.biggestGap.diff >= 0 ? "+" : ""}${stats.biggestGap.diff.toFixed(1)} bu`
+                        : "—"}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        );
+          );
         })}
       </div>
     </div>

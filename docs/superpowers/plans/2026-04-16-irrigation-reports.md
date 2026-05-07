@@ -37,6 +37,7 @@ components/layout/nav-links.tsx               — Add Reports nav link
 ### Task 1: Create the database table
 
 **Files:**
+
 - None (SQL executed against Supabase directly)
 
 - [ ] **Step 1: Create the `irrigation_analysis_results` table**
@@ -104,6 +105,7 @@ Expected: One row showing `irrigation_analysis_results`.
 ### Task 2: Add TypeScript type and data layer
 
 **Files:**
+
 - Modify: `types/john-deere.ts` (add type at end of file)
 - Create: `lib/reports-data.ts`
 
@@ -141,8 +143,12 @@ export interface IrrigationAnalysisResult {
 - [ ] **Step 2: Create `lib/reports-data.ts`**
 
 ```typescript
-import { supabase } from './supabase';
-import type { StoredField, StoredFieldOperation, IrrigationAnalysisResult } from '@/types/john-deere';
+import { supabase } from "./supabase";
+import type {
+  StoredField,
+  StoredFieldOperation,
+  IrrigationAnalysisResult,
+} from "@/types/john-deere";
 
 export interface ReportRow {
   field: StoredField;
@@ -156,11 +162,11 @@ export interface ReportRow {
 /** Fetch all fields that have irrigated boundaries */
 export async function fetchIrrigatedFields(userId: string, orgId: string): Promise<StoredField[]> {
   const { data, error } = await supabase
-    .from('fields')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('org_id', orgId)
-    .eq('has_irrigated_boundary', true);
+    .from("fields")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("has_irrigated_boundary", true);
 
   if (error) throw new Error(`Failed to load fields: ${error.message}`);
   return data || [];
@@ -175,17 +181,17 @@ export async function fetchHarvestOperations(
   cropName?: string,
 ): Promise<StoredFieldOperation[]> {
   let query = supabase
-    .from('field_operations')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('org_id', orgId)
-    .eq('operation_type', 'harvest')
-    .in('jd_field_id', fieldIds);
+    .from("field_operations")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("operation_type", "harvest")
+    .in("jd_field_id", fieldIds);
 
-  if (season) query = query.eq('crop_season', season);
-  if (cropName) query = query.eq('crop_name', cropName);
+  if (season) query = query.eq("crop_season", season);
+  if (cropName) query = query.eq("crop_name", cropName);
 
-  const { data, error } = await query.order('crop_season', { ascending: false });
+  const { data, error } = await query.order("crop_season", { ascending: false });
   if (error) throw new Error(`Failed to load operations: ${error.message}`);
   return data || [];
 }
@@ -193,15 +199,15 @@ export async function fetchHarvestOperations(
 /** Fetch all available crop seasons */
 export async function fetchAvailableSeasons(userId: string, orgId: string): Promise<string[]> {
   const { data, error } = await supabase
-    .from('field_operations')
-    .select('crop_season')
-    .eq('user_id', userId)
-    .eq('org_id', orgId)
-    .eq('operation_type', 'harvest')
-    .not('crop_season', 'is', null);
+    .from("field_operations")
+    .select("crop_season")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("operation_type", "harvest")
+    .not("crop_season", "is", null);
 
   if (error) return [];
-  const seasons = [...new Set((data || []).map(d => d.crop_season as string))];
+  const seasons = [...new Set((data || []).map((d) => d.crop_season as string))];
   return seasons.sort((a, b) => b.localeCompare(a));
 }
 
@@ -212,16 +218,16 @@ export async function fetchAvailableCrops(
   fieldIds: string[],
 ): Promise<string[]> {
   const { data, error } = await supabase
-    .from('field_operations')
-    .select('crop_name')
-    .eq('user_id', userId)
-    .eq('org_id', orgId)
-    .eq('operation_type', 'harvest')
-    .in('jd_field_id', fieldIds)
-    .not('crop_name', 'is', null);
+    .from("field_operations")
+    .select("crop_name")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("operation_type", "harvest")
+    .in("jd_field_id", fieldIds)
+    .not("crop_name", "is", null);
 
   if (error) return [];
-  const crops = [...new Set((data || []).map(d => d.crop_name as string))];
+  const crops = [...new Set((data || []).map((d) => d.crop_name as string))];
   return crops.sort();
 }
 
@@ -232,10 +238,10 @@ export async function fetchAnalysisResults(
 ): Promise<IrrigationAnalysisResult[]> {
   if (operationIds.length === 0) return [];
   const { data, error } = await supabase
-    .from('irrigation_analysis_results')
-    .select('*')
-    .eq('user_id', userId)
-    .in('jd_operation_id', operationIds);
+    .from("irrigation_analysis_results")
+    .select("*")
+    .eq("user_id", userId)
+    .in("jd_operation_id", operationIds);
 
   if (error) throw new Error(`Failed to load analysis results: ${error.message}`);
   return data || [];
@@ -243,29 +249,24 @@ export async function fetchAnalysisResults(
 
 /** Save an analysis result (upsert by user_id + jd_operation_id) */
 export async function saveAnalysisResult(
-  result: Omit<IrrigationAnalysisResult, 'id' | 'created_at'>,
+  result: Omit<IrrigationAnalysisResult, "id" | "created_at">,
 ): Promise<void> {
   const { error } = await supabase
-    .from('irrigation_analysis_results')
-    .upsert(result, { onConflict: 'user_id,jd_operation_id' });
+    .from("irrigation_analysis_results")
+    .upsert(result, { onConflict: "user_id,jd_operation_id" });
 
   if (error) throw new Error(`Failed to save analysis: ${error.message}`);
 }
 
 /** Delete an analysis result and its cached shapefile */
-export async function deleteAnalysisResult(
-  userId: string,
-  operationId: string,
-): Promise<void> {
+export async function deleteAnalysisResult(userId: string, operationId: string): Promise<void> {
   await supabase
-    .from('irrigation_analysis_results')
+    .from("irrigation_analysis_results")
     .delete()
-    .eq('user_id', userId)
-    .eq('jd_operation_id', operationId);
+    .eq("user_id", userId)
+    .eq("jd_operation_id", operationId);
 
-  await supabase.storage
-    .from('shapefiles')
-    .remove([`${userId}/${operationId}.zip`]);
+  await supabase.storage.from("shapefiles").remove([`${userId}/${operationId}.zip`]);
 }
 
 /** Build report rows by joining fields, operations, and cached analysis */
@@ -274,12 +275,12 @@ export function buildReportRows(
   operations: StoredFieldOperation[],
   analysisResults: IrrigationAnalysisResult[],
 ): ReportRow[] {
-  const fieldMap = new Map(fields.map(f => [f.jd_field_id, f]));
-  const analysisMap = new Map(analysisResults.map(a => [a.jd_operation_id, a]));
+  const fieldMap = new Map(fields.map((f) => [f.jd_field_id, f]));
+  const analysisMap = new Map(analysisResults.map((a) => [a.jd_operation_id, a]));
 
   return operations
-    .filter(op => fieldMap.has(op.jd_field_id))
-    .map(op => {
+    .filter((op) => fieldMap.has(op.jd_field_id))
+    .map((op) => {
       const field = fieldMap.get(op.jd_field_id)!;
       const analysis = analysisMap.get(op.jd_operation_id) || null;
 
@@ -312,6 +313,7 @@ git commit -m "feat: add irrigation analysis result type and reports data layer"
 ### Task 3: Add Reports nav link
 
 **Files:**
+
 - Modify: `components/layout/nav-links.tsx`
 
 - [ ] **Step 1: Add the Reports link**
@@ -319,11 +321,13 @@ git commit -m "feat: add irrigation analysis result type and reports data layer"
 In `components/layout/nav-links.tsx`, add the `FileBarChart` import and a new entry to the `links` array:
 
 Add to imports:
+
 ```typescript
-import { Map, Grid3X3, BarChart3, FileBarChart } from 'lucide-react';
+import { Map, Grid3X3, BarChart3, FileBarChart } from "lucide-react";
 ```
 
 Add to the `links` array after the Operations entry:
+
 ```typescript
 { href: '/reports', label: 'Reports', icon: FileBarChart },
 ```
@@ -340,6 +344,7 @@ git commit -m "feat: add Reports link to navigation"
 ### Task 4: Create the reports page shell and filters
 
 **Files:**
+
 - Create: `app/(app)/reports/page.tsx`
 - Create: `components/reports/reports-filters.tsx`
 - Create: `components/reports/reports-view.tsx`
@@ -599,6 +604,7 @@ git commit -m "feat: add reports page shell with filters and data loading"
 ### Task 5: Create the reports data table
 
 **Files:**
+
 - Create: `components/reports/reports-table.tsx`
 - Create: `components/reports/reports-summary-row.tsx`
 - Modify: `components/reports/reports-view.tsx` (wire in table)
@@ -832,17 +838,20 @@ export function ReportsSummaryRow({ rows }: ReportsSummaryRowProps) {
 In `components/reports/reports-view.tsx`, replace the placeholder `<div>` that says "operations loaded" with:
 
 Add imports at the top:
+
 ```typescript
-import { ReportsTable } from './reports-table';
+import { ReportsTable } from "./reports-table";
 ```
 
 Add state variables after the existing state declarations:
+
 ```typescript
 const [runningOperationId, setRunningOperationId] = useState<string | null>(null);
 const [failedOperationIds, setFailedOperationIds] = useState<Set<string>>(new Set());
 ```
 
 Add handler stubs (will be implemented in Task 6):
+
 ```typescript
 const handleRunAnalysis = async (row: ReportRow) => {
   // Implemented in Task 6
@@ -854,6 +863,7 @@ const handleRerunAnalysis = async (row: ReportRow) => {
 ```
 
 Replace the placeholder div with:
+
 ```typescript
 <ReportsTable
   rows={rows}
@@ -880,6 +890,7 @@ git commit -m "feat: add reports data table with summary row"
 ### Task 6: Implement single + batch analysis runner
 
 **Files:**
+
 - Create: `components/reports/analysis-runner.tsx`
 - Modify: `components/reports/reports-view.tsx` (wire in analysis logic)
 
@@ -932,45 +943,62 @@ export function AnalysisRunner({
 - [ ] **Step 2: Add analysis logic to `reports-view.tsx`**
 
 Add imports at the top of `components/reports/reports-view.tsx`:
+
 ```typescript
-import { AnalysisRunner } from './analysis-runner';
-import { saveAnalysisResult, deleteAnalysisResult, type ReportRow } from '@/lib/reports-data';
-import { pollForShapefileUrl } from '@/lib/john-deere-client';
-import { processShapefile, classifyHarvestPolygons } from '@/lib/shapefile-analysis';
-import { supabase } from '@/lib/supabase';
+import { AnalysisRunner } from "./analysis-runner";
+import { saveAnalysisResult, deleteAnalysisResult, type ReportRow } from "@/lib/reports-data";
+import { pollForShapefileUrl } from "@/lib/john-deere-client";
+import { processShapefile, classifyHarvestPolygons } from "@/lib/shapefile-analysis";
+import { supabase } from "@/lib/supabase";
 ```
 
 Add state for batch running after existing state declarations:
+
 ```typescript
 const [isBatchRunning, setIsBatchRunning] = useState(false);
-const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fieldName: string } | null>(null);
+const [batchProgress, setBatchProgress] = useState<{
+  current: number;
+  total: number;
+  fieldName: string;
+} | null>(null);
 ```
 
 Replace the `handleRunAnalysis` stub with:
+
 ```typescript
 const runAnalysisForRow = async (row: ReportRow): Promise<void> => {
   const opId = row.operation.jd_operation_id;
   setRunningOperationId(opId);
-  setFailedOperationIds((prev) => { const next = new Set(prev); next.delete(opId); return next; });
+  setFailedOperationIds((prev) => {
+    const next = new Set(prev);
+    next.delete(opId);
+    return next;
+  });
 
   try {
     const storagePath = await pollForShapefileUrl(opId, () => {});
 
     const { data: blob, error: downloadError } = await supabase.storage
-      .from('shapefiles')
+      .from("shapefiles")
       .download(storagePath);
 
     if (downloadError || !blob) {
-      throw new Error(`Failed to download shapefile: ${downloadError?.message || 'No data'}`);
+      throw new Error(`Failed to download shapefile: ${downloadError?.message || "No data"}`);
     }
 
     const zipBuffer = await blob.arrayBuffer();
     const geojson = await processShapefile(zipBuffer);
 
-    const irrigatedBoundary = (row.field.irrigated_boundary_geojson || null) as
-      { type: 'MultiPolygon'; coordinates: number[][][][] } | null;
+    const irrigatedBoundary = (row.field.irrigated_boundary_geojson || null) as {
+      type: "MultiPolygon";
+      coordinates: number[][][][];
+    } | null;
 
-    const stats = classifyHarvestPolygons(geojson, irrigatedBoundary, row.field.has_irrigated_boundary);
+    const stats = classifyHarvestPolygons(
+      geojson,
+      irrigatedBoundary,
+      row.field.has_irrigated_boundary,
+    );
 
     const result = {
       user_id: user!.id,
@@ -978,8 +1006,8 @@ const runAnalysisForRow = async (row: ReportRow): Promise<void> => {
       jd_field_id: row.field.jd_field_id,
       jd_operation_id: opId,
       operation_type: row.operation.operation_type,
-      crop_name: row.operation.crop_name || '',
-      crop_season: row.operation.crop_season || '',
+      crop_name: row.operation.crop_name || "",
+      crop_season: row.operation.crop_season || "",
       irrigated_acres: stats.irrigatedHarvestedAcres,
       dryland_acres: stats.drylandHarvestedAcres,
       total_acres: stats.irrigatedHarvestedAcres + stats.drylandHarvestedAcres,
@@ -1060,6 +1088,7 @@ git commit -m "feat: add single and batch analysis runner for reports"
 ### Task 7: Add trends section
 
 **Files:**
+
 - Create: `components/reports/reports-trends.tsx`
 - Modify: `components/reports/reports-view.tsx` (wire in trends)
 
@@ -1301,11 +1330,13 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
 - [ ] **Step 2: Wire trends into `reports-view.tsx`**
 
 Add import:
+
 ```typescript
-import { ReportsTrends } from './reports-trends';
+import { ReportsTrends } from "./reports-trends";
 ```
 
 Add the trends component after the `<ReportsTable />` in the JSX, inside the `<div className="space-y-6">`:
+
 ```typescript
 <ReportsTrends
   userId={user!.id}
@@ -1330,6 +1361,7 @@ git commit -m "feat: add year-over-year trends section to reports"
 ### Task 8: Add CSV and PDF export
 
 **Files:**
+
 - Create: `lib/reports-export-utils.ts`
 - Create: `components/reports/reports-export.tsx`
 - Modify: `components/reports/reports-view.tsx` (wire in export)
@@ -1337,47 +1369,57 @@ git commit -m "feat: add year-over-year trends section to reports"
 - [ ] **Step 1: Create `lib/reports-export-utils.ts`**
 
 ```typescript
-import { type ReportRow } from './reports-data';
+import { type ReportRow } from "./reports-data";
 
 function fmt(value: number | null | undefined, decimals = 1): string {
-  if (value == null) return '';
+  if (value == null) return "";
   return value.toFixed(decimals);
 }
 
 export function generateCSV(rows: ReportRow[], season: string): string {
   const headers = [
-    'Field', 'Crop', 'Season',
-    'Irrigated Acres', 'Dryland Acres', 'Total Acres',
-    'Irrigated Yield (bu/ac)', 'Dryland Yield (bu/ac)', 'Total Yield (bu/ac)',
-    'Irrigated Moisture %', 'Dryland Moisture %', 'Total Moisture %',
+    "Field",
+    "Crop",
+    "Season",
+    "Irrigated Acres",
+    "Dryland Acres",
+    "Total Acres",
+    "Irrigated Yield (bu/ac)",
+    "Dryland Yield (bu/ac)",
+    "Total Yield (bu/ac)",
+    "Irrigated Moisture %",
+    "Dryland Moisture %",
+    "Total Moisture %",
   ];
 
-  const csvRows = [headers.join(',')];
+  const csvRows = [headers.join(",")];
 
   for (const row of rows) {
-    csvRows.push([
-      `"${row.field.name}"`,
-      row.operation.crop_name || '',
-      row.operation.crop_season || season,
-      fmt(row.irrigatedAcres),
-      fmt(row.drylandAcres),
-      fmt(row.totalAcres),
-      row.analysis ? fmt(row.analysis.irrigated_yield) : '',
-      row.analysis ? fmt(row.analysis.dryland_yield) : '',
-      fmt(row.operation.avg_yield_value),
-      row.analysis ? fmt(row.analysis.irrigated_moisture) : '',
-      row.analysis ? fmt(row.analysis.dryland_moisture) : '',
-      fmt(row.operation.avg_moisture),
-    ].join(','));
+    csvRows.push(
+      [
+        `"${row.field.name}"`,
+        row.operation.crop_name || "",
+        row.operation.crop_season || season,
+        fmt(row.irrigatedAcres),
+        fmt(row.drylandAcres),
+        fmt(row.totalAcres),
+        row.analysis ? fmt(row.analysis.irrigated_yield) : "",
+        row.analysis ? fmt(row.analysis.dryland_yield) : "",
+        fmt(row.operation.avg_yield_value),
+        row.analysis ? fmt(row.analysis.irrigated_moisture) : "",
+        row.analysis ? fmt(row.analysis.dryland_moisture) : "",
+        fmt(row.operation.avg_moisture),
+      ].join(","),
+    );
   }
 
-  return csvRows.join('\n');
+  return csvRows.join("\n");
 }
 
 export function downloadCSV(csv: string, filename: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   link.click();
@@ -1385,21 +1427,25 @@ export function downloadCSV(csv: string, filename: string): void {
 }
 
 export function generatePDFHtml(rows: ReportRow[], season: string, title: string): string {
-  const tableRows = rows.map((row) => `
+  const tableRows = rows
+    .map(
+      (row) => `
     <tr>
       <td>${row.field.name}</td>
-      <td>${row.operation.crop_name || ''}</td>
+      <td>${row.operation.crop_name || ""}</td>
       <td style="text-align:right">${fmt(row.irrigatedAcres)}</td>
       <td style="text-align:right">${fmt(row.drylandAcres)}</td>
       <td style="text-align:right">${fmt(row.totalAcres)}</td>
-      <td style="text-align:right">${row.analysis ? fmt(row.analysis.irrigated_yield) : '--'}</td>
-      <td style="text-align:right">${row.analysis ? fmt(row.analysis.dryland_yield) : '--'}</td>
+      <td style="text-align:right">${row.analysis ? fmt(row.analysis.irrigated_yield) : "--"}</td>
+      <td style="text-align:right">${row.analysis ? fmt(row.analysis.dryland_yield) : "--"}</td>
       <td style="text-align:right">${fmt(row.operation.avg_yield_value)}</td>
-      <td style="text-align:right">${row.analysis ? fmt(row.analysis.irrigated_moisture, 1) + '%' : '--'}</td>
-      <td style="text-align:right">${row.analysis ? fmt(row.analysis.dryland_moisture, 1) + '%' : '--'}</td>
-      <td style="text-align:right">${row.operation.avg_moisture != null ? fmt(row.operation.avg_moisture, 1) + '%' : '--'}</td>
+      <td style="text-align:right">${row.analysis ? fmt(row.analysis.irrigated_moisture, 1) + "%" : "--"}</td>
+      <td style="text-align:right">${row.analysis ? fmt(row.analysis.dryland_moisture, 1) + "%" : "--"}</td>
+      <td style="text-align:right">${row.operation.avg_moisture != null ? fmt(row.operation.avg_moisture, 1) + "%" : "--"}</td>
     </tr>
-  `).join('');
+  `,
+    )
+    .join("");
 
   return `<!DOCTYPE html>
 <html>
@@ -1435,11 +1481,13 @@ export function generatePDFHtml(rows: ReportRow[], season: string, title: string
 }
 
 export function printPDF(html: string): void {
-  const win = window.open('', '_blank');
+  const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(html);
   win.document.close();
-  win.onload = () => { win.print(); };
+  win.onload = () => {
+    win.print();
+  };
 }
 ```
 
@@ -1485,11 +1533,13 @@ export function ReportsExport({ rows, season }: ReportsExportProps) {
 - [ ] **Step 3: Wire exports into `reports-view.tsx`**
 
 Add imports:
+
 ```typescript
-import { ReportsExport } from './reports-export';
+import { ReportsExport } from "./reports-export";
 ```
 
 Add the export component in the filter bar area, after `<AnalysisRunner ... />`:
+
 ```typescript
 <ReportsExport rows={rows} season={selectedSeason} />
 ```
@@ -1510,6 +1560,7 @@ git commit -m "feat: add CSV and PDF export to reports page"
 ### Task 9: Build verification and push
 
 **Files:**
+
 - All files from previous tasks
 
 - [ ] **Step 1: Run the build**
@@ -1523,6 +1574,7 @@ Expected: Build succeeds with no type errors. Warnings about `@supabase/realtime
 - [ ] **Step 2: Fix any build errors**
 
 If there are type errors, fix them. Common issues:
+
 - Missing imports
 - Nullable type mismatches (add `!` or null checks)
 - Missing `'use client'` directives
@@ -1536,6 +1588,7 @@ git push
 - [ ] **Step 4: Verify on production**
 
 Navigate to `https://operations-center-api-demo.vercel.app/reports`. Verify:
+
 - Filters load with seasons and crops
 - Table shows fields with irrigated boundaries
 - Acreage columns are populated

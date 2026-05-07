@@ -5,7 +5,7 @@
  * Crops in GLOBALLY_EXCLUDED_CROPS are *always* hidden — not user-toggleable.
  * Treat these as off the platform entirely.
  */
-export const GLOBALLY_EXCLUDED_CROPS = ['RYE'] as const;
+export const GLOBALLY_EXCLUDED_CROPS = ["RYE"] as const;
 
 function mergedHidden(hidden: string[] | null | undefined): Set<string> {
   const set = new Set<string>(GLOBALLY_EXCLUDED_CROPS);
@@ -34,10 +34,10 @@ export function filterHiddenOperations<T extends { crop_name: string | null }>(
  * operations for them yet. Used in the Settings UI to seed the checklist.
  */
 export const COMMON_COVER_CROPS = [
-  'RYE',
-  'GRASSLAND',
-  'RADISH',
-  'TURNIP',
-  'CLOVER',
-  'ALFALFA',
+  "RYE",
+  "GRASSLAND",
+  "RADISH",
+  "TURNIP",
+  "CLOVER",
+  "ALFALFA",
 ] as const;

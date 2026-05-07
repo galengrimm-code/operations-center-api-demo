@@ -9,23 +9,19 @@ export function sqMetersToAcres(sqm: number): number {
 
 export function sqMetersToUnit(sqm: number, unit: string): number {
   const u = unit.toLowerCase();
-  if (u === 'ac') return sqm * SQM_TO_AC;
-  if (u === 'ha') return sqm * SQM_TO_HA;
+  if (u === "ac") return sqm * SQM_TO_AC;
+  if (u === "ha") return sqm * SQM_TO_HA;
   return sqm;
 }
 
-export function convertArea(
-  value: number,
-  fromUnit: string,
-  toUnit: string
-): number {
+export function convertArea(value: number, fromUnit: string, toUnit: string): number {
   const from = fromUnit.toLowerCase();
   const to = toUnit.toLowerCase();
 
   if (from === to) return value;
 
-  if (from === 'ha' && to === 'ac') return value * HA_TO_AC;
-  if (from === 'ac' && to === 'ha') return value * AC_TO_HA;
+  if (from === "ha" && to === "ac") return value * HA_TO_AC;
+  if (from === "ac" && to === "ha") return value * AC_TO_HA;
 
   return value;
 }
@@ -33,9 +29,9 @@ export function convertArea(
 export function formatArea(
   value: number | null,
   sourceUnit: string | null,
-  preferredUnit: string
+  preferredUnit: string,
 ): string {
-  if (value == null || !sourceUnit) return '';
+  if (value == null || !sourceUnit) return "";
 
   const converted = convertArea(value, sourceUnit, preferredUnit);
   const formatted = converted.toLocaleString(undefined, {

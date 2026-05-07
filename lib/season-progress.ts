@@ -1,7 +1,7 @@
-import { supabase } from '@/lib/supabase';
-import { convertArea } from '@/lib/area-utils';
-import { GLOBALLY_EXCLUDED_CROPS } from '@/lib/crop-filter';
-import type { StoredField, StoredFieldOperation, FieldSeason } from '@/types/john-deere';
+import { supabase } from "@/lib/supabase";
+import { convertArea } from "@/lib/area-utils";
+import { GLOBALLY_EXCLUDED_CROPS } from "@/lib/crop-filter";
+import type { StoredField, StoredFieldOperation, FieldSeason } from "@/types/john-deere";
 
 export interface FieldProgressRow {
   field_id: string;
@@ -12,7 +12,7 @@ export interface FieldProgressRow {
   target_acres: number;
   planted_acres: number;
   planted_date: string | null;
-  source: 'manual' | 'jd' | 'none';
+  source: "manual" | "jd" | "none";
 }
 
 export interface CropProgress {
@@ -41,26 +41,26 @@ export interface SeasonProgress {
   crops: CropProgress[];
   fields: FieldProgressRow[];
   cumulative: CumulativePoint[];
-  unit: 'ac';
+  unit: "ac";
 }
 
-const fieldAcres = (f: Pick<StoredField, 'boundary_area_value' | 'boundary_area_unit'>): number => {
+const fieldAcres = (f: Pick<StoredField, "boundary_area_value" | "boundary_area_unit">): number => {
   if (f.boundary_area_value == null || !f.boundary_area_unit) return 0;
-  return convertArea(f.boundary_area_value, f.boundary_area_unit, 'ac');
+  return convertArea(f.boundary_area_value, f.boundary_area_unit, "ac");
 };
 
-const opAcres = (op: Pick<StoredFieldOperation, 'area_value' | 'area_unit'>): number => {
+const opAcres = (op: Pick<StoredFieldOperation, "area_value" | "area_unit">): number => {
   if (op.area_value == null || !op.area_unit) return 0;
-  return convertArea(op.area_value, op.area_unit, 'ac');
+  return convertArea(op.area_value, op.area_unit, "ac");
 };
 
 const normalizeCrop = (raw: string | null | undefined): string | null => {
   if (!raw) return null;
   const c = raw.trim().toUpperCase();
-  if (!c || c === '---') return null;
-  if (c.startsWith('SOYBEAN')) return 'SOYBEANS';
-  if (c.startsWith('CORN')) return 'CORN';
-  if (c.startsWith('WHEAT')) return 'WHEAT';
+  if (!c || c === "---") return null;
+  if (c.startsWith("SOYBEAN")) return "SOYBEANS";
+  if (c.startsWith("CORN")) return "CORN";
+  if (c.startsWith("WHEAT")) return "WHEAT";
   return c;
 };
 
@@ -101,22 +101,20 @@ export async function loadSeasonProgress(opts: {
 
   const [fieldsRes, opsRes, seasonsRes] = await Promise.all([
     supabase
-      .from('fields')
-      .select('id,jd_field_id,name,farm_name,boundary_area_value,boundary_area_unit')
-      .eq('user_id', userId)
-      .eq('org_id', orgId),
+      .from("fields")
+      .select("id,jd_field_id,name,farm_name,boundary_area_value,boundary_area_unit")
+      .eq("user_id", userId)
+      .eq("org_id", orgId),
     supabase
-      .from('field_operations')
-      .select('jd_field_id,crop_season,crop_name,crop_name_override,start_date,area_value,area_unit')
-      .eq('user_id', userId)
-      .eq('org_id', orgId)
-      .eq('operation_type', 'seeding')
-      .in('crop_season', yearStrings),
-    supabase
-      .from('field_seasons')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('season_year', year),
+      .from("field_operations")
+      .select(
+        "jd_field_id,crop_season,crop_name,crop_name_override,start_date,area_value,area_unit",
+      )
+      .eq("user_id", userId)
+      .eq("org_id", orgId)
+      .eq("operation_type", "seeding")
+      .in("crop_season", yearStrings),
+    supabase.from("field_seasons").select("*").eq("user_id", userId).eq("season_year", year),
   ]);
 
   if (fieldsRes.error) throw fieldsRes.error;
@@ -124,7 +122,10 @@ export async function loadSeasonProgress(opts: {
   if (seasonsRes.error) throw seasonsRes.error;
 
   const allFields = (fieldsRes.data || []) as Array<
-    Pick<StoredField, 'id' | 'jd_field_id' | 'name' | 'farm_name' | 'boundary_area_value' | 'boundary_area_unit'>
+    Pick<
+      StoredField,
+      "id" | "jd_field_id" | "name" | "farm_name" | "boundary_area_value" | "boundary_area_unit"
+    >
   >;
 
   // Apply farm filter at the field level
@@ -134,7 +135,13 @@ export async function loadSeasonProgress(opts: {
   const allOps = (opsRes.data || []) as Array<
     Pick<
       StoredFieldOperation,
-      'jd_field_id' | 'crop_season' | 'crop_name' | 'crop_name_override' | 'start_date' | 'area_value' | 'area_unit'
+      | "jd_field_id"
+      | "crop_season"
+      | "crop_name"
+      | "crop_name_override"
+      | "start_date"
+      | "area_value"
+      | "area_unit"
     >
   >;
   // Filter ops to fields in the active farm filter
@@ -152,7 +159,7 @@ export async function loadSeasonProgress(opts: {
     const c = normalizeCrop(op.crop_name_override || op.crop_name);
     return !!c && !hidden.has(c);
   });
-  const opByField = new Map<string, typeof ops[number]>();
+  const opByField = new Map<string, (typeof ops)[number]>();
   currentYearOps.forEach((op) => {
     const existing = opByField.get(op.jd_field_id);
     if (!existing || opAcres(op) > opAcres(existing)) {
@@ -177,16 +184,16 @@ export async function loadSeasonProgress(opts: {
 
     let planted = 0;
     let planted_date: string | null = null;
-    let source: FieldProgressRow['source'] = 'none';
+    let source: FieldProgressRow["source"] = "none";
 
     if (season?.planted_acres != null || season?.planted_date) {
       planted = season.planted_acres ?? (op ? opAcres(op) : 0);
       planted_date = season.planted_date ?? (op ? dateKey(op.start_date) : null);
-      source = 'manual';
+      source = "manual";
     } else if (op) {
       planted = opAcres(op);
       planted_date = dateKey(op.start_date);
-      source = 'jd';
+      source = "jd";
     }
 
     return {
@@ -209,7 +216,13 @@ export async function loadSeasonProgress(opts: {
     if (hidden.has(r.crop)) return;
     let entry = cropMap.get(r.crop);
     if (!entry) {
-      entry = { crop: r.crop, target_acres: 0, planted_acres: 0, fields_total: 0, fields_planted: 0 };
+      entry = {
+        crop: r.crop,
+        target_acres: 0,
+        planted_acres: 0,
+        fields_total: 0,
+        fields_planted: 0,
+      };
       cropMap.set(r.crop, entry);
     }
     entry.target_acres += r.target_acres;
@@ -248,7 +261,7 @@ export async function loadSeasonProgress(opts: {
   rows.forEach((r) => {
     if (!r.crop || !currentYearCrops.includes(r.crop)) return;
     if (hidden.has(r.crop)) return;
-    if (r.source !== 'manual') return; // JD-derived rows handled in op loop below
+    if (r.source !== "manual") return; // JD-derived rows handled in op loop below
     if (!r.planted_date || r.planted_acres <= 0) return;
     const md = monthDayKey(r.planted_date);
     if (!md) return;
@@ -256,7 +269,9 @@ export async function loadSeasonProgress(opts: {
   });
 
   // For non-manual current-year fields: use ops directly
-  const manualFieldIds = new Set(rows.filter((r) => r.source === 'manual').map((r) => r.jd_field_id));
+  const manualFieldIds = new Set(
+    rows.filter((r) => r.source === "manual").map((r) => r.jd_field_id),
+  );
 
   ops.forEach((op) => {
     const opYear = op.crop_season ? Number(op.crop_season) : NaN;
@@ -334,6 +349,6 @@ export async function loadSeasonProgress(opts: {
     crops,
     fields: rows,
     cumulative,
-    unit: 'ac',
+    unit: "ac",
   };
 }

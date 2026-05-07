@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect } from 'react';
-import { useAuth } from '@/contexts/auth-context';
-import { fetchStoredOperations } from '@/lib/john-deere-client';
-import type { StoredFieldOperation } from '@/types/john-deere';
-import { filterHiddenOperations } from '@/lib/crop-filter';
+import { useState, useCallback, useEffect } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { fetchStoredOperations } from "@/lib/john-deere-client";
+import type { StoredFieldOperation } from "@/types/john-deere";
+import { filterHiddenOperations } from "@/lib/crop-filter";
 
 export function useOperations(fieldId?: string, operationType?: string) {
   const { johnDeereConnection } = useAuth();
@@ -15,7 +15,7 @@ export function useOperations(fieldId?: string, operationType?: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hiddenKey = hiddenCrops.join(',');
+  const hiddenKey = hiddenCrops.join(",");
 
   const refresh = useCallback(async () => {
     if (!orgId) return;
@@ -25,7 +25,7 @@ export function useOperations(fieldId?: string, operationType?: string) {
       const data = await fetchStoredOperations(fieldId, operationType);
       setOperations(filterHiddenOperations(data.operations || [], hiddenCrops));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load operations');
+      setError(err instanceof Error ? err.message : "Failed to load operations");
     } finally {
       setLoading(false);
     }

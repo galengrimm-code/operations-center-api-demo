@@ -74,20 +74,20 @@ Only fields with irrigated boundaries appear. One row per field per crop per ope
 
 Columns:
 
-| Column | Source | Always available? |
-|--------|--------|-------------------|
-| Field | `fields.name` | Yes |
-| Crop | `field_operations.crop_name` | Yes |
-| Irrigated Ac | `fields.irrigated_boundary_area_value` | Yes |
-| Dryland Ac | `fields.boundary_area_value - irrigated_boundary_area_value` | Yes |
-| Total Ac | `field_operations.area_value` or boundary total | Yes |
-| Irrigated Yield (bu/ac) | `irrigation_analysis_results.irrigated_yield` | After analysis |
-| Dryland Yield (bu/ac) | `irrigation_analysis_results.dryland_yield` | After analysis |
-| Total Yield (bu/ac) | `field_operations.avg_yield_value` | Yes |
-| Irrigated Moisture % | `irrigation_analysis_results.irrigated_moisture` | After analysis |
-| Dryland Moisture % | `irrigation_analysis_results.dryland_moisture` | After analysis |
-| Total Moisture % | `field_operations.avg_moisture` | After analysis |
-| Action | Run / Re-run button | Always |
+| Column                  | Source                                                       | Always available? |
+| ----------------------- | ------------------------------------------------------------ | ----------------- |
+| Field                   | `fields.name`                                                | Yes               |
+| Crop                    | `field_operations.crop_name`                                 | Yes               |
+| Irrigated Ac            | `fields.irrigated_boundary_area_value`                       | Yes               |
+| Dryland Ac              | `fields.boundary_area_value - irrigated_boundary_area_value` | Yes               |
+| Total Ac                | `field_operations.area_value` or boundary total              | Yes               |
+| Irrigated Yield (bu/ac) | `irrigation_analysis_results.irrigated_yield`                | After analysis    |
+| Dryland Yield (bu/ac)   | `irrigation_analysis_results.dryland_yield`                  | After analysis    |
+| Total Yield (bu/ac)     | `field_operations.avg_yield_value`                           | Yes               |
+| Irrigated Moisture %    | `irrigation_analysis_results.irrigated_moisture`             | After analysis    |
+| Dryland Moisture %      | `irrigation_analysis_results.dryland_moisture`               | After analysis    |
+| Total Moisture %        | `field_operations.avg_moisture`                              | After analysis    |
+| Action                  | Run / Re-run button                                          | Always            |
 
 Un-analyzed rows show `--` for irrigated/dryland yield and moisture columns, with a "Run" button in the action column. After analysis, the button changes to a "Re-run" option.
 
@@ -111,12 +111,12 @@ Only includes rows that have analysis results for the yield/moisture averages.
 
 Below the main table. Separate filter dropdowns for field and crop. Shows year-over-year data for the selected field + crop combination:
 
-| Year | Irr Ac | Dry Ac | Total Ac | Irr Yield | Dry Yield | Total Yield |
-|------|--------|--------|----------|-----------|-----------|-------------|
-| 2025 | 125.3 | 14.1 | 139.4 | 247.1 | 198.3 | 241.5 |
-| 2024 | 125.3 | 14.1 | 139.4 | 247.1 | 216.6 | 243.8 |
-| 2023 | 125.3 | 14.1 | 139.4 | 221.4 | 189.2 | 217.6 |
-| **AVG** | **125.3** | **14.1** | **139.4** | **238.5** | **201.4** | **234.3** |
+| Year    | Irr Ac    | Dry Ac   | Total Ac  | Irr Yield | Dry Yield | Total Yield |
+| ------- | --------- | -------- | --------- | --------- | --------- | ----------- |
+| 2025    | 125.3     | 14.1     | 139.4     | 247.1     | 198.3     | 241.5       |
+| 2024    | 125.3     | 14.1     | 139.4     | 247.1     | 216.6     | 243.8       |
+| 2023    | 125.3     | 14.1     | 139.4     | 221.4     | 189.2     | 217.6       |
+| **AVG** | **125.3** | **14.1** | **139.4** | **238.5** | **201.4** | **234.3**   |
 
 Average row uses weighted averages (by acreage). Only includes years where analysis has been run.
 
@@ -172,6 +172,7 @@ lib/
 ```
 
 Reuses existing:
+
 - `lib/shapefile-analysis.ts` — polygon classification (no changes needed)
 - `lib/supabase.ts` — database client (already configured for `operations_center` schema)
 - `lib/john-deere-client.ts` — Edge Function calls for shapefile fetching
@@ -179,12 +180,12 @@ Reuses existing:
 
 ## Error Handling
 
-| Scenario | Behavior |
-|----------|----------|
-| Shapefile fetch fails (JD 403/timeout) | Show "Failed — Retry" on that row. Don't block batch. |
-| JD returns 406 (no shapefile available) | Show "N/A" instead of Run button. Total yield still shown from JD data. |
-| Classification fails | Catch error, show on row. Results not saved. User can retry. |
-| Export with missing data | CSV/PDF exports whatever is available. Un-analyzed rows show blanks for yield columns. |
+| Scenario                                | Behavior                                                                               |
+| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| Shapefile fetch fails (JD 403/timeout)  | Show "Failed — Retry" on that row. Don't block batch.                                  |
+| JD returns 406 (no shapefile available) | Show "N/A" instead of Run button. Total yield still shown from JD data.                |
+| Classification fails                    | Catch error, show on row. Results not saved. User can retry.                           |
+| Export with missing data                | CSV/PDF exports whatever is available. Un-analyzed rows show blanks for yield columns. |
 
 ## Not In Scope
 

@@ -134,21 +134,21 @@ supabase/
 
 ### Frontend (`.env.local`)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase public anon key |
-| `NEXT_PUBLIC_JOHN_DEERE_CLIENT_ID` | Yes | John Deere OAuth client ID (used to build auth URL) |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | Yes | Mapbox GL JS public access token (for the field boundary map) |
+| Variable                           | Required | Description                                                   |
+| ---------------------------------- | -------- | ------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`         | Yes      | Supabase project URL                                          |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | Yes      | Supabase public anon key                                      |
+| `NEXT_PUBLIC_JOHN_DEERE_CLIENT_ID` | Yes      | John Deere OAuth client ID (used to build auth URL)           |
+| `NEXT_PUBLIC_MAPBOX_TOKEN`         | Yes      | Mapbox GL JS public access token (for the field boundary map) |
 
 ### Supabase Edge Functions
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `JOHN_DEERE_CLIENT_ID` | Yes | John Deere OAuth client ID |
-| `JOHN_DEERE_CLIENT_SECRET` | Yes | John Deere OAuth client secret (never exposed to browser) |
-| `SUPABASE_URL` | auto | Injected by Supabase runtime |
-| `SUPABASE_SERVICE_ROLE_KEY` | auto | Injected by Supabase runtime (bypasses RLS) |
+| Variable                    | Required | Description                                               |
+| --------------------------- | -------- | --------------------------------------------------------- |
+| `JOHN_DEERE_CLIENT_ID`      | Yes      | John Deere OAuth client ID                                |
+| `JOHN_DEERE_CLIENT_SECRET`  | Yes      | John Deere OAuth client secret (never exposed to browser) |
+| `SUPABASE_URL`              | auto     | Injected by Supabase runtime                              |
+| `SUPABASE_SERVICE_ROLE_KEY` | auto     | Injected by Supabase runtime (bypasses RLS)               |
 
 ---
 
@@ -156,62 +156,62 @@ supabase/
 
 ### `john_deere_connections` (one row per authenticated user)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid PK | `gen_random_uuid()` |
-| `user_id` | uuid FK → `auth.users` | UNIQUE, CASCADE DELETE |
-| `access_token` | text | Short-lived John Deere token |
-| `refresh_token` | text | Long-lived token for renewal |
-| `token_expires_at` | timestamptz | Used to decide when to refresh |
-| `selected_org_id` | text (nullable) | Currently selected JD org |
-| `selected_org_name` | text (nullable) | Display name for selected org |
-| `preferred_area_unit` | text | Default: 'ac' |
-| `created_at` | timestamptz | |
-| `updated_at` | timestamptz | |
+| Column                | Type                   | Notes                          |
+| --------------------- | ---------------------- | ------------------------------ |
+| `id`                  | uuid PK                | `gen_random_uuid()`            |
+| `user_id`             | uuid FK → `auth.users` | UNIQUE, CASCADE DELETE         |
+| `access_token`        | text                   | Short-lived John Deere token   |
+| `refresh_token`       | text                   | Long-lived token for renewal   |
+| `token_expires_at`    | timestamptz            | Used to decide when to refresh |
+| `selected_org_id`     | text (nullable)        | Currently selected JD org      |
+| `selected_org_name`   | text (nullable)        | Display name for selected org  |
+| `preferred_area_unit` | text                   | Default: 'ac'                  |
+| `created_at`          | timestamptz            |                                |
+| `updated_at`          | timestamptz            |                                |
 
 ### `fields` (imported field data with boundaries)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid PK | |
-| `user_id` | uuid FK → `auth.users` | CASCADE DELETE |
-| `org_id` | text | John Deere organization ID |
-| `jd_field_id` | text | John Deere field ID |
-| `name` | text | Field name |
-| `boundary_geojson` | jsonb (nullable) | GeoJSON MultiPolygon — active boundary |
-| `boundary_area_value` | double precision (nullable) | |
-| `boundary_area_unit` | text (nullable) | e.g. "ha" or "ac" |
-| `active_boundary` | boolean | |
-| `irrigated_boundary_geojson` | jsonb (nullable) | GeoJSON MultiPolygon — irrigated boundary |
-| `irrigated_boundary_area_value` | double precision (nullable) | |
-| `irrigated_boundary_area_unit` | text (nullable) | |
-| `has_irrigated_boundary` | boolean | Quick filter flag |
-| `client_name` | text (nullable) | |
-| `client_id` | text (nullable) | |
-| `farm_name` | text (nullable) | |
-| `farm_id` | text (nullable) | |
-| `raw_response` | jsonb (nullable) | Full JD API response |
+| Column                          | Type                        | Notes                                     |
+| ------------------------------- | --------------------------- | ----------------------------------------- |
+| `id`                            | uuid PK                     |                                           |
+| `user_id`                       | uuid FK → `auth.users`      | CASCADE DELETE                            |
+| `org_id`                        | text                        | John Deere organization ID                |
+| `jd_field_id`                   | text                        | John Deere field ID                       |
+| `name`                          | text                        | Field name                                |
+| `boundary_geojson`              | jsonb (nullable)            | GeoJSON MultiPolygon — active boundary    |
+| `boundary_area_value`           | double precision (nullable) |                                           |
+| `boundary_area_unit`            | text (nullable)             | e.g. "ha" or "ac"                         |
+| `active_boundary`               | boolean                     |                                           |
+| `irrigated_boundary_geojson`    | jsonb (nullable)            | GeoJSON MultiPolygon — irrigated boundary |
+| `irrigated_boundary_area_value` | double precision (nullable) |                                           |
+| `irrigated_boundary_area_unit`  | text (nullable)             |                                           |
+| `has_irrigated_boundary`        | boolean                     | Quick filter flag                         |
+| `client_name`                   | text (nullable)             |                                           |
+| `client_id`                     | text (nullable)             |                                           |
+| `farm_name`                     | text (nullable)             |                                           |
+| `farm_id`                       | text (nullable)             |                                           |
+| `raw_response`                  | jsonb (nullable)            | Full JD API response                      |
 
 UNIQUE constraint: `(user_id, org_id, jd_field_id)`
 
 ### `field_operations` (imported harvest/seeding operations)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid PK | |
-| `user_id` | uuid FK → `auth.users` | CASCADE DELETE |
-| `org_id` | text | |
-| `jd_field_id` | text | |
-| `jd_operation_id` | text | |
-| `operation_type` | text | "harvest", "seeding" |
-| `crop_season`, `crop_name` | text (nullable) | |
-| `start_date`, `end_date` | text (nullable) | |
-| `area_value`, `area_unit` | (nullable) | Measurement data |
-| `avg_yield_value`, `avg_yield_unit` | (nullable) | |
-| `avg_moisture` | double precision (nullable) | |
-| `map_image_path` | text (nullable) | Supabase Storage path |
-| `map_image_extent` | jsonb (nullable) | Lat/lon extent for map overlay |
-| `map_image_legends` | jsonb (nullable) | Color legend ranges |
+| Column                              | Type                        | Notes                          |
+| ----------------------------------- | --------------------------- | ------------------------------ |
+| `id`                                | uuid PK                     |                                |
+| `user_id`                           | uuid FK → `auth.users`      | CASCADE DELETE                 |
+| `org_id`                            | text                        |                                |
+| `jd_field_id`                       | text                        |                                |
+| `jd_operation_id`                   | text                        |                                |
+| `operation_type`                    | text                        | "harvest", "seeding"           |
+| `crop_season`, `crop_name`          | text (nullable)             |                                |
+| `start_date`, `end_date`            | text (nullable)             |                                |
+| `area_value`, `area_unit`           | (nullable)                  | Measurement data               |
+| `avg_yield_value`, `avg_yield_unit` | (nullable)                  |                                |
+| `avg_moisture`                      | double precision (nullable) |                                |
+| `map_image_path`                    | text (nullable)             | Supabase Storage path          |
+| `map_image_extent`                  | jsonb (nullable)            | Lat/lon extent for map overlay |
+| `map_image_legends`                 | jsonb (nullable)            | Color legend ranges            |
 
 UNIQUE constraint: `(user_id, org_id, jd_operation_id)`
 
@@ -240,41 +240,42 @@ Row-Level Security is enabled on all tables. Authenticated users can only read/w
 ## Supabase Edge Functions
 
 All functions share the same pattern:
+
 1. Validate the `Authorization: Bearer <user_jwt>` header using `supabase.auth.getUser()`.
 2. Dispatch on the `?action=` query param.
 3. Return JSON with CORS headers.
 
 ### `john-deere-auth`
 
-| Action | Method | Description |
-|--------|--------|-------------|
-| `exchange` | POST | Trade authorization code for tokens; upsert into DB |
-| `refresh` | POST | Refresh access token using stored refresh token |
-| `disconnect` | POST | Delete the user's connection row |
+| Action       | Method | Description                                         |
+| ------------ | ------ | --------------------------------------------------- |
+| `exchange`   | POST   | Trade authorization code for tokens; upsert into DB |
+| `refresh`    | POST   | Refresh access token using stored refresh token     |
+| `disconnect` | POST   | Delete the user's connection row                    |
 
 ### `john-deere-api`
 
-| Action | Method | Description |
-|--------|--------|-------------|
-| `organizations` | GET | List organizations from JD API |
-| `select-organization` | POST | Persist selected org ID/name to DB |
-| `fields` | GET | Proxy field list from JD API |
-| `get-stored-fields` | GET | Query imported fields from local DB |
-| `get-stored-operations` | GET | Query imported operations from local DB (supports fieldId, operationType filters) |
+| Action                  | Method | Description                                                                       |
+| ----------------------- | ------ | --------------------------------------------------------------------------------- |
+| `organizations`         | GET    | List organizations from JD API                                                    |
+| `select-organization`   | POST   | Persist selected org ID/name to DB                                                |
+| `fields`                | GET    | Proxy field list from JD API                                                      |
+| `get-stored-fields`     | GET    | Query imported fields from local DB                                               |
+| `get-stored-operations` | GET    | Query imported operations from local DB (supports fieldId, operationType filters) |
 
 ### `john-deere-import`
 
-| Action | Method | Description |
-|--------|--------|-------------|
-| `import-fields` | POST | Fetch all fields from JD (paginated), fetch irrigated boundaries (`?recordFilter=all`), import operations, store everything in DB |
-| `import-operations` | POST | Import operations only for already-imported fields |
+| Action              | Method | Description                                                                                                                       |
+| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `import-fields`     | POST   | Fetch all fields from JD (paginated), fetch irrigated boundaries (`?recordFilter=all`), import operations, store everything in DB |
+| `import-operations` | POST   | Import operations only for already-imported fields                                                                                |
 
 ### `john-deere-irrigation`
 
-| Action | Method | Description |
-|--------|--------|-------------|
-| `irrigation-analysis` | GET | Analyze field boundary to compute irrigated/dryland acres |
-| `shapefile-status` | GET | Check/download shapefile from JD, upload to Supabase Storage |
+| Action                | Method | Description                                                  |
+| --------------------- | ------ | ------------------------------------------------------------ |
+| `irrigation-analysis` | GET    | Analyze field boundary to compute irrigated/dryland acres    |
+| `shapefile-status`    | GET    | Check/download shapefile from JD, upload to Supabase Storage |
 
 > **Note:** The app targets the John Deere **production** API (`api.deere.com`).
 
@@ -305,6 +306,7 @@ All functions share the same pattern:
 ## Deployment
 
 ### Vercel
+
 Connect your GitHub repo to Vercel — Next.js is auto-detected, no config file required. Set the four `NEXT_PUBLIC_*` environment variables in **Project Settings → Environment Variables** (for Production, Preview, and Development). Vercel builds and deploys automatically on every push to `main`.
 
 ### Supabase Edge Functions
@@ -317,7 +319,9 @@ supabase functions deploy john-deere-api --no-verify-jwt
 supabase functions deploy john-deere-import --no-verify-jwt
 supabase functions deploy john-deere-irrigation --no-verify-jwt
 ```
+
 Set secrets:
+
 ```bash
 supabase secrets set JOHN_DEERE_CLIENT_ID=<value>
 supabase secrets set JOHN_DEERE_CLIENT_SECRET=<value>

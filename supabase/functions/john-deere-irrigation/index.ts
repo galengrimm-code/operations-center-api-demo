@@ -1,15 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { optionsResponse, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getAuthenticatedUser, isResponse } from "../_shared/auth.ts";
-import {
-  getValidToken,
-  getUserConnection,
-  JOHN_DEERE_API_BASE,
-} from "../_shared/john-deere.ts";
-import {
-  buildExteriorOnlyGeoJSON,
-  JdBoundary,
-} from "../_shared/boundaries.ts";
+import { getValidToken, getUserConnection, JOHN_DEERE_API_BASE } from "../_shared/john-deere.ts";
+import { buildExteriorOnlyGeoJSON, JdBoundary } from "../_shared/boundaries.ts";
 import area from "npm:@turf/area@7";
 import intersect from "npm:@turf/intersect@7";
 
@@ -74,8 +67,16 @@ async function analyzeBoundary(
       // in a single call — handles overlapping pivots without double-counting
       let irrigatedSqm = 0;
       try {
-        const fieldFeature = { type: "Feature" as const, geometry: exteriorGeoJSON, properties: {} };
-        const irrigFeature = { type: "Feature" as const, geometry: irrigatedBoundaryGeoJSON, properties: {} };
+        const fieldFeature = {
+          type: "Feature" as const,
+          geometry: exteriorGeoJSON,
+          properties: {},
+        };
+        const irrigFeature = {
+          type: "Feature" as const,
+          geometry: irrigatedBoundaryGeoJSON,
+          properties: {},
+        };
         const fc = { type: "FeatureCollection" as const, features: [fieldFeature, irrigFeature] };
         const intersectFn = intersect.intersect || intersect.default || intersect;
         const clipped = intersectFn(fc);
@@ -183,14 +184,17 @@ Deno.serve(async (req: Request) => {
 
       const response = await fetch(shapefileUrl, {
         headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Accept": "application/vnd.deere.axiom.v3+json",
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/vnd.deere.axiom.v3+json",
         },
         redirect: "manual",
       });
 
       console.log(`[irrigation] JD response status: ${response.status}`);
-      console.log(`[irrigation] JD response headers:`, Object.fromEntries(response.headers.entries()));
+      console.log(
+        `[irrigation] JD response headers:`,
+        Object.fromEntries(response.headers.entries()),
+      );
 
       if (response.status === 307) {
         const downloadUrl = response.headers.get("Location");
@@ -206,7 +210,9 @@ Deno.serve(async (req: Request) => {
         }
 
         const zipBytes = new Uint8Array(await zipResponse.arrayBuffer());
-        console.log(`[irrigation] Downloaded ${(zipBytes.length / 1024).toFixed(0)} KB, uploading to storage...`);
+        console.log(
+          `[irrigation] Downloaded ${(zipBytes.length / 1024).toFixed(0)} KB, uploading to storage...`,
+        );
 
         // Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage
@@ -218,7 +224,10 @@ Deno.serve(async (req: Request) => {
 
         if (uploadError) {
           console.error("[irrigation] Storage upload error:", uploadError);
-          return errorResponse(`Failed to upload shapefile to storage: ${uploadError.message}`, 500);
+          return errorResponse(
+            `Failed to upload shapefile to storage: ${uploadError.message}`,
+            500,
+          );
         }
 
         console.log(`[irrigation] Shapefile uploaded to storage`);
@@ -235,13 +244,18 @@ Deno.serve(async (req: Request) => {
 
       // Capture the full error response for debugging
       const responseBody = await response.text();
-      console.error(`[irrigation] JD error response: status=${response.status}, body=${responseBody}`);
-      return jsonResponse({
-        error: `John Deere API error: ${response.status}`,
-        details: responseBody,
-        url: shapefileUrl,
-        operationId,
-      }, response.status);
+      console.error(
+        `[irrigation] JD error response: status=${response.status}, body=${responseBody}`,
+      );
+      return jsonResponse(
+        {
+          error: `John Deere API error: ${response.status}`,
+          details: responseBody,
+          url: shapefileUrl,
+          operationId,
+        },
+        response.status,
+      );
     }
 
     return errorResponse("Unknown action", 400);

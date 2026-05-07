@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
 interface ClientFilterContextType {
   selectedFarm: string | null;
@@ -11,7 +11,7 @@ interface ClientFilterContextType {
 
 const ClientFilterContext = createContext<ClientFilterContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'ops-center-farm-filter';
+const STORAGE_KEY = "ops-center-farm-filter";
 
 export function ClientFilterProvider({ children }: { children: ReactNode }) {
   const [selectedFarm, setSelectedFarmState] = useState<string | null>(null);
@@ -33,12 +33,14 @@ export function ClientFilterProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ClientFilterContext.Provider value={{
-      selectedFarm,
-      setSelectedFarm,
-      availableFarms,
-      setAvailableFarms,
-    }}>
+    <ClientFilterContext.Provider
+      value={{
+        selectedFarm,
+        setSelectedFarm,
+        availableFarms,
+        setAvailableFarms,
+      }}
+    >
       {children}
     </ClientFilterContext.Provider>
   );
@@ -47,7 +49,7 @@ export function ClientFilterProvider({ children }: { children: ReactNode }) {
 export function useClientFilter() {
   const context = useContext(ClientFilterContext);
   if (context === undefined) {
-    throw new Error('useClientFilter must be used within a ClientFilterProvider');
+    throw new Error("useClientFilter must be used within a ClientFilterProvider");
   }
   return context;
 }

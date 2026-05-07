@@ -71,13 +71,13 @@
 
 @layer utilities {
   .glass {
-    @apply bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] shadow-2xl;
+    @apply border border-white/[0.08] bg-slate-900/70 shadow-2xl backdrop-blur-xl;
   }
   .glass-light {
-    @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-slate-200/50 dark:border-white/[0.08] shadow-2xl;
+    @apply border border-slate-200/50 bg-white/70 shadow-2xl backdrop-blur-xl dark:border-white/[0.08] dark:bg-slate-900/70;
   }
   .glass-panel {
-    @apply bg-slate-950/80 backdrop-blur-2xl border border-white/[0.06] shadow-2xl;
+    @apply border border-white/[0.06] bg-slate-950/80 shadow-2xl backdrop-blur-2xl;
   }
   .font-mono-data {
     font-family: var(--font-jetbrains), ui-monospace, monospace;
@@ -86,16 +86,16 @@
 
 /* Mapbox overrides for dark theme */
 .mapboxgl-popup-content {
-  @apply !bg-slate-900/95 !backdrop-blur-xl !text-slate-100 !rounded-xl !border !border-white/10 !shadow-2xl !px-4 !py-3;
+  @apply !rounded-xl !border !border-white/10 !bg-slate-900/95 !px-4 !py-3 !text-slate-100 !shadow-2xl !backdrop-blur-xl;
 }
 .mapboxgl-popup-tip {
   @apply !border-t-slate-900/95;
 }
 .mapboxgl-popup-close-button {
-  @apply !text-slate-400 hover:!text-white !text-lg !pr-2 !pt-1;
+  @apply !pr-2 !pt-1 !text-lg !text-slate-400 hover:!text-white;
 }
 .mapboxgl-ctrl-group {
-  @apply !bg-slate-900/80 !backdrop-blur-xl !border !border-white/10 !rounded-xl !shadow-2xl;
+  @apply !rounded-xl !border !border-white/10 !bg-slate-900/80 !shadow-2xl !backdrop-blur-xl;
 }
 .mapboxgl-ctrl-group button {
   @apply !border-b-white/5;
@@ -113,34 +113,86 @@
   backdrop-filter: blur(24px) !important;
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
-.irrigation-dark-wrapper .border-slate-200 { border-color: rgba(255, 255, 255, 0.08) !important; }
-.irrigation-dark-wrapper .border-slate-300 { border-color: rgba(255, 255, 255, 0.12) !important; }
-.irrigation-dark-wrapper .text-slate-900 { color: #fff !important; }
-.irrigation-dark-wrapper .text-slate-700 { color: #cbd5e1 !important; }
-.irrigation-dark-wrapper .text-slate-600 { color: #94a3b8 !important; }
-.irrigation-dark-wrapper .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.1) !important; }
-.irrigation-dark-wrapper .text-emerald-900 { color: #6ee7b7 !important; }
-.irrigation-dark-wrapper .text-emerald-700 { color: #34d399 !important; }
-.irrigation-dark-wrapper .text-emerald-600 { color: rgba(52, 211, 153, 0.7) !important; }
-.irrigation-dark-wrapper .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
-.irrigation-dark-wrapper .text-amber-900 { color: #fcd34d !important; }
-.irrigation-dark-wrapper .text-amber-700 { color: #fbbf24 !important; }
-.irrigation-dark-wrapper .text-amber-600 { color: rgba(251, 191, 36, 0.7) !important; }
-.irrigation-dark-wrapper .bg-slate-50 { background-color: rgba(255, 255, 255, 0.03) !important; }
-.irrigation-dark-wrapper .bg-blue-50 { background-color: rgba(59, 130, 246, 0.1) !important; }
-.irrigation-dark-wrapper .border-blue-200 { border-color: rgba(59, 130, 246, 0.2) !important; }
-.irrigation-dark-wrapper .text-blue-700 { color: #60a5fa !important; }
-.irrigation-dark-wrapper .text-blue-600 { color: rgba(96, 165, 250, 0.7) !important; }
-.irrigation-dark-wrapper .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
-.irrigation-dark-wrapper .border-red-200 { border-color: rgba(239, 68, 68, 0.2) !important; }
-.irrigation-dark-wrapper .text-red-700 { color: #f87171 !important; }
-.irrigation-dark-wrapper .bg-green-100 { background-color: rgba(34, 197, 94, 0.1) !important; }
-.irrigation-dark-wrapper .text-green-600 { color: #4ade80 !important; }
-.irrigation-dark-wrapper .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.15) !important; }
-.irrigation-dark-wrapper .bg-amber-100 { background-color: rgba(245, 158, 11, 0.15) !important; }
+.irrigation-dark-wrapper .border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.irrigation-dark-wrapper .border-slate-300 {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+.irrigation-dark-wrapper .text-slate-900 {
+  color: #fff !important;
+}
+.irrigation-dark-wrapper .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+.irrigation-dark-wrapper .text-slate-600 {
+  color: #94a3b8 !important;
+}
+.irrigation-dark-wrapper .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+.irrigation-dark-wrapper .text-emerald-900 {
+  color: #6ee7b7 !important;
+}
+.irrigation-dark-wrapper .text-emerald-700 {
+  color: #34d399 !important;
+}
+.irrigation-dark-wrapper .text-emerald-600 {
+  color: rgba(52, 211, 153, 0.7) !important;
+}
+.irrigation-dark-wrapper .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+.irrigation-dark-wrapper .text-amber-900 {
+  color: #fcd34d !important;
+}
+.irrigation-dark-wrapper .text-amber-700 {
+  color: #fbbf24 !important;
+}
+.irrigation-dark-wrapper .text-amber-600 {
+  color: rgba(251, 191, 36, 0.7) !important;
+}
+.irrigation-dark-wrapper .bg-slate-50 {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+.irrigation-dark-wrapper .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+.irrigation-dark-wrapper .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.2) !important;
+}
+.irrigation-dark-wrapper .text-blue-700 {
+  color: #60a5fa !important;
+}
+.irrigation-dark-wrapper .text-blue-600 {
+  color: rgba(96, 165, 250, 0.7) !important;
+}
+.irrigation-dark-wrapper .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+.irrigation-dark-wrapper .border-red-200 {
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+.irrigation-dark-wrapper .text-red-700 {
+  color: #f87171 !important;
+}
+.irrigation-dark-wrapper .bg-green-100 {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+.irrigation-dark-wrapper .text-green-600 {
+  color: #4ade80 !important;
+}
+.irrigation-dark-wrapper .bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+.irrigation-dark-wrapper .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
 .irrigation-dark-wrapper select {
   background-color: rgba(255, 255, 255, 0.03) !important;
   color: #e2e8f0 !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
 }
-.irrigation-dark-wrapper .bg-slate-300 { background-color: #475569 !important; }
+.irrigation-dark-wrapper .bg-slate-300 {
+  background-color: #475569 !important;
+}

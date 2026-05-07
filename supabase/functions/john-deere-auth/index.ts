@@ -26,15 +26,16 @@ Deno.serve(async (req: Request) => {
       const tokens = await exchangeCodeForTokens(code, redirectUri);
       const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-      const { error: upsertError } = await supabase
-        .from("john_deere_connections")
-        .upsert({
+      const { error: upsertError } = await supabase.from("john_deere_connections").upsert(
+        {
           user_id: user.id,
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
           token_expires_at: expiresAt,
           updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
+        },
+        { onConflict: "user_id" },
+      );
 
       if (upsertError) {
         throw new Error(`Failed to save tokens: ${upsertError.message}`);
@@ -71,10 +72,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "disconnect") {
-      await supabase
-        .from("john_deere_connections")
-        .delete()
-        .eq("user_id", user.id);
+      await supabase.from("john_deere_connections").delete().eq("user_id", user.id);
 
       return jsonResponse({ success: true });
     }

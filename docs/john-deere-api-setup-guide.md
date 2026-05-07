@@ -31,15 +31,15 @@ All three must be completed before your app can read any farm data. Missing any 
 
 ### Scopes
 
-| Scope | Access |
-|-------|--------|
-| `ag1` | Fields, boundaries |
-| `ag2` | Crop data |
-| `ag3` | Advanced ag data |
-| `org1` | Organization listing |
-| `org2` | Organization details |
-| `work1` | Field operations (harvest, seeding) |
-| `work2` | Advanced operations data |
+| Scope            | Access                                            |
+| ---------------- | ------------------------------------------------- |
+| `ag1`            | Fields, boundaries                                |
+| `ag2`            | Crop data                                         |
+| `ag3`            | Advanced ag data                                  |
+| `org1`           | Organization listing                              |
+| `org2`           | Organization details                              |
+| `work1`          | Field operations (harvest, seeding)               |
+| `work2`          | Advanced operations data                          |
 | `offline_access` | Refresh tokens (required for long-lived sessions) |
 
 For a field data visualization app, request all of the above. For equipment-only apps, `org1 org2` plus equipment-specific scopes may suffice.
@@ -56,14 +56,15 @@ For a field data visualization app, request all of the above. For equipment-only
 
 John Deere has multiple API environments. Use the correct base URL:
 
-| Environment | Base URL | Use Case |
-|-------------|----------|----------|
-| **Production** | `https://api.deere.com/platform` | Real farm data, real organizations |
-| **Sandbox** | `https://sandboxapi.deere.com/platform` | Test data only, fake organizations |
+| Environment    | Base URL                                | Use Case                           |
+| -------------- | --------------------------------------- | ---------------------------------- |
+| **Production** | `https://api.deere.com/platform`        | Real farm data, real organizations |
+| **Sandbox**    | `https://sandboxapi.deere.com/platform` | Test data only, fake organizations |
 
 **Important:** The sandbox does not contain real organization or field data. If your users are connecting real John Deere accounts, you must use the production API. Tokens issued via OAuth work against production -- the sandbox will return 403 for real org IDs.
 
 The **OAuth token endpoint** is the same for both environments:
+
 ```
 https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token
 ```
@@ -75,6 +76,7 @@ https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token
 ### Flow
 
 1. **Redirect user** to John Deere's authorization URL:
+
    ```
    https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/authorize
      ?client_id=YOUR_CLIENT_ID
@@ -87,11 +89,13 @@ https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token
 2. **User logs in** on John Deere's site and grants permission
 
 3. **John Deere redirects back** to your redirect URI with an authorization code:
+
    ```
    https://your-app.com/auth/callback?code=AUTHORIZATION_CODE&state=STATE
    ```
 
 4. **Exchange the code for tokens** (server-side):
+
    ```
    POST https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token
    Content-Type: application/x-www-form-urlencoded
@@ -137,6 +141,7 @@ After OAuth authentication, your app can list organizations. But **you cannot ac
 ### How It Works
 
 1. Call the organizations endpoint:
+
    ```
    GET https://api.deere.com/platform/organizations
    Authorization: Bearer ACCESS_TOKEN
@@ -148,6 +153,7 @@ After OAuth authentication, your app can list organizations. But **you cannot ac
    - If it only contains a `connections` link -- the user needs to authorize data sharing
 
 3. If authorization is needed, redirect the user to:
+
    ```
    https://connections.deere.com/connections/YOUR_CLIENT_ID/select-organizations
    ```
@@ -160,12 +166,10 @@ After OAuth authentication, your app can list organizations. But **you cannot ac
 
 ```javascript
 for (const org of organizations) {
-  const hasDataLinks = org.links?.some(l =>
-    ['fields', 'machines', 'boundaries'].includes(l.rel)
-  );
+  const hasDataLinks = org.links?.some((l) => ["fields", "machines", "boundaries"].includes(l.rel));
 
   if (!hasDataLinks) {
-    const connectionsLink = org.links?.find(l => l.rel === 'connections');
+    const connectionsLink = org.links?.find((l) => l.rel === "connections");
     if (connectionsLink) {
       // User needs to visit connectionsLink.uri to grant access
     }
@@ -192,21 +196,21 @@ If you skip this step, API calls to organization-specific endpoints (fields, ope
 
 ### Common Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `/organizations` | List user's organizations |
-| `/organizations/{orgId}/fields` | List fields for an org |
-| `/organizations/{orgId}/fields?embed=activeBoundary,clients,farms` | Fields with boundary data |
-| `/organizations/{orgId}/fields/{fieldId}/boundaries` | Field boundaries |
-| `/organizations/{orgId}/fields/{fieldId}/fieldOperations` | Operations for a field |
-| `/fieldOperations/{opId}/measurementTypes/{type}` | Measurement data (yield, area) |
+| Endpoint                                                           | Description                    |
+| ------------------------------------------------------------------ | ------------------------------ |
+| `/organizations`                                                   | List user's organizations      |
+| `/organizations/{orgId}/fields`                                    | List fields for an org         |
+| `/organizations/{orgId}/fields?embed=activeBoundary,clients,farms` | Fields with boundary data      |
+| `/organizations/{orgId}/fields/{fieldId}/boundaries`               | Field boundaries               |
+| `/organizations/{orgId}/fields/{fieldId}/fieldOperations`          | Operations for a field         |
+| `/fieldOperations/{opId}/measurementTypes/{type}`                  | Measurement data (yield, area) |
 
 ### Pagination
 
 John Deere APIs use link-based pagination. Check the response for a `nextPage` link:
 
 ```javascript
-const nextLink = (data.links || []).find(l => l.rel === 'nextPage');
+const nextLink = (data.links || []).find((l) => l.rel === "nextPage");
 if (nextLink) {
   // Fetch nextLink.uri for the next page
 }
@@ -214,12 +218,12 @@ if (nextLink) {
 
 ### Measurement Types
 
-| Operation Type | Measurement Type |
-|----------------|-----------------|
-| harvest | HarvestYieldResult |
-| seeding | SeedingRateResult |
-| application | ApplicationRateResult |
-| tillage | TillageDepthResult |
+| Operation Type | Measurement Type      |
+| -------------- | --------------------- |
+| harvest        | HarvestYieldResult    |
+| seeding        | SeedingRateResult     |
+| application    | ApplicationRateResult |
+| tillage        | TillageDepthResult    |
 
 ---
 

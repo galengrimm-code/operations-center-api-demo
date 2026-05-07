@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useMapContext } from '@/contexts/map-context';
+import { useEffect } from "react";
+import { useMapContext } from "@/contexts/map-context";
 
 export default function FieldDetailPage({ params }: { params: { fieldId: string } }) {
   const { setSelectedFieldId } = useMapContext();

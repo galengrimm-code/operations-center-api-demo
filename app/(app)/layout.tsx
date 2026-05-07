@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
-import { TopBar } from '@/components/layout/top-bar';
-import { ConnectOverlay } from '@/components/overlays/connect-overlay';
-import { OrgSelectorOverlay } from '@/components/overlays/org-selector-overlay';
-import { ClientFilterProvider } from '@/contexts/client-filter-context';
-import { Loader2 } from 'lucide-react';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
+import { TopBar } from "@/components/layout/top-bar";
+import { ConnectOverlay } from "@/components/overlays/connect-overlay";
+import { OrgSelectorOverlay } from "@/components/overlays/org-selector-overlay";
+import { ClientFilterProvider } from "@/contexts/client-filter-context";
+import { Loader2 } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -15,14 +15,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [user, loading, router]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
       </div>
     );
   }

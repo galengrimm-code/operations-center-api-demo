@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { Users, Chrome as Home } from 'lucide-react';
-import type { StoredField } from '@/types/john-deere';
+import { useMemo } from "react";
+import { Users, Chrome as Home } from "lucide-react";
+import type { StoredField } from "@/types/john-deere";
 
 interface FieldFiltersProps {
   fields: StoredField[];
@@ -29,7 +29,7 @@ export function FieldFilters({
 
   const farms = useMemo(() => {
     const relevantFields = selectedClient
-      ? fields.filter(f => f.client_name === selectedClient)
+      ? fields.filter((f) => f.client_name === selectedClient)
       : fields;
     const names = new Set<string>();
     for (const f of relevantFields) {
@@ -40,8 +40,8 @@ export function FieldFilters({
 
   const filteredCount = useMemo(() => {
     let result = fields;
-    if (selectedClient) result = result.filter(f => f.client_name === selectedClient);
-    if (selectedFarm) result = result.filter(f => f.farm_name === selectedFarm);
+    if (selectedClient) result = result.filter((f) => f.client_name === selectedClient);
+    if (selectedFarm) result = result.filter((f) => f.farm_name === selectedFarm);
     return result.length;
   }, [fields, selectedClient, selectedFarm]);
 
@@ -53,11 +53,11 @@ export function FieldFilters({
   const isFiltering = selectedClient !== null || selectedFarm !== null;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 px-5 py-4 space-y-3">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white px-5 py-4">
       {hasClients && (
         <div className="flex items-start gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 uppercase tracking-wide pt-1 shrink-0">
-            <Users className="w-3.5 h-3.5" />
+          <div className="flex shrink-0 items-center gap-1.5 pt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <Users className="h-3.5 w-3.5" />
             <span>Client</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -68,13 +68,13 @@ export function FieldFilters({
               }}
               className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all ${
                 selectedClient === null
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               All
             </button>
-            {clients.map(name => (
+            {clients.map((name) => (
               <button
                 key={name}
                 onClick={() => {
@@ -88,8 +88,8 @@ export function FieldFilters({
                 }}
                 className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all ${
                   selectedClient === name
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 {name}
@@ -101,8 +101,8 @@ export function FieldFilters({
 
       {hasFarms && (
         <div className="flex items-start gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 uppercase tracking-wide pt-1 shrink-0">
-            <Home className="w-3.5 h-3.5" />
+          <div className="flex shrink-0 items-center gap-1.5 pt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <Home className="h-3.5 w-3.5" />
             <span>Farm</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -110,13 +110,13 @@ export function FieldFilters({
               onClick={() => onFarmChange(null)}
               className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all ${
                 selectedFarm === null
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               All
             </button>
-            {farms.map(name => (
+            {farms.map((name) => (
               <button
                 key={name}
                 onClick={() => {
@@ -124,8 +124,8 @@ export function FieldFilters({
                 }}
                 className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all ${
                   selectedFarm === name
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 {name}
@@ -136,8 +136,8 @@ export function FieldFilters({
       )}
 
       {isFiltering && (
-        <div className="text-xs text-slate-500 pt-1 border-t border-slate-100">
-          Showing {filteredCount} of {fields.length} field{fields.length !== 1 ? 's' : ''}
+        <div className="border-t border-slate-100 pt-1 text-xs text-slate-500">
+          Showing {filteredCount} of {fields.length} field{fields.length !== 1 ? "s" : ""}
         </div>
       )}
     </div>

@@ -29,18 +29,18 @@ The app is deployed to **Vercel**.
 
 ## Stack
 
-| Layer | Details |
-|---|---|
-| Frontend | Next.js 13.5.1 (App Router), React 18.2.0, shadcn/ui (Radix UI), Tailwind CSS 3.3.3 |
-| Map | Mapbox GL 3.20.0 |
-| Charts | Recharts 2.12.7 |
-| Backend | Supabase Edge Functions (Deno) — 4 functions |
-| Database | Supabase PostgreSQL (operations_center schema) |
-| Storage | Supabase Storage (shapefiles + operation-images buckets) |
-| Auth | Supabase Auth (email/password) + John Deere OAuth 2.0 |
-| Hosting | Vercel — `https://operations-center-api-demo.vercel.app` (auto-deploy on push to main) |
-| Repo | Public on GitHub (`galengrimm-code/operations-center-api-demo`) |
-| Testing | None |
+| Layer    | Details                                                                                |
+| -------- | -------------------------------------------------------------------------------------- |
+| Frontend | Next.js 13.5.1 (App Router), React 18.2.0, shadcn/ui (Radix UI), Tailwind CSS 3.3.3    |
+| Map      | Mapbox GL 3.20.0                                                                       |
+| Charts   | Recharts 2.12.7                                                                        |
+| Backend  | Supabase Edge Functions (Deno) — 4 functions                                           |
+| Database | Supabase PostgreSQL (operations_center schema)                                         |
+| Storage  | Supabase Storage (shapefiles + operation-images buckets)                               |
+| Auth     | Supabase Auth (email/password) + John Deere OAuth 2.0                                  |
+| Hosting  | Vercel — `https://operations-center-api-demo.vercel.app` (auto-deploy on push to main) |
+| Repo     | Public on GitHub (`galengrimm-code/operations-center-api-demo`)                        |
+| Testing  | None                                                                                   |
 
 ## Architecture
 
@@ -61,6 +61,7 @@ The app is deployed to **Vercel**.
 **Data flow:** User authenticates via Supabase Auth → auth-context provides session → components call `lib/john-deere-client.ts` with Bearer JWT → Edge Functions validate JWT via `getAuthenticatedUser()` → Edge Functions call John Deere API using stored OAuth tokens → data persisted to PostgreSQL (operations_center schema) → components read stored data → Mapbox GL renders field GeoJSON boundaries from DB.
 
 **External calls:**
+
 - John Deere Operations Center API (`api.deere.com/platform`) — triggered on import action
 - John Deere OAuth (`signin.johndeere.com/oauth2/.../v1/token`) — token exchange/refresh from edge functions
 - Supabase Edge Functions (`project.supabase.co/functions/v1/*`) — called on user interaction
@@ -70,6 +71,7 @@ The app is deployed to **Vercel**.
 ## Environment Variables
 
 **`.env.local` (Next.js frontend)**
+
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -78,6 +80,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN
 ```
 
 **Supabase Edge Function secrets**
+
 ```
 JOHN_DEERE_CLIENT_ID
 JOHN_DEERE_CLIENT_SECRET
@@ -89,18 +92,18 @@ SUPABASE_SERVICE_ROLE_KEY     (auto-injected)
 
 ### Active Flags
 
-| Severity | Category | Confidence | Description |
-|----------|----------|------------|-------------|
-| P1 | npm-cve-critical | 1.00 | Next.js 13.5.1 still has critical Authorization Bypass CVE (GHSA-f82v-jwr5-mffw, CVSS 9.1) — `npm audit fix` (without --force) was applied 2026-05-02 and resolved 12 of 18 CVEs, but the Next.js 13.5.1 → 13.5.11 patch bump requires `npm audit fix --force` because package.json pins `"next": "13.5.1"` (exact pin, no caret). 6 vulnerabilities remain (1 critical, 3 high, 2 moderate) — all in Next.js or its bundled deps (postcss, zod). Recommended next step: bump pin to `"next": "^13.5.11"` then `npm install`, or run `npm audit fix --force` after confirming. |
-| P1 | cors-open | 1.00 | CORS wildcard (`Access-Control-Allow-Origin: *`) on ALL 4 edge functions in `_shared/cors.ts`. Confirmed serving on deployed surface (`curl -I https://operations-center-api-demo.vercel.app` returns `Access-Control-Allow-Origin: *`). Any origin can make cross-origin requests to authenticated endpoints. |
-| P2 | error-response-leakage | 1.00 | All 4 edge functions forward `error.message` to HTTP responses. `john-deere-import` also returns `error.stack` (lines 656). `john-deere-irrigation` returns full JD response body + internal URL (lines 240-245). |
-| P3 | no-input-validation | 0.95 | No Zod/schema validation on request bodies in any edge function — `req.json()` parsed and used directly in `john-deere-auth/index.ts:20`, `john-deere-api/index.ts:41`. |
-| P3 | no-rate-limiting | 0.95 | No rate limiting on any edge function endpoint. Notable risk: shapefile polling (`john-deere-irrigation` `shapefile-status`) issues paid JD API calls per request. |
-| P3 | route-protection-gap | 0.90 | Auth protection is client-side only (`useEffect` redirect in `(app)` pages). No `middleware.ts` for server-side route protection — page HTML loads before client-side redirect. |
-| P3 | oauth-broad-scopes | 0.85 | John Deere OAuth requests `ag1 ag2 ag3 org1 org2 work1 work2 offline_access` (`lib/john-deere-client.ts:273`) — full read/write across all four ag scopes when current functionality only reads fields/operations. Trim to read-only scopes (`ag1 org1 work1 offline_access`) unless write is required. |
-| P4 | formatting-inconsistency | 1.00 | 129 files need Prettier formatting (`npx prettier --check .` reported "Code style issues found in 129 files"). No `.prettierrc` config found. |
-| P4 | file-over-500 | 1.00 | `supabase/functions/john-deere-import/index.ts` is now 658 lines (was 610 last scan, growing). `app/(app)/progress/page.tsx` is 614 lines. |
-| P4 | npm-cve-residual | 1.00 | 6 vulnerabilities remain after `npm audit fix` (1 critical, 3 high, 2 moderate) — all blocked by the strict `next@13.5.1` pin. See `npm-cve-critical` row above for fix path. |
+| Severity | Category                 | Confidence | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------- | ------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1       | npm-cve-critical         | 1.00       | Next.js 13.5.1 still has critical Authorization Bypass CVE (GHSA-f82v-jwr5-mffw, CVSS 9.1) — `npm audit fix` (without --force) was applied 2026-05-02 and resolved 12 of 18 CVEs, but the Next.js 13.5.1 → 13.5.11 patch bump requires `npm audit fix --force` because package.json pins `"next": "13.5.1"` (exact pin, no caret). 6 vulnerabilities remain (1 critical, 3 high, 2 moderate) — all in Next.js or its bundled deps (postcss, zod). Recommended next step: bump pin to `"next": "^13.5.11"` then `npm install`, or run `npm audit fix --force` after confirming. |
+| P1       | cors-open                | 1.00       | CORS wildcard (`Access-Control-Allow-Origin: *`) on ALL 4 edge functions in `_shared/cors.ts`. Confirmed serving on deployed surface (`curl -I https://operations-center-api-demo.vercel.app` returns `Access-Control-Allow-Origin: *`). Any origin can make cross-origin requests to authenticated endpoints.                                                                                                                                                                                                                                                                 |
+| P2       | error-response-leakage   | 1.00       | All 4 edge functions forward `error.message` to HTTP responses. `john-deere-import` also returns `error.stack` (lines 656). `john-deere-irrigation` returns full JD response body + internal URL (lines 240-245).                                                                                                                                                                                                                                                                                                                                                              |
+| P3       | no-input-validation      | 0.95       | No Zod/schema validation on request bodies in any edge function — `req.json()` parsed and used directly in `john-deere-auth/index.ts:20`, `john-deere-api/index.ts:41`.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| P3       | no-rate-limiting         | 0.95       | No rate limiting on any edge function endpoint. Notable risk: shapefile polling (`john-deere-irrigation` `shapefile-status`) issues paid JD API calls per request.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| P3       | route-protection-gap     | 0.90       | Auth protection is client-side only (`useEffect` redirect in `(app)` pages). No `middleware.ts` for server-side route protection — page HTML loads before client-side redirect.                                                                                                                                                                                                                                                                                                                                                                                                |
+| P3       | oauth-broad-scopes       | 0.85       | John Deere OAuth requests `ag1 ag2 ag3 org1 org2 work1 work2 offline_access` (`lib/john-deere-client.ts:273`) — full read/write across all four ag scopes when current functionality only reads fields/operations. Trim to read-only scopes (`ag1 org1 work1 offline_access`) unless write is required.                                                                                                                                                                                                                                                                        |
+| P4       | formatting-inconsistency | 1.00       | 129 files need Prettier formatting (`npx prettier --check .` reported "Code style issues found in 129 files"). No `.prettierrc` config found.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| P4       | file-over-500            | 1.00       | `supabase/functions/john-deere-import/index.ts` is now 658 lines (was 610 last scan, growing). `app/(app)/progress/page.tsx` is 614 lines.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| P4       | npm-cve-residual         | 1.00       | 6 vulnerabilities remain after `npm audit fix` (1 critical, 3 high, 2 moderate) — all blocked by the strict `next@13.5.1` pin. See `npm-cve-critical` row above for fix path.                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### Watch List (confidence < 0.8)
 
@@ -112,22 +115,23 @@ _None_
 
 ### Resolved
 
-| Date | Category | Note |
-|---|---|---|
-| 2026-05-02 | missing-csp | Added Content-Security-Policy via `next.config.js` `headers()` — allows mapbox + supabase + JD origins, frame-ancestors 'none', form-action limited to self + JD signin. |
-| 2026-05-02 | missing-x-frame | Added `X-Frame-Options: DENY` via `next.config.js` `headers()`. |
-| 2026-05-02 | missing-x-content-type | Added `X-Content-Type-Options: nosniff` via `next.config.js` `headers()`. |
-| 2026-05-02 | missing-referrer-policy | Added `Referrer-Policy: strict-origin-when-cross-origin` via `next.config.js` `headers()`. Permissions-Policy added at the same time. |
-| 2026-05-02 | no-security-contact | Added `public/.well-known/security.txt` with mailto:galengrimm@gmail.com, expires 2027-12-31. |
-| 2026-05-02 | missing-robots-txt | Added `public/robots.txt` (allow all). |
-| 2026-05-02 | missing-env-example | Added `.env.local.example` listing the 4 NEXT_PUBLIC_* var names without values. |
-| 2026-05-02 | debug-logging | Removed partial-token console logs in `lib/john-deere-client.ts:12`, `supabase/functions/john-deere-irrigation/index.ts:183`, `supabase/functions/john-deere-import/index.ts:447,467`. |
-| 2026-05-02 | npm-cve-moderate | `npm audit fix` (no --force) bumped 16 transitive deps and resolved 12 of 18 CVEs (postcss, zod, ajv, nanoid, lodash, brace-expansion, minimatch, glob, cross-spawn, flatted, yaml, picomatch, protocol-buffers-schema, js-yaml, @babel/runtime). Remaining 6 are bundled inside next@13.5.1 and require the Next bump. |
-| 2026-05-01 | missing-hsts | Now served on deployed surface: `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (Vercel default). |
+| Date       | Category                | Note                                                                                                                                                                                                                                                                                                                    |
+| ---------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-05-02 | missing-csp             | Added Content-Security-Policy via `next.config.js` `headers()` — allows mapbox + supabase + JD origins, frame-ancestors 'none', form-action limited to self + JD signin.                                                                                                                                                |
+| 2026-05-02 | missing-x-frame         | Added `X-Frame-Options: DENY` via `next.config.js` `headers()`.                                                                                                                                                                                                                                                         |
+| 2026-05-02 | missing-x-content-type  | Added `X-Content-Type-Options: nosniff` via `next.config.js` `headers()`.                                                                                                                                                                                                                                               |
+| 2026-05-02 | missing-referrer-policy | Added `Referrer-Policy: strict-origin-when-cross-origin` via `next.config.js` `headers()`. Permissions-Policy added at the same time.                                                                                                                                                                                   |
+| 2026-05-02 | no-security-contact     | Added `public/.well-known/security.txt` with mailto:galengrimm@gmail.com, expires 2027-12-31.                                                                                                                                                                                                                           |
+| 2026-05-02 | missing-robots-txt      | Added `public/robots.txt` (allow all).                                                                                                                                                                                                                                                                                  |
+| 2026-05-02 | missing-env-example     | Added `.env.local.example` listing the 4 NEXT*PUBLIC*\* var names without values.                                                                                                                                                                                                                                       |
+| 2026-05-02 | debug-logging           | Removed partial-token console logs in `lib/john-deere-client.ts:12`, `supabase/functions/john-deere-irrigation/index.ts:183`, `supabase/functions/john-deere-import/index.ts:447,467`.                                                                                                                                  |
+| 2026-05-02 | npm-cve-moderate        | `npm audit fix` (no --force) bumped 16 transitive deps and resolved 12 of 18 CVEs (postcss, zod, ajv, nanoid, lodash, brace-expansion, minimatch, glob, cross-spawn, flatted, yaml, picomatch, protocol-buffers-schema, js-yaml, @babel/runtime). Remaining 6 are bundled inside next@13.5.1 and require the Next bump. |
+| 2026-05-01 | missing-hsts            | Now served on deployed surface: `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (Vercel default).                                                                                                                                                                                             |
 
 ## Guardrails
 
 ### Universal (apply to all projects)
+
 1. Never hardcode API keys or secrets — use `.env` + `.env.example` from first commit
 2. Every API route needs CORS origin validation, input validation, and auth
 3. Write RLS/Firestore rules the same day you create a table
@@ -139,6 +143,7 @@ _None_
 9. Run `npx prettier --write .` before committing — keep a `.prettierrc` in the repo root
 
 ### Project-Specific
+
 - **Public repo:** This repo is PUBLIC on GitHub. Never commit `.env*` files or rotate immediately if you do — already gitignored, verified clean in history.
 - **CORS:** Restrict `Access-Control-Allow-Origin` in `_shared/cors.ts` to `https://operations-center-api-demo.vercel.app` (and `http://localhost:3000` for dev) — wildcard is verified live in production.
 - **Errors:** Edge function catch blocks must return generic messages only — log full errors server-side, never forward `error.message` or `error.stack` to HTTP responses (currently happens in all 4 functions).

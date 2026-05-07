@@ -1,9 +1,24 @@
 // Types matching John Deere boundary API responses
-export interface JdLink { rel: string; uri: string; }
-export interface JdBoundaryPoint { lat: number; lon: number; }
-export interface JdRing { points: JdBoundaryPoint[]; type: string; passable?: boolean; }
-export interface JdPolygon { rings: JdRing[]; }
-export interface JdMeasurement { valueAsDouble: number; unit: string; }
+export interface JdLink {
+  rel: string;
+  uri: string;
+}
+export interface JdBoundaryPoint {
+  lat: number;
+  lon: number;
+}
+export interface JdRing {
+  points: JdBoundaryPoint[];
+  type: string;
+  passable?: boolean;
+}
+export interface JdPolygon {
+  rings: JdRing[];
+}
+export interface JdMeasurement {
+  valueAsDouble: number;
+  unit: string;
+}
 export interface JdBoundary {
   id: string;
   name?: string;
@@ -15,10 +30,22 @@ export interface JdBoundary {
   archived?: boolean;
   links?: JdLink[];
 }
-export interface JdClient { id: string; name: string; links?: JdLink[]; }
-export interface JdFarm { id: string; name: string; links?: JdLink[]; }
-export interface JdClientsEmbed { clients?: JdClient[]; }
-export interface JdFarmsEmbed { farms?: JdFarm[]; }
+export interface JdClient {
+  id: string;
+  name: string;
+  links?: JdLink[];
+}
+export interface JdFarm {
+  id: string;
+  name: string;
+  links?: JdLink[];
+}
+export interface JdClientsEmbed {
+  clients?: JdClient[];
+}
+export interface JdFarmsEmbed {
+  farms?: JdFarm[];
+}
 export interface JdField {
   id: string;
   name: string;
@@ -30,7 +57,10 @@ export interface JdField {
 }
 
 function closeRing(coords: number[][]): number[][] {
-  if (coords.length > 0 && (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1])) {
+  if (
+    coords.length > 0 &&
+    (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1])
+  ) {
     coords.push([...coords[0]]);
   }
   return coords;
@@ -44,7 +74,9 @@ function pointsToCoords(points: JdBoundaryPoint[]): number[][] {
  * Convert a JD boundary to a GeoJSON MultiPolygon.
  * Exterior and interior rings are preserved in the standard GeoJSON structure.
  */
-export function convertBoundaryToGeoJSON(boundary: JdBoundary): { type: "MultiPolygon"; coordinates: number[][][][] } | null {
+export function convertBoundaryToGeoJSON(
+  boundary: JdBoundary,
+): { type: "MultiPolygon"; coordinates: number[][][][] } | null {
   if (!boundary.multipolygons || boundary.multipolygons.length === 0) return null;
 
   const polygons: number[][][][] = [];
@@ -71,7 +103,9 @@ export function convertBoundaryToGeoJSON(boundary: JdBoundary): { type: "MultiPo
  * Build a GeoJSON Polygon from only the exterior rings of a boundary (no holes).
  * Useful for calculating total field area.
  */
-export function buildExteriorOnlyGeoJSON(boundary: JdBoundary): { type: "MultiPolygon"; coordinates: number[][][][] } | null {
+export function buildExteriorOnlyGeoJSON(
+  boundary: JdBoundary,
+): { type: "MultiPolygon"; coordinates: number[][][][] } | null {
   if (!boundary.multipolygons || boundary.multipolygons.length === 0) return null;
 
   const polygons: number[][][][] = [];
@@ -91,7 +125,9 @@ export function buildExteriorOnlyGeoJSON(boundary: JdBoundary): { type: "MultiPo
  * Extract interior rings as individual GeoJSON Polygons.
  * Each interior ring (e.g., a dryland corner outside a pivot) becomes its own polygon.
  */
-export function buildInteriorRingPolygons(boundary: JdBoundary): Array<{ type: "Polygon"; coordinates: number[][][] }> {
+export function buildInteriorRingPolygons(
+  boundary: JdBoundary,
+): Array<{ type: "Polygon"; coordinates: number[][][] }> {
   const result: Array<{ type: "Polygon"; coordinates: number[][][] }> = [];
 
   for (const polygon of boundary.multipolygons || []) {

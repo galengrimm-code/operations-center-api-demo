@@ -22,7 +22,8 @@ import { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 async function fetchAllFieldsPaginated(accessToken: string, orgId: string): Promise<JdField[]> {
   const allFields: JdField[] = [];
-  let url: string | null = `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields?embed=activeBoundary,clients,farms`;
+  let url: string | null =
+    `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields?embed=activeBoundary,clients,farms`;
 
   while (url) {
     const response = await callJohnDeereUrl(accessToken, url);
@@ -57,7 +58,9 @@ async function fetchIrrigatedBoundaries(
     // Log all boundaries for debugging
     console.log(`[import] Field ${fieldId}: ${boundaries.length} total boundaries from API`);
     for (const b of boundaries) {
-      console.log(`[import]   - name="${b.name || '(none)'}" active=${b.active} irrigated=${b.irrigated} area=${b.area?.valueAsDouble?.toFixed(1)} ${b.area?.unit || ''}`);
+      console.log(
+        `[import]   - name="${b.name || "(none)"}" active=${b.active} irrigated=${b.irrigated} area=${b.area?.valueAsDouble?.toFixed(1)} ${b.area?.unit || ""}`,
+      );
     }
 
     // Filter for irrigated boundaries that are NOT the active field boundary
@@ -67,7 +70,9 @@ async function fetchIrrigatedBoundaries(
     const irrigated = boundaries.filter(
       (b) => b.irrigated === true && b.active !== true && b.archived !== true,
     );
-    console.log(`[import] Field ${fieldId}: ${irrigated.length} irrigated (non-active, non-archived) boundaries found`);
+    console.log(
+      `[import] Field ${fieldId}: ${irrigated.length} irrigated (non-active, non-archived) boundaries found`,
+    );
     return irrigated;
   } catch (_) {
     return [];
@@ -89,10 +94,11 @@ async function importFields(
     let boundaryAreaUnit = null;
     let activeBoundary = false;
 
-    const boundary = field.activeBoundary
-      || (field.boundaries && field.boundaries.find((b: JdBoundary) => b.active))
-      || (field.boundaries && field.boundaries[0])
-      || null;
+    const boundary =
+      field.activeBoundary ||
+      (field.boundaries && field.boundaries.find((b: JdBoundary) => b.active)) ||
+      (field.boundaries && field.boundaries[0]) ||
+      null;
 
     if (boundary) {
       boundaryGeojson = convertBoundaryToGeoJSON(boundary);
@@ -160,7 +166,9 @@ async function importFields(
               clientId = firstClient.id || null;
             }
           }
-        } catch (_) { /* skip */ }
+        } catch (_) {
+          /* skip */
+        }
       }
     }
 
@@ -181,14 +189,15 @@ async function importFields(
               farmId = firstFarm.id || null;
             }
           }
-        } catch (_) { /* skip */ }
+        } catch (_) {
+          /* skip */
+        }
       }
     }
 
     const now = new Date().toISOString();
-    await supabase
-      .from("fields")
-      .upsert({
+    await supabase.from("fields").upsert(
+      {
         user_id: userId,
         org_id: orgId,
         jd_field_id: field.id,
@@ -208,7 +217,9 @@ async function importFields(
         raw_response: field,
         imported_at: now,
         updated_at: now,
-      }, { onConflict: "user_id,org_id,jd_field_id" });
+      },
+      { onConflict: "user_id,org_id,jd_field_id" },
+    );
   }
 
   return { totalImported: allFields.length, withoutBoundaries };
@@ -260,8 +271,8 @@ async function fetchMeasurementData(
       `${JOHN_DEERE_API_BASE}/fieldOperations/${operationId}/measurementTypes/${measurementType}`,
       {
         headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Accept": "application/vnd.deere.axiom.v3+json",
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/vnd.deere.axiom.v3+json",
           "Accept-UOM-System": "ENGLISH",
           "Accept-Yield-Preference": "VOLUME",
         },
@@ -306,8 +317,8 @@ async function fetchAndStoreMapImage(
       `${JOHN_DEERE_API_BASE}/fieldOperations/${operationId}/measurementTypes/${measurementType}`,
       {
         headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Accept": "application/vnd.deere.axiom.v3.image+json",
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/vnd.deere.axiom.v3.image+json",
           "Accept-UOM-System": "ENGLISH",
         },
       },
@@ -395,15 +406,20 @@ async function importOperations(
           const measurements = await fetchMeasurementData(accessToken, op.id, opTypeStr);
 
           // Fetch and store map image
-          const imageData = await fetchAndStoreMapImage(supabase, accessToken, userId, op.id, opTypeStr);
+          const imageData = await fetchAndStoreMapImage(
+            supabase,
+            accessToken,
+            userId,
+            op.id,
+            opTypeStr,
+          );
 
           const firstVariety = op.varieties?.[0];
           const firstMachine = op.fieldOperationMachines?.[0];
 
           const now = new Date().toISOString();
-          await supabase
-            .from("field_operations")
-            .upsert({
+          await supabase.from("field_operations").upsert(
+            {
               user_id: userId,
               org_id: orgId,
               jd_field_id: field.jd_field_id,
@@ -421,7 +437,9 @@ async function importOperations(
               raw_response: op,
               imported_at: now,
               updated_at: now,
-            }, { onConflict: "user_id,org_id,jd_operation_id" });
+            },
+            { onConflict: "user_id,org_id,jd_operation_id" },
+          );
 
           totalImported++;
         }
@@ -446,7 +464,12 @@ Deno.serve(async (req: Request) => {
     console.log("[import] Auth header present:", !!req.headers.get("Authorization"));
 
     const authResult = await getAuthenticatedUser(req);
-    console.log("[import] authResult type:", typeof authResult, "isResponse:", isResponse(authResult));
+    console.log(
+      "[import] authResult type:",
+      typeof authResult,
+      "isResponse:",
+      isResponse(authResult),
+    );
     if (isResponse(authResult)) return authResult;
     const { user, supabase } = authResult;
     console.log("[import] Authenticated user:", user.id);
@@ -470,7 +493,9 @@ Deno.serve(async (req: Request) => {
       // Import fields, then automatically import operations
       const fieldResult = await importFields(supabase, accessToken, user.id, orgId);
 
-      console.log(`[import] Imported ${fieldResult.totalImported} fields, now importing operations...`);
+      console.log(
+        `[import] Imported ${fieldResult.totalImported} fields, now importing operations...`,
+      );
       const opsResult = await importOperations(supabase, accessToken, user.id, orgId);
       console.log(`[import] Imported ${opsResult.totalImported} operations`);
 
@@ -509,7 +534,8 @@ Deno.serve(async (req: Request) => {
       for (const opType of operationTypes) {
         try {
           // Follow pagination to get ALL operations for this field
-          let pageUrl: string | null = `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`;
+          let pageUrl: string | null =
+            `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`;
 
           while (pageUrl) {
             const response = await callJohnDeereUrl(accessToken, pageUrl);
@@ -521,15 +547,20 @@ Deno.serve(async (req: Request) => {
             for (const op of operations) {
               const opTypeStr = op.fieldOperationType || opType.toLowerCase();
               const measurements = await fetchMeasurementData(accessToken, op.id, opTypeStr);
-              const imageData = await fetchAndStoreMapImage(supabase, accessToken, user.id, op.id, opTypeStr);
+              const imageData = await fetchAndStoreMapImage(
+                supabase,
+                accessToken,
+                user.id,
+                op.id,
+                opTypeStr,
+              );
 
               const firstVariety = op.varieties?.[0];
               const firstMachine = op.fieldOperationMachines?.[0];
 
               const now = new Date().toISOString();
-              await supabase
-                .from("field_operations")
-                .upsert({
+              await supabase.from("field_operations").upsert(
+                {
                   user_id: user.id,
                   org_id: orgId,
                   jd_field_id: fieldId,
@@ -547,7 +578,9 @@ Deno.serve(async (req: Request) => {
                   raw_response: op,
                   imported_at: now,
                   updated_at: now,
-                }, { onConflict: "user_id,org_id,jd_operation_id" });
+                },
+                { onConflict: "user_id,org_id,jd_operation_id" },
+              );
 
               totalImported++;
             }

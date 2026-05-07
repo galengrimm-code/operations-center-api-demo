@@ -20,13 +20,13 @@ A demo web app that connects to the **John Deere Operations Center API** to disp
 
 ## Tech stack
 
-| Layer | Technology |
-|-------|-----------|
+| Layer    | Technology                                                         |
+| -------- | ------------------------------------------------------------------ |
 | Frontend | Next.js 13 (App Router), React, Tailwind CSS, shadcn/ui, Mapbox GL |
-| Backend | Supabase Edge Functions (Deno) |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase Auth (email/password) + John Deere OAuth 2.0 |
-| Hosting | Vercel |
+| Backend  | Supabase Edge Functions (Deno)                                     |
+| Database | Supabase (PostgreSQL)                                              |
+| Auth     | Supabase Auth (email/password) + John Deere OAuth 2.0              |
+| Hosting  | Vercel                                                             |
 
 ## Project structure
 
@@ -96,23 +96,23 @@ types/
 
 ### Next.js frontend (`.env.local`)
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous (public) API key |
-| `NEXT_PUBLIC_JOHN_DEERE_CLIENT_ID` | John Deere OAuth application client ID |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | Mapbox GL JS public access token (used for the field map) |
+| Variable                           | Description                                               |
+| ---------------------------------- | --------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`         | Your Supabase project URL                                 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | Supabase anonymous (public) API key                       |
+| `NEXT_PUBLIC_JOHN_DEERE_CLIENT_ID` | John Deere OAuth application client ID                    |
+| `NEXT_PUBLIC_MAPBOX_TOKEN`         | Mapbox GL JS public access token (used for the field map) |
 
 ### Supabase Edge Functions
 
 Set these in the Supabase dashboard under **Project Settings → Edge Functions** or via the Supabase CLI:
 
-| Variable | Description |
-|----------|-------------|
-| `JOHN_DEERE_CLIENT_ID` | John Deere OAuth application client ID |
-| `JOHN_DEERE_CLIENT_SECRET` | John Deere OAuth application client secret |
-| `SUPABASE_URL` | Auto-injected by Supabase runtime |
-| `SUPABASE_SERVICE_ROLE_KEY` | Auto-injected by Supabase runtime |
+| Variable                    | Description                                |
+| --------------------------- | ------------------------------------------ |
+| `JOHN_DEERE_CLIENT_ID`      | John Deere OAuth application client ID     |
+| `JOHN_DEERE_CLIENT_SECRET`  | John Deere OAuth application client secret |
+| `SUPABASE_URL`              | Auto-injected by Supabase runtime          |
+| `SUPABASE_SERVICE_ROLE_KEY` | Auto-injected by Supabase runtime          |
 
 ## Local development
 
@@ -171,6 +171,7 @@ npx supabase migration up
 ```
 
 Key tables:
+
 - **`john_deere_connections`** — One OAuth token record per user (RLS enforced)
 - **`fields`** — Imported field data with active + irrigated boundary GeoJSON
 - **`field_operations`** — Imported harvest/seeding operations with map images

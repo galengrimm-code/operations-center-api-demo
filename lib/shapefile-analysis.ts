@@ -1,6 +1,6 @@
-import shp from 'shpjs';
-import * as turf from '@turf/turf';
-import type { Feature, Polygon, MultiPolygon, FeatureCollection, GeoJsonProperties } from 'geojson';
+import shp from "shpjs";
+import * as turf from "@turf/turf";
+import type { Feature, Polygon, MultiPolygon, FeatureCollection, GeoJsonProperties } from "geojson";
 
 const SQM_TO_AC = 0.000247105;
 
@@ -19,16 +19,18 @@ export interface HarvestZoneStats {
 /**
  * Parse a shapefile zip buffer into a GeoJSON FeatureCollection.
  */
-export async function processShapefile(
-  zipBuffer: ArrayBuffer,
-): Promise<FeatureCollection> {
+export async function processShapefile(zipBuffer: ArrayBuffer): Promise<FeatureCollection> {
   const result = await shp(zipBuffer);
 
   // shpjs returns an array: [metadata JSON, FeatureCollection, ...]
   // Find the first item that's a GeoJSON FeatureCollection
   if (Array.isArray(result)) {
-    const fc = result.find((item: unknown) =>
-      item && typeof item === 'object' && 'type' in (item as Record<string, unknown>) && (item as Record<string, unknown>).type === 'FeatureCollection'
+    const fc = result.find(
+      (item: unknown) =>
+        item &&
+        typeof item === "object" &&
+        "type" in (item as Record<string, unknown>) &&
+        (item as Record<string, unknown>).type === "FeatureCollection",
     );
     if (fc) return fc as FeatureCollection;
     // Fallback: last item is usually the FeatureCollection
@@ -43,7 +45,7 @@ export async function processShapefile(
  */
 export function classifyHarvestPolygons(
   harvestGeoJSON: FeatureCollection,
-  irrigatedBoundaryGeoJSON: { type: 'MultiPolygon'; coordinates: number[][][][] } | null,
+  irrigatedBoundaryGeoJSON: { type: "MultiPolygon"; coordinates: number[][][][] } | null,
   irrigated: boolean,
 ): HarvestZoneStats {
   if (!harvestGeoJSON?.features) {
@@ -70,7 +72,7 @@ export function classifyHarvestPolygons(
   const drylandMoistures: number[] = [];
 
   const irrigatedFeature = irrigatedBoundaryGeoJSON
-    ? turf.feature(irrigatedBoundaryGeoJSON) as Feature<MultiPolygon>
+    ? (turf.feature(irrigatedBoundaryGeoJSON) as Feature<MultiPolygon>)
     : null;
 
   for (const feature of harvestGeoJSON.features) {
@@ -81,7 +83,13 @@ export function classifyHarvestPolygons(
 
     const props = feature.properties || {};
     // DBF column names are uppercased in shpjs output
-    const yieldVal = props.VRYIELDVOL ?? props.VRYieldVol ?? props.VRYIELDMAS ?? props.VrYieldMas ?? props.GROSSYLDA ?? props.GrossYldA;
+    const yieldVal =
+      props.VRYIELDVOL ??
+      props.VRYieldVol ??
+      props.VRYIELDMAS ??
+      props.VrYieldMas ??
+      props.GROSSYLDA ??
+      props.GrossYldA;
     const moistureVal = props.Moisture ?? props.MOISTURE;
 
     let isIrrigatedPolygon = false;
@@ -100,19 +108,19 @@ export function classifyHarvestPolygons(
 
     if (isIrrigatedPolygon) {
       irrigatedArea += featureAc;
-      if (typeof yieldVal === 'number') {
+      if (typeof yieldVal === "number") {
         irrigatedYields.push(yieldVal);
         // yieldVal is yield per area (bu/ac), multiply by polygon acres to get total bushels
         irrigatedTotalBushels += yieldVal * featureAc;
       }
-      if (typeof moistureVal === 'number') irrigatedMoistures.push(moistureVal);
+      if (typeof moistureVal === "number") irrigatedMoistures.push(moistureVal);
     } else {
       drylandArea += featureAc;
-      if (typeof yieldVal === 'number') {
+      if (typeof yieldVal === "number") {
         drylandYields.push(yieldVal);
         drylandTotalBushels += yieldVal * featureAc;
       }
-      if (typeof moistureVal === 'number') drylandMoistures.push(moistureVal);
+      if (typeof moistureVal === "number") drylandMoistures.push(moistureVal);
     }
   }
 
@@ -126,10 +134,14 @@ export function classifyHarvestPolygons(
   return {
     irrigatedHarvestedAcres: irrigatedArea,
     drylandHarvestedAcres: drylandArea,
-    irrigatedAvgYield: irrigatedArea >= MIN_ACRES_FOR_YIELD && irrigatedTotalBushels > 0
-      ? irrigatedTotalBushels / irrigatedArea : null,
-    drylandAvgYield: drylandArea >= MIN_ACRES_FOR_YIELD && drylandTotalBushels > 0
-      ? drylandTotalBushels / drylandArea : null,
+    irrigatedAvgYield:
+      irrigatedArea >= MIN_ACRES_FOR_YIELD && irrigatedTotalBushels > 0
+        ? irrigatedTotalBushels / irrigatedArea
+        : null,
+    drylandAvgYield:
+      drylandArea >= MIN_ACRES_FOR_YIELD && drylandTotalBushels > 0
+        ? drylandTotalBushels / drylandArea
+        : null,
     irrigatedTotalBushels,
     drylandTotalBushels,
     irrigatedAvgMoisture: irrigatedArea >= MIN_ACRES_FOR_YIELD ? avg(irrigatedMoistures) : null,
@@ -154,7 +166,7 @@ export interface SeedingZoneStats {
  */
 export function classifySeedingPolygons(
   seedingGeoJSON: FeatureCollection,
-  irrigatedBoundaryGeoJSON: { type: 'MultiPolygon'; coordinates: number[][][][] } | null,
+  irrigatedBoundaryGeoJSON: { type: "MultiPolygon"; coordinates: number[][][][] } | null,
   irrigated: boolean,
 ): SeedingZoneStats {
   if (!seedingGeoJSON?.features) {
@@ -177,7 +189,7 @@ export function classifySeedingPolygons(
   const drylandControlRates: number[] = [];
 
   const irrigatedFeature = irrigatedBoundaryGeoJSON
-    ? turf.feature(irrigatedBoundaryGeoJSON) as Feature<MultiPolygon>
+    ? (turf.feature(irrigatedBoundaryGeoJSON) as Feature<MultiPolygon>)
     : null;
 
   for (const feature of seedingGeoJSON.features) {
@@ -188,7 +200,8 @@ export function classifySeedingPolygons(
 
     const props = feature.properties || {};
     const appliedRate = props.APPLIEDRAT ?? props.AppliedRate ?? props.APPLIEDRATE;
-    const controlRate = props.CONTROLRAT ?? props.ControlRate ?? props.TARGETRATE ?? props.TargetRate;
+    const controlRate =
+      props.CONTROLRAT ?? props.ControlRate ?? props.TARGETRATE ?? props.TargetRate;
 
     let isIrrigatedPolygon = false;
 
@@ -206,12 +219,12 @@ export function classifySeedingPolygons(
 
     if (isIrrigatedPolygon) {
       irrigatedArea += featureAc;
-      if (typeof appliedRate === 'number') irrigatedRates.push(appliedRate);
-      if (typeof controlRate === 'number') irrigatedControlRates.push(controlRate);
+      if (typeof appliedRate === "number") irrigatedRates.push(appliedRate);
+      if (typeof controlRate === "number") irrigatedControlRates.push(controlRate);
     } else {
       drylandArea += featureAc;
-      if (typeof appliedRate === 'number') drylandRates.push(appliedRate);
-      if (typeof controlRate === 'number') drylandControlRates.push(controlRate);
+      if (typeof appliedRate === "number") drylandRates.push(appliedRate);
+      if (typeof controlRate === "number") drylandControlRates.push(controlRate);
     }
   }
 

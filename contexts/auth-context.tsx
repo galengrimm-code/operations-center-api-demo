@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-import type { JohnDeereConnection } from '@/types/database';
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import type { JohnDeereConnection } from "@/types/database";
 
 interface AuthContextType {
   user: User | null;
@@ -28,9 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchJohnDeereConnection = async (userId: string) => {
     const { data } = await supabase
-      .from('john_deere_connections')
-      .select('*')
-      .eq('user_id', userId)
+      .from("john_deere_connections")
+      .select("*")
+      .eq("user_id", userId)
       .maybeSingle();
 
     setJohnDeereConnection(data);
@@ -52,7 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -78,19 +80,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updatePreferredAreaUnit = async (unit: string) => {
     if (!user) return;
     await supabase
-      .from('john_deere_connections')
+      .from("john_deere_connections")
       .update({ preferred_area_unit: unit, updated_at: new Date().toISOString() } as never)
-      .eq('user_id', user.id);
-    setJohnDeereConnection((prev) => prev ? { ...prev, preferred_area_unit: unit } : prev);
+      .eq("user_id", user.id);
+    setJohnDeereConnection((prev) => (prev ? { ...prev, preferred_area_unit: unit } : prev));
   };
 
   const updateHiddenCrops = async (cropNames: string[]) => {
     if (!user) return;
     await supabase
-      .from('john_deere_connections')
+      .from("john_deere_connections")
       .update({ hidden_crop_names: cropNames, updated_at: new Date().toISOString() } as never)
-      .eq('user_id', user.id);
-    setJohnDeereConnection((prev) => prev ? { ...prev, hidden_crop_names: cropNames } : prev);
+      .eq("user_id", user.id);
+    setJohnDeereConnection((prev) => (prev ? { ...prev, hidden_crop_names: cropNames } : prev));
   };
 
   const signOut = async () => {
@@ -99,18 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      loading,
-      johnDeereConnection,
-      signIn,
-      signUp,
-      signOut,
-      refreshJohnDeereConnection,
-      updatePreferredAreaUnit,
-      updateHiddenCrops,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        johnDeereConnection,
+        signIn,
+        signUp,
+        signOut,
+        refreshJohnDeereConnection,
+        updatePreferredAreaUnit,
+        updateHiddenCrops,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -119,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

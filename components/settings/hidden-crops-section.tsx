@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { EyeOff, Loader2, Check } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
-import { supabase } from '@/lib/supabase';
-import { COMMON_COVER_CROPS } from '@/lib/crop-filter';
-import { formatCropName } from '@/lib/reports-data';
+import { useEffect, useState } from "react";
+import { EyeOff, Loader2, Check } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { supabase } from "@/lib/supabase";
+import { COMMON_COVER_CROPS } from "@/lib/crop-filter";
+import { formatCropName } from "@/lib/reports-data";
 
 export function HiddenCropsSection() {
   const { user, johnDeereConnection, updateHiddenCrops } = useAuth();
@@ -21,18 +21,22 @@ export function HiddenCropsSection() {
   useEffect(() => {
     setPending(new Set(currentHidden));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [johnDeereConnection?.hidden_crop_names?.join(',')]);
+  }, [johnDeereConnection?.hidden_crop_names?.join(",")]);
 
   useEffect(() => {
-    if (!user || !orgId) { setLoading(false); return; }
+    if (!user || !orgId) {
+      setLoading(false);
+      return;
+    }
     const loadCrops = async () => {
-      const { data } = await (supabase
-        .from('field_operations') as any)
-        .select('crop_name')
-        .eq('user_id', user.id)
-        .eq('org_id', orgId)
-        .not('crop_name', 'is', null);
-      const imported = Array.from(new Set(((data || []) as Array<{ crop_name: string }>).map((r) => r.crop_name)));
+      const { data } = await (supabase.from("field_operations") as any)
+        .select("crop_name")
+        .eq("user_id", user.id)
+        .eq("org_id", orgId)
+        .not("crop_name", "is", null);
+      const imported = Array.from(
+        new Set(((data || []) as Array<{ crop_name: string }>).map((r) => r.crop_name)),
+      );
       const combined = Array.from(new Set([...imported, ...COMMON_COVER_CROPS])).sort();
       setAvailableCrops(combined);
       setLoading(false);
@@ -68,36 +72,37 @@ export function HiddenCropsSection() {
 
   return (
     <div className="glass rounded-xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <EyeOff className="w-4 h-4 text-emerald-500" />
-        <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Hide Crops</h2>
+      <div className="mb-4 flex items-center gap-2">
+        <EyeOff className="h-4 w-4 text-emerald-500" />
+        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">Hide Crops</h2>
       </div>
-      <p className="text-xs text-slate-500 mb-4">
-        Hide cover crops (rye, grassland, etc.) from Reports, Operations, and all dropdowns site-wide. Data stays imported; only display is affected.
+      <p className="mb-4 text-xs text-slate-500">
+        Hide cover crops (rye, grassland, etc.) from Reports, Operations, and all dropdowns
+        site-wide. Data stays imported; only display is affected.
       </p>
 
       {loading ? (
         <div className="flex items-center gap-2 py-4 text-sm text-slate-400">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading crops...
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading crops...
         </div>
       ) : availableCrops.length === 0 ? (
-        <p className="text-sm text-slate-500 py-2">No crops imported yet.</p>
+        <p className="py-2 text-sm text-slate-500">No crops imported yet.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="mb-4 grid grid-cols-2 gap-2">
           {availableCrops.map((crop) => {
             const hidden = pending.has(crop);
             return (
               <button
                 key={crop}
                 onClick={() => toggle(crop)}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left transition-all ${
+                className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-all ${
                   hidden
-                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300'
-                    : 'bg-white/[0.03] border border-white/[0.06] text-slate-300 hover:bg-white/[0.06]'
+                    ? "border border-amber-500/30 bg-amber-500/10 text-amber-300"
+                    : "border border-white/[0.06] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
                 }`}
               >
                 <span>{formatCropName(crop)}</span>
-                <span className="text-xs opacity-60">{hidden ? 'Hidden' : 'Shown'}</span>
+                <span className="text-xs opacity-60">{hidden ? "Hidden" : "Shown"}</span>
               </button>
             );
           })}
@@ -108,16 +113,16 @@ export function HiddenCropsSection() {
         <button
           onClick={handleSave}
           disabled={!isDirty || saving}
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+          className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : justSaved ? <Check className="w-4 h-4" /> : null}
-          {justSaved ? 'Saved' : saving ? 'Saving...' : 'Save'}
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : justSaved ? (
+            <Check className="h-4 w-4" />
+          ) : null}
+          {justSaved ? "Saved" : saving ? "Saving..." : "Save"}
         </button>
-        {pending.size > 0 && (
-          <span className="text-xs text-slate-500">
-            {pending.size} hidden
-          </span>
-        )}
+        {pending.size > 0 && <span className="text-xs text-slate-500">{pending.size} hidden</span>}
       </div>
     </div>
   );

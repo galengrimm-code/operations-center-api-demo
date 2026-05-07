@@ -27,11 +27,12 @@ supabase secrets set JOHN_DEERE_CLIENT_SECRET=<value>
 ```
 
 Via the MCP tool in this codebase:
+
 ```typescript
 mcp__supabase__deploy_edge_function({
   slug: "john-deere-auth",
-  verify_jwt: false
-})
+  verify_jwt: false,
+});
 ```
 
 ## Auth pattern (every function)
@@ -39,8 +40,12 @@ mcp__supabase__deploy_edge_function({
 Every edge function follows this auth pattern (`_shared/auth.ts:8` initializes the Supabase client with `db: { schema: 'operations_center' }`):
 
 ```ts
-const user = await getAuthenticatedUser(req)
-if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
+const user = await getAuthenticatedUser(req);
+if (!user)
+  return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    status: 401,
+    headers: corsHeaders,
+  });
 ```
 
 ## Token refresh
@@ -50,6 +55,7 @@ All JD API calls use `getValidToken()` from `_shared/john-deere.ts` — auto-ref
 ## John Deere OAuth scopes
 
 Currently requests:
+
 ```
 ag1 ag2 ag3 org1 org2 work1 work2 offline_access
 ```
