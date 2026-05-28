@@ -17,7 +17,7 @@ export interface AuthResult {
 export async function getAuthenticatedUser(req: Request): Promise<AuthResult | Response> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    return errorResponse("No authorization header", 401);
+    return errorResponse("No authorization header", 401, undefined, req);
   }
 
   const supabase = createServiceClient();
@@ -28,7 +28,7 @@ export async function getAuthenticatedUser(req: Request): Promise<AuthResult | R
   } = await supabase.auth.getUser(token);
 
   if (userError || !user) {
-    return errorResponse("Invalid user token", 401);
+    return errorResponse("Invalid user token", 401, undefined, req);
   }
 
   return { user, supabase };

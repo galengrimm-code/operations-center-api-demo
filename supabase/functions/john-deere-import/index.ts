@@ -456,7 +456,7 @@ async function importOperations(
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return optionsResponse();
+    return optionsResponse(req);
   }
 
   try {
@@ -477,12 +477,12 @@ Deno.serve(async (req: Request) => {
     const connection = await getUserConnection(supabase, user.id);
     console.log("[import] Connection found:", !!connection, "org:", connection?.selected_org_id);
     if (!connection) {
-      return errorResponse("No John Deere connection found", 404);
+      return errorResponse("No John Deere connection found", 404, undefined, req);
     }
 
     const orgId = connection.selected_org_id;
     if (!orgId) {
-      return errorResponse("No organization selected", 400);
+      return errorResponse("No organization selected", 400, undefined, req);
     }
 
     const accessToken = await getValidToken(supabase, connection);
@@ -505,27 +505,35 @@ Deno.serve(async (req: Request) => {
         .eq("user_id", user.id)
         .eq("org_id", orgId);
 
-      return jsonResponse({
-        fields: storedFields || [],
-        totalImported: fieldResult.totalImported,
-        withoutBoundaries: fieldResult.withoutBoundaries,
-        operationsImported: opsResult.totalImported,
-      });
+      return jsonResponse(
+        {
+          fields: storedFields || [],
+          totalImported: fieldResult.totalImported,
+          withoutBoundaries: fieldResult.withoutBoundaries,
+          operationsImported: opsResult.totalImported,
+        },
+        200,
+        req,
+      );
     }
 
     if (action === "import-operations") {
       const opsResult = await importOperations(supabase, accessToken, user.id, orgId);
 
-      return jsonResponse({
-        totalImported: opsResult.totalImported,
-      });
+      return jsonResponse(
+        {
+          totalImported: opsResult.totalImported,
+        },
+        200,
+        req,
+      );
     }
 
     // Import operations for a single field (avoids timeout)
     if (action === "import-field-operations") {
       const fieldId = url.searchParams.get("fieldId");
       if (!fieldId) {
-        return errorResponse("Missing fieldId parameter", 400);
+        return errorResponse("Missing fieldId parameter", 400, undefined, req);
       }
 
       let totalImported = 0;
@@ -594,7 +602,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      return jsonResponse({ totalImported, fieldId });
+      return jsonResponse({ totalImported, fieldId }, 200, req);
     }
 
     // Diagnostic: show ALL boundaries (active + irrigated + others) for a field
@@ -602,7 +610,7 @@ Deno.serve(async (req: Request) => {
     if (action === "debug-field-boundaries") {
       const fieldId = url.searchParams.get("fieldId");
       if (!fieldId) {
-        return errorResponse("Missing fieldId parameter", 400);
+        return errorResponse("Missing fieldId parameter", 400, undefined, req);
       }
 
       const response = await callJohnDeereApi(
@@ -610,7 +618,12 @@ Deno.serve(async (req: Request) => {
         `/organizations/${orgId}/fields/${fieldId}/boundaries?recordFilter=all`,
       );
       if (!response.ok) {
-        return errorResponse(`John Deere API error: ${response.status}`, response.status);
+        return errorResponse(
+          `John Deere API error: ${response.status}`,
+          response.status,
+          undefined,
+          req,
+        );
       }
       const data = await response.json();
       const boundaries: JdBoundary[] = data.values || [];
@@ -640,14 +653,14 @@ Deno.serve(async (req: Request) => {
         };
       });
 
-      return jsonResponse({ fieldId, count: boundaries.length, boundaries: summary });
+      return jsonResponse({ fieldId, count: boundaries.length, boundaries: summary }, 200, req);
     }
 
     // Diagnostic: show what JD returns for a field's operations
     if (action === "debug-field-operations") {
       const fieldId = url.searchParams.get("fieldId");
       if (!fieldId) {
-        return errorResponse("Missing fieldId parameter", 400);
+        return errorResponse("Missing fieldId parameter", 400, undefined, req);
       }
 
       const results: Record<string, unknown> = {};
@@ -677,13 +690,13 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      return jsonResponse({ fieldId, results });
+      return jsonResponse({ fieldId, results }, 200, req);
     }
 
-    return errorResponse("Unknown action", 400);
+    return errorResponse("Unknown action", 400, undefined, req);
   } catch (error) {
     console.error("[import] Error:", error);
     console.error("[import] Error stack:", error.stack);
-    return errorResponse(error.message, 500, error.stack);
+    return errorResponse(error.message, 500, error.stack, req);
   }
 });

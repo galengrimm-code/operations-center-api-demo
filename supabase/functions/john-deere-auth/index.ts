@@ -5,7 +5,7 @@ import { exchangeCodeForTokens, refreshAccessToken } from "../_shared/john-deere
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return optionsResponse();
+    return optionsResponse(req);
   }
 
   try {
@@ -20,7 +20,7 @@ Deno.serve(async (req: Request) => {
       const { code, redirectUri } = await req.json();
 
       if (!code || !redirectUri) {
-        return errorResponse("Missing code or redirectUri", 400);
+        return errorResponse("Missing code or redirectUri", 400, undefined, req);
       }
 
       const tokens = await exchangeCodeForTokens(code, redirectUri);
@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
         throw new Error(`Failed to save tokens: ${upsertError.message}`);
       }
 
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, req);
     }
 
     if (action === "refresh") {
@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (connError || !connection) {
-        return errorResponse("No John Deere connection found", 404);
+        return errorResponse("No John Deere connection found", 404, undefined, req);
       }
 
       const tokens = await refreshAccessToken(connection.refresh_token);
@@ -68,18 +68,18 @@ Deno.serve(async (req: Request) => {
         })
         .eq("user_id", user.id);
 
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, req);
     }
 
     if (action === "disconnect") {
       await supabase.from("john_deere_connections").delete().eq("user_id", user.id);
 
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, req);
     }
 
-    return errorResponse("Unknown action", 400);
+    return errorResponse("Unknown action", 400, undefined, req);
   } catch (error) {
     console.error("Error:", error);
-    return errorResponse(error.message, 500);
+    return errorResponse(error.message, 500, undefined, req);
   }
 });

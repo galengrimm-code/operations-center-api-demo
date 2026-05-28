@@ -5,7 +5,7 @@ import { callJohnDeereApi, getValidToken, getUserConnection } from "../_shared/j
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return optionsResponse();
+    return optionsResponse(req);
   }
 
   try {
@@ -15,7 +15,7 @@ Deno.serve(async (req: Request) => {
 
     const connection = await getUserConnection(supabase, user.id);
     if (!connection) {
-      return errorResponse("No John Deere connection found", 404);
+      return errorResponse("No John Deere connection found", 404, undefined, req);
     }
 
     const accessToken = await getValidToken(supabase, connection);
@@ -31,17 +31,18 @@ Deno.serve(async (req: Request) => {
           `John Deere API error: ${response.status}`,
           response.status,
           errorText,
+          req,
         );
       }
 
-      return jsonResponse(await response.json());
+      return jsonResponse(await response.json(), 200, req);
     }
 
     if (action === "select-organization") {
       const { orgId, orgName } = await req.json();
 
       if (!orgId) {
-        return errorResponse("Missing orgId", 400);
+        return errorResponse("Missing orgId", 400, undefined, req);
       }
 
       await supabase
@@ -53,13 +54,13 @@ Deno.serve(async (req: Request) => {
         })
         .eq("user_id", user.id);
 
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, req);
     }
 
     if (action === "fields") {
       const orgId = connection.selected_org_id;
       if (!orgId) {
-        return errorResponse("No organization selected", 400);
+        return errorResponse("No organization selected", 400, undefined, req);
       }
 
       const response = await callJohnDeereApi(accessToken, `/organizations/${orgId}/fields`);
@@ -69,16 +70,17 @@ Deno.serve(async (req: Request) => {
           `John Deere API error: ${response.status}`,
           response.status,
           errorText,
+          req,
         );
       }
 
-      return jsonResponse(await response.json());
+      return jsonResponse(await response.json(), 200, req);
     }
 
     if (action === "get-stored-fields") {
       const orgId = connection.selected_org_id;
       if (!orgId) {
-        return errorResponse("No organization selected", 400);
+        return errorResponse("No organization selected", 400, undefined, req);
       }
 
       const { data: storedFields, error: fieldsError } = await supabase
@@ -88,16 +90,16 @@ Deno.serve(async (req: Request) => {
         .eq("org_id", orgId);
 
       if (fieldsError) {
-        return errorResponse(fieldsError.message, 500);
+        return errorResponse(fieldsError.message, 500, undefined, req);
       }
 
-      return jsonResponse({ fields: storedFields || [] });
+      return jsonResponse({ fields: storedFields || [] }, 200, req);
     }
 
     if (action === "get-stored-operations") {
       const orgId = connection.selected_org_id;
       if (!orgId) {
-        return errorResponse("No organization selected", 400);
+        return errorResponse("No organization selected", 400, undefined, req);
       }
 
       const fieldId = url.searchParams.get("fieldId");
@@ -120,15 +122,15 @@ Deno.serve(async (req: Request) => {
       const { data: operations, error: opsError } = await query;
 
       if (opsError) {
-        return errorResponse(opsError.message, 500);
+        return errorResponse(opsError.message, 500, undefined, req);
       }
 
-      return jsonResponse({ operations: operations || [] });
+      return jsonResponse({ operations: operations || [] }, 200, req);
     }
 
-    return errorResponse("Unknown action", 400);
+    return errorResponse("Unknown action", 400, undefined, req);
   } catch (error) {
     console.error("Error:", error);
-    return errorResponse(error.message, 500);
+    return errorResponse(error.message, 500, undefined, req);
   }
 });

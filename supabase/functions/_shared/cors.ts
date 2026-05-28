@@ -1,20 +1,40 @@
-export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+const ALLOWED_ORIGINS = new Set([
+  "https://operations-center-api-demo.vercel.app",
+  "http://localhost:3000",
+  // add Vercel preview origins explicitly here if needed: "https://operations-center-api-demo-git-*.vercel.app"
+]);
 
-export function jsonResponse(data: unknown, status = 200): Response {
+function resolveOrigin(req: Request | undefined): string {
+  if (!req) return "https://operations-center-api-demo.vercel.app"; // safe default for non-request contexts
+  const origin = req.headers.get("Origin") ?? "";
+  return ALLOWED_ORIGINS.has(origin) ? origin : "https://operations-center-api-demo.vercel.app";
+}
+
+function corsHeaders(req?: Request): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": resolveOrigin(req),
+    "Vary": "Origin",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  };
+}
+
+export function jsonResponse(data: unknown, status = 200, req?: Request): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
-export function errorResponse(error: string, status = 400, details?: string): Response {
-  return jsonResponse({ error, ...(details ? { details } : {}) }, status);
+export function errorResponse(
+  error: string,
+  status = 400,
+  details?: string,
+  req?: Request,
+): Response {
+  return jsonResponse({ error, ...(details ? { details } : {}) }, status, req);
 }
 
-export function optionsResponse(): Response {
-  return new Response(null, { status: 200, headers: corsHeaders });
+export function optionsResponse(req?: Request): Response {
+  return new Response(null, { status: 200, headers: corsHeaders(req) });
 }

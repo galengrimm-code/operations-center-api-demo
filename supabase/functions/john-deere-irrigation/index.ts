@@ -121,7 +121,7 @@ async function analyzeBoundary(
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return optionsResponse();
+    return optionsResponse(req);
   }
 
   try {
@@ -131,12 +131,12 @@ Deno.serve(async (req: Request) => {
 
     const connection = await getUserConnection(supabase, user.id);
     if (!connection) {
-      return errorResponse("No John Deere connection found", 404);
+      return errorResponse("No John Deere connection found", 404, undefined, req);
     }
 
     const orgId = connection.selected_org_id;
     if (!orgId) {
-      return errorResponse("No organization selected", 400);
+      return errorResponse("No organization selected", 400, undefined, req);
     }
 
     const accessToken = await getValidToken(supabase, connection);
@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
     if (action === "irrigation-analysis") {
       const fieldId = url.searchParams.get("fieldId");
       if (!fieldId) {
-        return errorResponse("Missing fieldId parameter", 400);
+        return errorResponse("Missing fieldId parameter", 400, undefined, req);
       }
 
       const { data: storedField } = await supabase
@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
 
       const fieldName = storedField?.name || "Unknown Field";
       const result = await analyzeBoundary(supabase, user.id, fieldId, fieldName);
-      return jsonResponse(result);
+      return jsonResponse(result, 200, req);
     }
 
     // Polls JD for shapefile status. When ready, downloads zip and uploads
@@ -166,7 +166,7 @@ Deno.serve(async (req: Request) => {
     if (action === "shapefile-status") {
       const operationId = url.searchParams.get("operationId");
       if (!operationId) {
-        return errorResponse("Missing operationId parameter", 400);
+        return errorResponse("Missing operationId parameter", 400, undefined, req);
       }
 
       // Check if we already have this shapefile in storage
@@ -176,7 +176,7 @@ Deno.serve(async (req: Request) => {
         .list(user.id, { search: `${operationId}.zip` });
 
       if (existing && existing.length > 0) {
-        return jsonResponse({ status: "ready", storagePath });
+        return jsonResponse({ status: "ready", storagePath }, 200, req);
       }
 
       const shapefileUrl = `${JOHN_DEERE_API_BASE}/fieldOps/${operationId}?shapeType=Polygon&resolution=EachSensor`;
@@ -199,14 +199,19 @@ Deno.serve(async (req: Request) => {
       if (response.status === 307) {
         const downloadUrl = response.headers.get("Location");
         if (!downloadUrl) {
-          return errorResponse("Redirect with no Location header", 500);
+          return errorResponse("Redirect with no Location header", 500, undefined, req);
         }
 
         // Download zip from JD's pre-signed URL
         console.log(`[irrigation] Downloading shapefile from JD redirect...`);
         const zipResponse = await fetch(downloadUrl);
         if (!zipResponse.ok) {
-          return errorResponse(`Failed to download shapefile: ${zipResponse.status}`, 502);
+          return errorResponse(
+            `Failed to download shapefile: ${zipResponse.status}`,
+            502,
+            undefined,
+            req,
+          );
         }
 
         const zipBytes = new Uint8Array(await zipResponse.arrayBuffer());
@@ -227,19 +232,26 @@ Deno.serve(async (req: Request) => {
           return errorResponse(
             `Failed to upload shapefile to storage: ${uploadError.message}`,
             500,
+            undefined,
+            req,
           );
         }
 
         console.log(`[irrigation] Shapefile uploaded to storage`);
-        return jsonResponse({ status: "ready", storagePath });
+        return jsonResponse({ status: "ready", storagePath }, 200, req);
       }
 
       if (response.status === 202) {
-        return jsonResponse({ status: "processing" }, 202);
+        return jsonResponse({ status: "processing" }, 202, req);
       }
 
       if (response.status === 406) {
-        return errorResponse("Shapefile cannot be generated for this operation", 406);
+        return errorResponse(
+          "Shapefile cannot be generated for this operation",
+          406,
+          undefined,
+          req,
+        );
       }
 
       // Capture the full error response for debugging
@@ -255,12 +267,13 @@ Deno.serve(async (req: Request) => {
           operationId,
         },
         response.status,
+        req,
       );
     }
 
-    return errorResponse("Unknown action", 400);
+    return errorResponse("Unknown action", 400, undefined, req);
   } catch (error) {
     console.error("[irrigation] Error:", error);
-    return errorResponse(error.message, 500);
+    return errorResponse(error.message, 500, undefined, req);
   }
 });
