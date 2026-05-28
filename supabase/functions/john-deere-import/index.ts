@@ -6,6 +6,7 @@ import { getValidToken, getUserConnection } from "../_shared/john-deere.ts";
 import { importFields } from "./actions/import-fields.ts";
 import { importOperations } from "./actions/import-operations.ts";
 import { importFieldOperations } from "./actions/import-field-operations.ts";
+import { importApplications } from "./actions/import-applications.ts";
 import { debugFieldBoundaries } from "./actions/debug-field-boundaries.ts";
 import { debugFieldOperations } from "./actions/debug-field-operations.ts";
 
@@ -75,6 +76,17 @@ Deno.serve(async (req: Request) => {
           fieldId,
         );
         return jsonResponse(result, 200, req);
+      }
+
+      case "import-applications": {
+        return await importApplications({
+          supabase,
+          accessToken,
+          user,
+          orgId,
+          url,
+          req,
+        });
       }
 
       case "debug-field-boundaries": {
