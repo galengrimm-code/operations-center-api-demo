@@ -10,6 +10,7 @@
 - **Products dictionary normalization** — if the spray-sync build stores products as denormalized strings per application, a follow-up could extract a `products` catalog table (product name → manufacturer → category → label info) so we can answer "all herbicide passes" or "all glyphosate this year" without string matching. Trigger: once we have ~50+ application records and start asking those questions in the UI.
 
 - **Cross-link spray data with Farm-Budget treatments** — Farm-Budget (sibling app in same Supabase project) has a `public.yield_records.treatments` JSONB column that appears to store manually-entered treatment data per yield record. After the OPS Center spray-sync ships, there's a natural question about whether to make these two data sources cross-reference (so a yield record can show "treatments per JD spray records" without manual entry). Defer until both data layers are stable. Triggered by: Farm-Budget patterns audit on 2026-05-28.
+- **pgTAP database-level RLS test suite** — automated SQL tests that prove "user B cannot read user A's data" before every deploy. Skipped for v1 of spray-sync because: only one effective user (Galen), runtime `checkMutationResult` + manual second-account verification already cover the bug class, ~1 hr setup cost not justified yet. Trigger: when the app gains a second real user (Galen's wife, hired hand, multi-tenant rollout). Decided 2026-05-28.
 
 ## Parked (decided to NOT do — but keep the reasoning)
 
