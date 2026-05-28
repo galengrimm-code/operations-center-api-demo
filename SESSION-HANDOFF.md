@@ -1,93 +1,99 @@
-# Session Handoff — 2026-05-28 (subagent-driven execution checkpoint)
+# Session Handoff — 2026-05-28 (after Group E)
 
-> **Ephemeral.** Rewritten at the end of each session via `/log` or trigger phrase.
+> **Ephemeral.** Rewritten end of session.
 
 ## What was done this session
 
-### Planning phase (before execution)
-- Adopted project-memory template from `~/.claude-sync/templates/project-memory/`
-- Brainstorm → spec v1→v4 with 2 Codex consults (gpt-5.3-codex)
-- Phase 0c real-data capture via temp `debug-spray-shape` edge function (still live, queued for delete in plan Task 38)
-- Wrote 45-task implementation plan; added Group 0 (security hardening) per Watch Tower v6.7 audit
-- Spec at `docs/superpowers/specs/2026-05-28-spray-application-sync-design.md`
-- Plan at `docs/superpowers/plans/2026-05-28-spray-application-sync.md`
+### Planning phase
+- Spec v1→v4 with 2 Codex consults (gpt-5.3-codex)
+- 45-task implementation plan with Group 0 added per Watch Tower v6.7 audit
+- Spec: `docs/superpowers/specs/2026-05-28-spray-application-sync-design.md`
+- Plan: `docs/superpowers/plans/2026-05-28-spray-application-sync.md`
 
-### Subagent-driven execution (this session) — 19/45 tasks complete
+### Subagent-driven execution — 27/45 tasks complete (60%)
 
-**Group 0 — Security Hardening (5/5 ✅):**
-- 0.1 — `_shared/cors.ts` allowlist (cors-open P1) → commits `aa76cd5` + `7942c9d` (DRY refactor)
-- 0.2 — `_shared/generic-error.ts` retrofitted to 4 functions (error-response-leakage P2) → `9442f2a`
-- 0.3 — `middleware.ts` via `@supabase/ssr` (route-protection-gap P3) → `e1e149c` + `ae0df7e`
-- 0.4 — OAuth scopes trimmed to read-only (oauth-broad-scopes P3) → `31207ee`
-- 0.5 — CLAUDE.md Resolved table + TECH-DEBT.md updated → `213b24e`
+| Group | Range | Status | Outcome |
+|---|---|---|---|
+| 0 Security | 0.1–0.5 | ✅ 5/5 | Resolves P1 cors-open, P2 error-leakage, P3 route-gap, P3 oauth-scopes |
+| A Test infra | 1–4 | ✅ 4/4 | Vitest + Playwright + fixtures + prebuild gate |
+| B Migrations | 5–9 | ✅ 5/5 | 4 SQL files applied live to `nuxofsjzrgdauzriraze` |
+| C TDD pure logic | 10–14 | ✅ 5/5 | 5 helpers, 39 unit tests (extract-tankmix, derive-application-name, normalize, merge-application-products, category-utils) |
+| D File split | 15–19 | ✅ 5/5 | `john-deere-import/index.ts` 689 → 112 lines (dispatch-only) |
+| E import-applications | 20–22 | ✅ 3/3 | 415-line action + Deno tests (unverified — Deno not installed) + auto-chain into import-fields |
+| F Frontend foundation | 23–26 | ⏳ 0/4 | next |
+| G UI | 27–32 | ⏳ 0/6 | pending |
+| H E2E + cleanup | 33–38 | ⏳ 0/6 | pending |
+| I Final | 39–40 | ⏳ 0/2 | pending |
 
-**Group A — Test Infrastructure (4/4 ✅):**
-- 1 — Vitest 4.1.7 + jsdom + testing-library installed; sanity test passes → `03454b8`
-- 2 — Playwright 1.60.0 + Chromium installed; sanity E2E passes → `4b18a9e`
-- 3 — `__fixtures__/jd/` seeded with Phase 0c capture + capture-jd-fixtures.ts script → `4677c9e`
-- 4 — `prebuild` script = `lint && typecheck && test` (Vercel gate active) → `b9172fe`
+### Test suite
+**40 Vitest tests passing, prebuild gate active.** Run time ~700ms.
 
-**Group B — Migrations (5/5 ✅):**
-- 5 — `products` table migration → `e710de9`
-- 6 — `field_operation_products` table + 2 triggers + 4 indexes → `b1e98da`
-- 7 — `field_operations` extension (measurement_status + application_name + jd_original + user_edited) → `c1cf10f`
-- 8 — `product_category_seeds` lookup with 21 INSERT rows → `94c5907`
-- 9 — **All 4 migrations applied to live `nuxofsjzrgdauzriraze` via MCP** → marker `36b1e3e`. Verified: 17 + 25 + 5 columns, 4 new field_operations cols, 21 seed rows, all 3 new tables RLS-enabled.
-- TECH-DEBT updated with `function_search_path_mutable` warn → `4b6abb0`
+### Live state
+- **Branch:** `main` local, ~36 commits ahead of origin, NOT pushed
+- **DB:** `products`, `field_operation_products`, `product_category_seeds` exist with RLS + 21 seeds. `field_operations` extended.
+- **Edge function:** `john-deere-import` v18+ deployed, all 6 actions (5 existing + new `import-applications`) live
+- **Auto-chain:** `?action=import-fields` now imports fields → operations → applications in one call
+- **Temp `debug-spray-shape` function:** still active. Plan Task 38 deletes it.
 
-**Group C — TDD Pure Logic (5/5 ✅):**
-- 10 — `extract-tankmix.ts` + `shared/types.ts` (flat product lines from JD response) → 9/9 tests → `267535b`
-- 11 — `derive-application-name.ts` (sorted distinct outer names + ; join) → 7/7 tests → `eaee9ca`
-- 12 — `normalize.ts` (trim + lowercase + collapse whitespace) → 6/6 tests → `2192ecc`
-- 13 — **`merge-application-products.ts` — the 5-case re-import decision tree** → 7/7 tests including combined-merge → `f918689`
-- 14 — `lib/category-utils.ts` (seed matcher + effectiveCategory) → 10/10 tests → `0578dd9`
-
-### Test suite state
-**6 test files, 40 tests, all passing.** Run time ~700ms. Wired into `npm run prebuild` so Vercel will block deploy on any test failure.
+### Notable findings during execution
+- Task 15: caught pre-existing typecheck failure on `lib/__tests__/category-utils.test.ts` (`.ts` extension import) — fixed in `487e52e`
+- Task 9: `function_search_path_mutable` advisor warns on 2 new trigger functions — logged to TECH-DEBT
+- Task 16+: deploys succeeded despite Supabase MCP showing as disconnected (CLI fallback worked throughout)
+- Task 19: index.ts landed at 112 lines vs target 80 — auto-chain composite block accounts for the overage; called acceptable
+- Task 20: implementer threaded `ctx.req` through error responses for CORS (fix on top of plan)
+- Task 21: Deno tests committed but un-executed (Deno not installed). Run via `npm run test:deno` after install
 
 ## Current state
 
-- **Branch:** `main` local, **28 commits ahead of origin** — NOT pushed (per `feedback_hold_push.md`)
-- **Live database:** Migrations applied. New tables present and RLS-enabled. No data destruction occurred — all migrations were additive (CREATE TABLE / ALTER ADD COLUMN / INSERT).
-- **Edge functions:** All 4 redeployed with allowlisted CORS + generic errors. Live URLs unchanged.
-- **Temporary `debug-spray-shape` function:** Still active on Supabase. Queued for delete in plan Task 38.
-- **OAuth scopes:** Trimmed to `ag1 org1 work1 offline_access`. Existing tokens keep their broader grants (JD enforces what was granted, not what was requested); new flows use the narrower set.
+Backend edge function is **feature-complete**: spray data can be imported via `?action=import-applications` or the auto-chain from `?action=import-fields`. The merge-by-`line_index` 5-case decision tree is locked in with 7 unit tests. Database is ready to receive product + field_operation_products rows.
+
+**What does NOT exist yet:** any frontend surface to display/edit the data. That's Group F+G.
 
 ## Open questions / decisions pending
 
-- **Push to origin?** When Galen says go, push. Until then, stays local.
-- **`function_search_path_mutable` advisor warns:** logged in TECH-DEBT.md as low-risk; not blocking. Sweep all `operations_center` functions in a future cleanup pass.
+- Push the 36 commits to origin? (Awaiting explicit go per `feedback_hold_push.md`.)
+- Install Deno locally to verify the import-applications Deno tests?
+- Trigger an end-to-end live import to confirm the new action works against real JD data before building UI? (Could surface issues with the action's real-world behavior — Deno tests use mocks, not real Supabase or JD.)
 
-## Next steps (immediate — start of next session)
+## Next steps (immediate, start of next session)
 
-**Resume subagent-driven execution at Task 15 (Group D start — file split).**
+### Group F — Frontend foundation (Tasks 23-26, 4 tasks)
+- 23: `types/applications.ts` — TypeScript types matching the new schema
+- 24: `lib/check-mutation-result.ts` + `lib/unit-display.ts` (with Vitest tests)
+- 25: `lib/applications-client.ts` — read paths (fetchApplications, fetchProductsRollup)
+- 26: `lib/applications-client.ts` — edit + revert mutations + product category edit + application name edit
 
-### Group D — File split of `john-deere-import` (Tasks 15-19, 5 tasks)
-Mechanical refactor: lift current 689-line `john-deere-import/index.ts` into per-action modules under `actions/` + helpers under `helpers/`. No behavior change. Verify each lifted action via deploy + smoke test before moving to the next. Final state: `index.ts` ~80 lines dispatch only.
+### Group G — UI (Tasks 27-32, 6 tasks)
+- 27: `/applications` page skeleton + nav entry
+- 28-30: List view + expanded row + product line edit dialog
+- 31: `/products` rollup page
+- 32: `/fields/[fieldId]/applications` tab
 
-Per plan section 5.1 + Tasks 15-19 detail.
+### Group H — E2E + cleanup (Tasks 33-38, 6 tasks)
+- 33: Playwright global auth setup
+- 34-36: 3 E2E specs (import-and-view, edit-and-revert, reimport-preserves-edits)
+- 37: capture richer JD fixtures
+- 38: delete `debug-spray-shape` function
 
-### Group E — `import-applications` action (Tasks 20-22, 3 tasks)
-The main new edge function action. Uses every helper from Group C. Has Deno tests against fixtures. Auto-chains into `import-fields`.
-
-### Group F-I — Frontend + E2E + cleanup (Tasks 23-40, 18 tasks)
-Types, applications-client.ts, UI surfaces (`/applications`, `/products`, field tab), Playwright E2E (3 scenarios), delete debug function, final code review.
+### Group I — Final (Tasks 39-40, 2 tasks)
+- 39: real import + manual verification
+- 40: `/code-review` + changelog/project-log updates
 
 ## How to resume
 
 ```bash
 cd "C:/Users/galen/Documents/Websites/OPS Center API"
-git log --oneline | head -25     # see what shipped today
-npm run prebuild                 # confirm 40 tests still green
+git log --oneline 460a4d3..HEAD | head -40
+npm run prebuild
 ```
 
-Then invoke `superpowers:subagent-driven-development` and direct it to "continue from Task 15." The plan file (`docs/superpowers/plans/2026-05-28-spray-application-sync.md`) has the verbatim task text for every remaining task.
+Then re-invoke `superpowers:subagent-driven-development` and continue at Task 23. All task text is in `docs/superpowers/plans/2026-05-28-spray-application-sync.md`.
 
-**Pacing recommendation:** Group D + E together is the next logical session chunk (8 tasks). After that, Group F-I in one or two more sessions.
+**Pacing recommendation:** Group F + G is one session chunk (~10 tasks, all frontend, can move fast since UI scaffolding doesn't require deploys). Group H + I in one final session.
 
-## Verification one-liner
+## Verification
 
 ```bash
-git log --oneline 460a4d3..HEAD | wc -l    # should be 22 (commits added by execution)
-npm run prebuild                          # should pass — 40 tests
+git log --oneline 460a4d3..HEAD | wc -l    # ~36 commits added this session
+npm run prebuild                          # 40 tests + lint + typecheck all green
 ```
