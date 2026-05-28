@@ -8,22 +8,6 @@
 
 ## Active
 
-### CORS wildcard on all Supabase Edge Functions
-- **Where:** `supabase/functions/_shared/cors.ts`
-- **What:** `Access-Control-Allow-Origin: *` on all 4 functions. Verified live in the SCAN:AUTO block — `curl -I -X OPTIONS ... -H "Origin: https://evil.com"` returns `*`.
-- **Why it's debt:** Any origin can hit authenticated endpoints. Currently mitigated by the per-request `getAuthenticatedUser` JWT check (no anonymous data exfiltration), but it's still a violated portfolio guardrail.
-- **Cost to fix:** small — restrict to `https://operations-center-api-demo.vercel.app` + `http://localhost:3000` in `_shared/cors.ts`, redeploy 4 functions.
-- **Risk of not fixing:** medium — defense-in-depth gap; gets re-flagged on every weekly scan.
-- **Trigger:** next time `_shared/cors.ts` is touched for any reason, or when adding the spray-products endpoints (don't widen a gap that's already flagged).
-
-### Error response leakage in all Edge Functions
-- **Where:** `john-deere-api/index.ts:132`, `john-deere-auth/index.ts:83`, `john-deere-import/index.ts:687`, `john-deere-irrigation/index.ts:264`
-- **What:** `error.message` (and `error.stack` in `john-deere-import`) forwarded to HTTP responses.
-- **Why it's debt:** Leaks internal state — SQL errors, JD upstream payloads — to any client.
-- **Cost to fix:** small — catch blocks return a generic message, log full error server-side.
-- **Risk of not fixing:** medium.
-- **Trigger:** before adding any new error path in an edge function (i.e., this needs to be cleaned up as part of the spray-sync build, not after).
-
 ### `john-deere-import/index.ts` over 500 lines (689 and growing)
 - **Where:** `supabase/functions/john-deere-import/index.ts`
 - **What:** 689 lines, multiple actions (`import-fields`, `import-operations`, `import-field-operations`, `debug-field-boundaries`, `debug-field-operations`) and helper functions in one file. Up from 658 at the last scan.
@@ -53,20 +37,6 @@
 - **Risk of not fixing:** medium (cost exposure on paid JD endpoints; abuse vector if origin is opened up)
 - **Trigger:** before any new endpoint that hits a paid JD API call (this includes spray-product import if JD bills it)
 
-### No server-side route protection (`middleware.ts`)
-- **Where:** All `(app)/*` routes — protected only by client-side `useEffect` redirects in `auth-context.tsx`
-- **What:** Page HTML loads before client-side redirect fires. Authenticated content isn't actually authenticated until the JS runs.
-- **Cost to fix:** small — add `middleware.ts` at project root using `@supabase/ssr`
-- **Risk of not fixing:** medium — content flash, plus the auth model isn't actually server-enforced
-- **Trigger:** before any sensitive data lands in a new authed page (the spray-products UI is a candidate)
-
-### Overly broad John Deere OAuth scopes
-- **Where:** `lib/john-deere-client.ts:288` — `ag1 ag2 ag3 org1 org2 work1 work2 offline_access`
-- **What:** Read+write scopes across all 3 ag tiers, when current features are read-only
-- **Cost to fix:** trivial — change the scope string + re-consent
-- **Risk of not fixing:** low–medium — gives the app more power than it uses; one stolen token leaks more than it should
-- **Trigger:** if/when we add a feature that needs write (push records back to JD), revisit the scope set then; until then, trim to `ag1 org1 work1 offline_access`
-
 ### Residual Next 13.5.x CVEs
 - **Where:** `next@^13.5.11` + 4 high CVEs inside the bundled deps + 1 moderate
 - **What:** `npm audit fix --force` would push to `next@16.2.5` (breaking major)
@@ -76,4 +46,14 @@
 
 ## Resolved
 
-_None yet. When something here is fixed, move it here with a date + commit reference._
+### CORS wildcard on all Supabase Edge Functions — 2026-05-28
+Resolved as part of spray-application sync build (Task 0.1). `_shared/cors.ts` now uses an explicit allowlist with `Vary: Origin`. Commits aa76cd5 + 7942c9d.
+
+### Error response leakage in all Edge Functions — 2026-05-28
+Resolved as part of spray-application sync build (Task 0.2). `_shared/generic-error.ts` added; all 4 functions' catch blocks retrofitted. Commit 9442f2a.
+
+### No server-side route protection (middleware.ts) — 2026-05-28
+Resolved as part of spray-application sync build (Task 0.3). `middleware.ts` added at project root using `@supabase/ssr`. Commits e1e149c + ae0df7e.
+
+### Overly broad John Deere OAuth scopes — 2026-05-28
+Resolved as part of spray-application sync build (Task 0.4). Scopes trimmed to `ag1 org1 work1 offline_access` in `lib/john-deere-client.ts`. Commit 31207ee.
