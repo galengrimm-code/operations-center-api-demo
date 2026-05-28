@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { matchCategoryFromSeeds, effectiveCategory } from "../category-utils.ts";
-import type { CategorySeed } from "../category-utils.ts";
+import { matchCategoryFromSeeds, effectiveCategory } from "../category-utils";
+import type { CategorySeed } from "../category-utils";
 
 const seeds: CategorySeed[] = [
   { name_pattern: "atrazine",   match_type: "contains", product_category: "chemical" },
