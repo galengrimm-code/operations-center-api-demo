@@ -38,9 +38,19 @@ Deno.serve(async (req: Request) => {
 
     switch (action) {
       case "import-fields": {
-        // Import fields, then automatically import operations
+        // Import fields, then automatically import operations + applications
         const fieldResult = await importFields(supabase, accessToken, user.id, orgId);
         const opsResult = await importOperations(supabase, accessToken, user.id, orgId);
+        // importApplications returns a Response; we invoke it for side effects only
+        // (it writes to the applications table) and surface a simple flag in the composite.
+        await importApplications({
+          supabase,
+          accessToken,
+          user,
+          orgId,
+          url,
+          req,
+        });
 
         const { data: storedFields } = await supabase
           .from("fields")
@@ -54,6 +64,7 @@ Deno.serve(async (req: Request) => {
             totalImported: fieldResult.totalImported,
             withoutBoundaries: fieldResult.withoutBoundaries,
             operationsImported: opsResult.totalImported,
+            applicationsImported: true,
           },
           200,
           req,
