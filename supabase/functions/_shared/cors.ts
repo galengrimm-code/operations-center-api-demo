@@ -1,13 +1,15 @@
+const DEFAULT_ORIGIN = "https://operations-center-api-demo.vercel.app";
+
 const ALLOWED_ORIGINS = new Set([
-  "https://operations-center-api-demo.vercel.app",
+  DEFAULT_ORIGIN,
   "http://localhost:3000",
   // add Vercel preview origins explicitly here if needed: "https://operations-center-api-demo-git-*.vercel.app"
 ]);
 
 function resolveOrigin(req: Request | undefined): string {
-  if (!req) return "https://operations-center-api-demo.vercel.app"; // safe default for non-request contexts
+  if (!req) return DEFAULT_ORIGIN; // safe default for non-request contexts
   const origin = req.headers.get("Origin") ?? "";
-  return ALLOWED_ORIGINS.has(origin) ? origin : "https://operations-center-api-demo.vercel.app";
+  return ALLOWED_ORIGINS.has(origin) ? origin : DEFAULT_ORIGIN;
 }
 
 function corsHeaders(req?: Request): Record<string, string> {
