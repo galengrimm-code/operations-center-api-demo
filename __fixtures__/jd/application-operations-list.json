@@ -1,0 +1,23 @@
+{
+  "@type": "PagingResponse",
+  "values": [
+    {
+      "@type": "FieldOperation",
+      "id": "00000000-0000-0000-0000-000000000001",
+      "fieldOperationType": "application",
+      "cropSeason": "2025",
+      "startDate": "2025-06-03T22:01:57.473Z",
+      "endDate": "2025-06-03T22:02:31.477Z"
+    },
+    {
+      "@type": "FieldOperation",
+      "id": "00000000-0000-0000-0000-000000000002",
+      "fieldOperationType": "application",
+      "cropSeason": "2026",
+      "startDate": "2026-03-13T16:03:56.849Z",
+      "endDate": "2026-03-19T21:07:39.475Z"
+    }
+  ],
+  "links": [],
+  "total": 2
+}

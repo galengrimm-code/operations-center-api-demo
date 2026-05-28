@@ -1,0 +1,11 @@
+{
+  "@type": "Errors",
+  "errors": [
+    {
+      "@type": "Error",
+      "guid": "00000000-0000-0000-0000-000000000404",
+      "message": "The requested resource was not found"
+    }
+  ],
+  "otherAttributes": {}
+}

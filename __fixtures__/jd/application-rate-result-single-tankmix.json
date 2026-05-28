@@ -1,0 +1,84 @@
+{
+  "@type": "FieldOperationMeasurement",
+  "measurementName": "ApplicationRateResult",
+  "measurementCategory": "Result",
+  "varietyTotals": [],
+  "applicationProductTotals": [
+    {
+      "@type": "ApplicationProductTotal",
+      "productId": "fefe63ecd90a4869de911756e7211332",
+      "name": "Infurrow",
+      "area": {
+        "@type": "EventMeasurement",
+        "value": 0.04,
+        "unitId": "ac",
+        "variableRepresentation": "vrTaskArea"
+      },
+      "averageSpeed": {
+        "@type": "EventMeasurement",
+        "value": 0.1,
+        "unitId": "mi1hr-1",
+        "variableRepresentation": "vrVehicleSpeed"
+      },
+      "totalMaterial": {
+        "@type": "EventMeasurement",
+        "value": 0.3,
+        "unitId": "gal",
+        "variableRepresentation": "vrTotalQuantityAppliedVolume"
+      },
+      "averageMaterial": {
+        "@type": "EventMeasurement",
+        "value": 7.64,
+        "unitId": "gal1ac-1",
+        "variableRepresentation": "vrAppRateVolumeMeasured"
+      },
+      "appliedArea": {
+        "@type": "EventMeasurement",
+        "value": 0.04,
+        "unitId": "ac",
+        "variableRepresentation": "vrAppliedArea"
+      },
+      "productTotals": [
+        {
+          "@type": "ProductTotal",
+          "productId": "66834dae-f252-4454-99b0-d7a287e9d4fe",
+          "name": "EnzUpP",
+          "brand": "---",
+          "carrier": false,
+          "totalMaterial": {
+            "@type": "EventMeasurement",
+            "value": 0.3,
+            "unitId": "gal",
+            "variableRepresentation": "vrTotalQuantityAppliedVolume"
+          },
+          "averageMaterial": {
+            "@type": "EventMeasurement",
+            "value": 7.49,
+            "unitId": "gal1ac-1",
+            "variableRepresentation": "vrAppRateVolumeMeasured"
+          }
+        },
+        {
+          "@type": "ProductTotal",
+          "productId": "0d373fc5-d2a0-4afc-be6e-f8f34eabaaac",
+          "name": "Water",
+          "brand": "---",
+          "carrier": true,
+          "totalMaterial": {
+            "@type": "EventMeasurement",
+            "value": 0,
+            "unitId": "gal",
+            "variableRepresentation": "vrTotalQuantityAppliedVolume"
+          },
+          "averageMaterial": {
+            "@type": "EventMeasurement",
+            "value": 0.15,
+            "unitId": "gal1ac-1",
+            "variableRepresentation": "vrAppRateVolumeMeasured"
+          }
+        }
+      ]
+    }
+  ],
+  "links": []
+}
