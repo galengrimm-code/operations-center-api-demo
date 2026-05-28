@@ -29,13 +29,14 @@ Both ambitions are out of scope for THIS build but inform the schema shape.
 - Capture per-product tank-mix breakdown with rates, totals, areas, carrier flag
 - New `products` catalog auto-populated by JD's stable product UUIDs (no manual matching required)
 - **Product classification** (`product_category`: `fertilizer` | `chemical` | `seed` | `adjuvant` | `other` — 5-bucket vocabulary aligned with Harvest Profit's UX) — seeded from a lookup table on first import for ~20 common ag products, manually editable per product, persists across all applications. Per-line override available for the rare case where the same SKU is categorized differently in different operations.
-- **Editable JD-imported values** — user can override `rate_value`, `total_value`, `area_value` on any product row, with revert-to-JD-original path; re-imports skip edited rows
+- **Editable JD-imported values** — user can override `rate_value`, `total_value`, `area_value` on any product row, with revert-to-JD-original path; re-imports preserve edited rows via merge-by-line_index
 - Seed migration with ~20 common ag products pre-classified (atrazine, glyphosate, UAN, urea, etc.) so Galen's first import doesn't require manual classification of obvious items
 - Two new UI surfaces: `/applications` (operation list with filters) and `/products` (rollup view)
 - New tab on field detail showing applications for that field
 - Frontend `checkMutationResult` pattern (per Farm-Budget audit) on all new mutations
 - Address pre-existing tech debt on new endpoints: Zod input validation, generic error responses, restricted CORS, JWT auth pattern
 - Split `supabase/functions/john-deere-import/index.ts` (currently 689 lines) into per-action modules — overdue per existing project guardrail
+- **Introduce automated testing** — Vitest (unit, TDD on pure logic), Playwright (E2E for edit/revert flow), Deno test (edge function actions). `prebuild` runs lint + typecheck + Vitest. Project previously had no tests; this build establishes the baseline.
 
 ### Out of scope (explicit)
 - **Map UI changes** — existing `/map` continues to work, no spray overlay
@@ -589,17 +590,69 @@ async function editApplicationName(operationId: string, name: string) {
 
 ## 7. Testing approach
 
-No automated tests in this project (per CLAUDE.md). Validation:
+**Per Galen's 2026-05-28 directive ("as bug-proof as possible"):** this build introduces automated testing to a project that previously had none. The tier matrix below is pragmatic — coverage where bugs actually hide, no formal layer where the cost outweighs the benefit.
 
-- `npm run typecheck` and `npm run build` must pass on every commit
-- `npm run lint` must pass
-- Manual verification by Galen:
-  1. Run `import-applications` from UI → expect products + tank mix rows appear in DB
-  2. Open `/applications` → expect rows with tank-mix expand
-  3. Open `/products` → expect "X gallons of EnzUpP across N fields" rollup
-  4. Open `/fields/A Test Clean out/applications` → expect that field's apps
-- Re-run import → expect no duplicates (idempotency check)
-- Inspect a known 404 operation in DB → expect `measurement_status = 'not_found'` and no product rows
+### 7.1 Tier matrix
+
+| Tier | Framework | Scope | Files |
+|---|---|---|---|
+| Unit (TS) | **Vitest** | Pure logic: JD response extraction, products catalog matching, seed-list lookup, merge-by-line_index decision tree, application_name derivation | `lib/__tests__/*.test.ts` |
+| Edge function | **Deno test** | `import-applications` action: 200 happy path, 404 graceful skip, 5xx error, idempotent re-import preserving user edits | `supabase/functions/john-deere-import/__tests__/*.test.ts` |
+| E2E (UI) | **Playwright** | Sign in → import-applications → view `/applications` → edit rate on a line → confirm `is_user_edited` + JD-original preserved → revert → re-run import → confirm edit was preserved across imports | `tests/e2e/*.spec.ts` |
+| DB / RLS | **Manual + `checkMutationResult`** | Multi-account read attempts verify RLS at runtime. `checkMutationResult` catches silent failures on every mutation. | (no test files; runtime + manual) |
+
+### 7.2 Test data — real fixtures, not synthetic
+
+`__fixtures__/jd/` contains JD API responses captured during Phase 0c from Galen's actual account (anonymized field/operation IDs where applicable). Tests run against real production shapes:
+
+- `application-rate-result-single-tankmix.json` — one outer aggregate (Infurrow), one constituent + water carrier (the captured 2025-06-03 op)
+- `application-rate-result-404.json` — a recorded 404 response payload
+- `application-rate-result-multi-tankmix.json` — to be captured before tests run; multiple outer aggregates
+- `application-operations-list.json` — the `fieldOperations?fieldOperationType=APPLICATION` list response
+
+Fixture capture script committed at `scripts/capture-jd-fixtures.ts` (Deno) so fixtures can be refreshed when JD API shape drifts.
+
+### 7.3 TDD posture
+
+- **Pure logic with clear contracts → TDD.** Write the Vitest unit test first for: tank-mix product extraction, seed-list category matching, merge-by-line_index, application_name derivation. This forces the merge decision tree (5 cases: new line / existing-unedited / existing-edited / vanished-unedited / vanished-edited) to be enumerated before code.
+- **UI components → test-after.** Playwright E2E written after the UI exists (writing browser tests against a non-existent UI is friction without value).
+- **Edge function actions → test-during.** Deno tests written alongside the action implementation, against the captured fixtures.
+
+### 7.4 CI / build integration
+
+```json
+"scripts": {
+  "test": "vitest run",
+  "test:watch": "vitest",
+  "test:e2e": "playwright test",
+  "test:deno": "cd supabase/functions && deno test --allow-net --allow-env",
+  "prebuild": "npm run lint && npm run typecheck && npm run test"
+}
+```
+
+- **Vitest in `prebuild`** — Vercel deploys fail on test failure. Strong guarantee.
+- **Playwright NOT in prebuild** — too slow (needs browsers + running app). Runs locally + GitHub Actions added as a follow-on if Galen wants gated PRs.
+- **Deno tests NOT in prebuild** — Vercel doesn't have Deno installed by default. Add separately via Supabase CLI in a GitHub Action if needed; for v1, run locally before edge function deploys.
+
+### 7.5 Manual verification (still required, supplements automated tests)
+
+After automated tests pass, Galen runs:
+1. Trigger `import-applications` from UI → expect products + tank mix rows
+2. Open `/applications` → expect rows with tank-mix expand, products grouped by category
+3. Open `/products` → expect "X gallons of EnzUpP across N fields" rollup
+4. Open `/fields/[id]` Applications tab → expect that field's apps chronologically
+5. Edit a rate on a product line → save → reload → expect edit persists, `is_user_edited` badge visible
+6. Revert the edit → expect JD's original value restored
+7. Run import-applications again → expect user-edited line preserved, other lines refreshed
+8. Inspect a known 404 operation in DB → expect `measurement_status = 'not_found'` and no product rows
+9. Sign in as a second test account → expect zero visibility into account 1's data (manual RLS check)
+
+### 7.6 What we deliberately don't test for v1
+
+- **Component snapshot tests** — high churn, low signal
+- **pgTAP RLS test suite** — Significant setup cost; `checkMutationResult` provides runtime safety net. Revisit if RLS bugs surface in production.
+- **Mutation testing / coverage targets** — discipline over metrics; add if test quality becomes an issue.
+- **Visual regression tests** — Playwright captures screenshots on failure for debug; no formal visual diff suite.
 
 ---
 
@@ -653,16 +706,20 @@ These shape today's decisions but are not implemented now:
 
 After this spec is approved, the implementation plan (`writing-plans` skill output) will atomize the work in this order:
 
-1. **Migrations** — three SQL files, applied via `mcp__supabase__apply_migration` to staging-equivalent (this app has no staging — applied directly to shared project; confirm with Galen before applying)
-2. **File split of `john-deere-import`** — extract per-action files with no behavior change; verify with build + typecheck + manual run of existing actions
-3. **Add `import-applications` action** + helpers + Zod validation + error discipline
-4. **Frontend `lib/applications-client.ts`** + types
-5. **`/applications` route + table component**
-6. **`/products` route + rollup component**
-7. **`/fields/[fieldId]` applications tab**
-8. **Delete temp `debug-spray-shape` function**
-9. **Run real import against Galen's account**, verify schema decisions hold against the full data set
-10. **Code review (`/code-review`)** before any push
+1. **Test infrastructure setup** — install Vitest, React Testing Library, Playwright, set up `vitest.config.ts`, `playwright.config.ts`, `__fixtures__/jd/` (seeded with the Phase 0c captured response), `prebuild` script that runs lint + typecheck + tests. Commit zero passing tests; the framework lights up green.
+2. **Migrations** — four SQL files, applied via `mcp__supabase__apply_migration` directly to shared project (no staging environment for this app — confirm with Galen before applying)
+3. **TDD: Pure logic in `lib/`** — for each pure module (tank-mix extractor, seed-list matcher, merge-by-line_index, application_name deriver): write Vitest test first against fixtures, implement, refactor. Each module commits independently with its tests.
+4. **File split of `john-deere-import`** — extract per-action files with no behavior change; existing actions verified with build + typecheck + manual run; new shared `errors.ts` + `validation.ts` per Codex revision
+5. **Add `import-applications` action** — with Deno tests written alongside, Zod validation, generic errors, merge-by-line_index merge logic, soft-delete via `deleted_at`
+6. **Capture richer JD fixtures** — once import-applications runs against a few fields, capture more fixtures (multi-tankmix, 404, error) to harden the test suite
+7. **Frontend `lib/applications-client.ts`** + types + edit-mutation contract from spec section 6.6
+8. **`/applications` route + table component** with the category-grouped expanded view
+9. **`/products` route + rollup component**
+10. **`/fields/[fieldId]` Applications tab**
+11. **Playwright E2E suite** — sign in, import, edit+revert flow, re-import preservation test
+12. **Delete temp `debug-spray-shape` function**
+13. **Run real import** against Galen's account, verify schema + tests hold against the full data set
+14. **Final code review** via `/code-review` before any push
 
 Each phase commits independently. No push to remote until Galen says push.
 
