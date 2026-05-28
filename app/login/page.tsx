@@ -25,6 +25,9 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
+        // SAFETY: if you wire up the `redirect` query param (set by middleware.ts on auth-protected paths),
+        // validate it before using: must start with `/`, must NOT start with `//` or `/\`, must not match `^https?://`.
+        // Otherwise: open-redirect to attacker-controlled URLs. See Task 0.3 review notes.
         router.push("/map");
       }
     } catch (err) {
