@@ -37,6 +37,14 @@
 - **Risk of not fixing:** medium (cost exposure on paid JD endpoints; abuse vector if origin is opened up)
 - **Trigger:** before any new endpoint that hits a paid JD API call (this includes spray-product import if JD bills it)
 
+### Mutable function search_path in `operations_center` schema
+- **Where:** Trigger functions in `operations_center` schema (incl. `fop_set_user_org_from_field_op`, `fop_set_updated_at`, plus pre-existing functions from earlier migrations)
+- **What:** Functions don't have `SET search_path = ''` or explicit schema qualification, leaving them vulnerable to shadow-table attacks if `search_path` is manipulated for the executing session
+- **Why it's debt:** Supabase security advisor flags `function_search_path_mutable` WARN. Fix is one-line per function (`SET search_path = ''`). Existing functions in the schema also lack this hardening — codebase has implicitly accepted the pattern, but Watch Tower / Supabase advisors will keep flagging.
+- **Cost to fix:** small — sweep all `operations_center` functions in one cleanup migration, add the explicit search_path setting
+- **Risk of not fixing:** low — trigger functions only take internal references (UUIDs); risk only materializes if service_role's `search_path` is attacker-controlled, which it isn't
+- **Trigger:** next routine security cleanup pass, OR if Watch Tower elevates the severity
+
 ### Residual Next 13.5.x CVEs
 - **Where:** `next@^13.5.11` + 4 high CVEs inside the bundled deps + 1 moderate
 - **What:** `npm audit fix --force` would push to `next@16.2.5` (breaking major)
