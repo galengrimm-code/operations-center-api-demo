@@ -285,7 +285,8 @@ export function getJohnDeereAuthUrl(redirectUri: string, state: string) {
     client_id: process.env.NEXT_PUBLIC_JOHN_DEERE_CLIENT_ID || "",
     response_type: "code",
     redirect_uri: redirectUri,
-    scope: "ag1 ag2 ag3 org1 org2 work1 work2 offline_access",
+    // Read-only scopes per spec/security audit (was: ag1-3 org1-2 work1-2). Bump back up if write functionality is ever added.
+    scope: "ag1 org1 work1 offline_access",
     state,
   });
 
