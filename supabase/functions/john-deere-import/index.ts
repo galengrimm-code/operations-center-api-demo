@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { optionsResponse, jsonResponse, errorResponse } from "../_shared/cors.ts";
+import { logAndRespond } from "../_shared/generic-error.ts";
 import { getAuthenticatedUser, isResponse } from "../_shared/auth.ts";
 import {
   callJohnDeereApi,
@@ -695,8 +696,6 @@ Deno.serve(async (req: Request) => {
 
     return errorResponse("Unknown action", 400, undefined, req);
   } catch (error) {
-    console.error("[import] Error:", error);
-    console.error("[import] Error stack:", error.stack);
-    return errorResponse(error.message, 500, error.stack, req);
+    return logAndRespond(500, "request_failed", "IMPORT_500", error, {}, req);
   }
 });

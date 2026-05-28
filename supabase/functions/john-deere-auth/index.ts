@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { optionsResponse, jsonResponse, errorResponse } from "../_shared/cors.ts";
+import { logAndRespond } from "../_shared/generic-error.ts";
 import { getAuthenticatedUser, isResponse } from "../_shared/auth.ts";
 import { exchangeCodeForTokens, refreshAccessToken } from "../_shared/john-deere.ts";
 
@@ -79,7 +80,6 @@ Deno.serve(async (req: Request) => {
 
     return errorResponse("Unknown action", 400, undefined, req);
   } catch (error) {
-    console.error("Error:", error);
-    return errorResponse(error.message, 500, undefined, req);
+    return logAndRespond(500, "request_failed", "AUTH_500", error, {}, req);
   }
 });
