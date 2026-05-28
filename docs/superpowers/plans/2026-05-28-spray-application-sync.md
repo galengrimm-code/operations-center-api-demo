@@ -140,6 +140,449 @@ __fixtures__/jd/README.md
 
 ## Tasks
 
+---
+
+## Group 0 — Security Hardening (runs BEFORE Group A)
+
+Folds in the existing P1/P2/P3 flags from the Watch Tower scan v6.7 that touch surfaces the spray-sync build will modify anyway. New feature work then lands on the improved baseline rather than the legacy one.
+
+Cross-reference: `CLAUDE.md` SCAN:AUTO block lists these as active flags. Addressing them here resolves: `cors-open` (P1), `error-response-leakage` (P2), `route-protection-gap` (P3), `oauth-broad-scopes` (P3).
+
+### Task 0.1: Restrict CORS in `_shared/cors.ts` (P1 — `cors-open`)
+
+**Files:**
+- Modify: `supabase/functions/_shared/cors.ts`
+
+- [ ] **Step 1: Read current CORS module**
+
+```bash
+cat supabase/functions/_shared/cors.ts
+```
+
+Confirm it currently uses `"Access-Control-Allow-Origin": "*"`.
+
+- [ ] **Step 2: Replace wildcard with allowlist + origin reflection (safe pattern)**
+
+```typescript
+// supabase/functions/_shared/cors.ts
+
+const ALLOWED_ORIGINS = new Set([
+  "https://operations-center-api-demo.vercel.app",
+  "http://localhost:3000",
+  // add Vercel preview origins explicitly here if needed: "https://operations-center-api-demo-git-*.vercel.app"
+]);
+
+function resolveOrigin(req: Request | undefined): string {
+  if (!req) return "https://operations-center-api-demo.vercel.app";  // safe default for non-request contexts
+  const origin = req.headers.get("Origin") ?? "";
+  return ALLOWED_ORIGINS.has(origin) ? origin : "https://operations-center-api-demo.vercel.app";
+}
+
+function corsHeaders(req?: Request): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": resolveOrigin(req),
+    "Vary": "Origin",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  };
+}
+
+export function jsonResponse(data: unknown, status = 200, req?: Request): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+  });
+}
+
+export function errorResponse(error: string, status = 400, details?: string, req?: Request): Response {
+  return jsonResponse({ error, ...(details ? { details } : {}) }, status, req);
+}
+
+export function optionsResponse(req?: Request): Response {
+  return new Response(null, { status: 200, headers: corsHeaders(req) });
+}
+```
+
+Notes:
+- `Vary: Origin` is required when the response depends on the Origin header (cache correctness).
+- Existing callers pass `req` from the function handler; if they don't, defaults to production origin (won't echo evil.com).
+- No `cors-origin-reflection` (v6.7 P1) risk because we never echo an origin we didn't pre-approve.
+
+- [ ] **Step 3: Update call sites in all 4 functions to pass `req`**
+
+In each of `john-deere-auth/index.ts`, `john-deere-api/index.ts`, `john-deere-import/index.ts`, `john-deere-irrigation/index.ts`:
+
+- Change `optionsResponse()` → `optionsResponse(req)`
+- Change `jsonResponse(data, status)` → `jsonResponse(data, status, req)`
+- Change `errorResponse(msg, status)` → `errorResponse(msg, status, undefined, req)`
+
+(These are mechanical find/replace per file.)
+
+- [ ] **Step 4: Deploy all 4 functions via `mcp__supabase__deploy_edge_function`**
+
+Use `project_id: "nuxofsjzrgdauzriraze"` and `verify_jwt: false` per `.claude/rules/edge-functions.md`.
+
+- [ ] **Step 5: Verify with curl (P1 gate)**
+
+```bash
+curl -I -X OPTIONS \
+  https://nuxofsjzrgdauzriraze.supabase.co/functions/v1/john-deere-api \
+  -H "Origin: https://evil.com"
+```
+
+Expected: `Access-Control-Allow-Origin: https://operations-center-api-demo.vercel.app` (NOT `*`, NOT `https://evil.com`).
+
+```bash
+curl -I -X OPTIONS \
+  https://nuxofsjzrgdauzriraze.supabase.co/functions/v1/john-deere-api \
+  -H "Origin: http://localhost:3000"
+```
+
+Expected: `Access-Control-Allow-Origin: http://localhost:3000`.
+
+- [ ] **Step 6: Verify dev still works**
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000`, sign in, hit any existing action (import-fields debug or similar). Expected: no CORS errors in console.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add supabase/functions/_shared/cors.ts supabase/functions/john-deere-auth/ supabase/functions/john-deere-api/ supabase/functions/john-deere-import/ supabase/functions/john-deere-irrigation/
+git commit -m "security: restrict CORS to allowlist origins on all edge functions (P1 cors-open)"
+```
+
+---
+
+### Task 0.2: Generic errors across all 4 functions (P2 — `error-response-leakage`)
+
+**Files:**
+- Create: `supabase/functions/_shared/generic-error.ts`
+- Modify: catch blocks in all 4 existing edge functions
+
+The new code in Tasks 15/20 already uses generic errors. This task brings the existing 4 functions up to the same posture so the SCAN:AUTO `error-response-leakage` flag clears.
+
+- [ ] **Step 1: Create `_shared/generic-error.ts`**
+
+```typescript
+// supabase/functions/_shared/generic-error.ts
+// Generic error responder shared across functions. Never leaks error.message, error.stack,
+// or upstream payloads. Server-side logs the full context; clients get a stable code.
+
+import { jsonResponse } from "./cors.ts";
+
+type ErrorCategory = "request_failed" | "unauthorized" | "not_found" | "validation_failed";
+
+export function genericError(
+  status: number,
+  category: ErrorCategory,
+  code: string,
+  req?: Request,
+): Response {
+  return jsonResponse({ error: category, code }, status, req);
+}
+
+export function logAndRespond(
+  status: number,
+  category: ErrorCategory,
+  code: string,
+  err: unknown,
+  context: Record<string, unknown> = {},
+  req?: Request,
+): Response {
+  console.error(`[${code}]`, { ...context, error: serializeError(err) });
+  return genericError(status, category, code, req);
+}
+
+function serializeError(err: unknown): { name: string; message: string; stack?: string } {
+  if (err instanceof Error) {
+    return { name: err.name, message: err.message, stack: err.stack };
+  }
+  return { name: "Unknown", message: String(err) };
+}
+```
+
+- [ ] **Step 2: Retrofit `john-deere-auth/index.ts` catch block**
+
+Find the existing `} catch (error) {` block at approximately line 80-85 that currently returns `errorResponse(error.message, ...)`. Replace with:
+
+```typescript
+} catch (error) {
+  return logAndRespond(500, "request_failed", "AUTH_500", error, {}, req);
+}
+```
+
+Add import at top: `import { logAndRespond } from "../_shared/generic-error.ts";`
+
+- [ ] **Step 3: Retrofit `john-deere-api/index.ts` catch block**
+
+Same pattern. Code prefix `API_500`.
+
+- [ ] **Step 4: Retrofit `john-deere-import/index.ts` catch block**
+
+The existing block at line 687 currently returns `errorResponse(error.message, 500, error.stack)` — leaking BOTH message and stack. Replace:
+
+```typescript
+} catch (error) {
+  return logAndRespond(500, "request_failed", "IMPORT_500", error, {}, req);
+}
+```
+
+- [ ] **Step 5: Retrofit `john-deere-irrigation/index.ts` catch block**
+
+Code prefix `IRRIGATION_500`.
+
+- [ ] **Step 6: Deploy all 4 functions**
+
+Via `mcp__supabase__deploy_edge_function` with `verify_jwt: false`.
+
+- [ ] **Step 7: Verify (P2 gate)**
+
+Manually trigger an error path (e.g., call a function without the Authorization header):
+
+```bash
+curl -i https://nuxofsjzrgdauzriraze.supabase.co/functions/v1/john-deere-api?action=organizations
+```
+
+Expected response body: `{"error":"unauthorized","code":"..."}` or generic `{"error":"request_failed","code":"..."}`. NOT containing `error.message` text, JS stack frames, or upstream JSON.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add supabase/functions/_shared/generic-error.ts supabase/functions/john-deere-*/index.ts
+git commit -m "security: generic error responses across edge functions (P2 error-response-leakage)"
+```
+
+---
+
+### Task 0.3: Server-side route protection via `middleware.ts` (P3 — `route-protection-gap`)
+
+**Files:**
+- Create: `middleware.ts` (project root)
+- Modify: `package.json` (add `@supabase/ssr` dependency)
+
+Server-side gate on `(app)/*` routes. Page HTML won't load at all without a valid session, eliminating the "auth content flashes before client redirect" issue.
+
+- [ ] **Step 1: Install `@supabase/ssr`**
+
+```bash
+npm install @supabase/ssr
+```
+
+Expected: package added; lockfile updated.
+
+- [ ] **Step 2: Create `middleware.ts` at project root**
+
+```typescript
+// middleware.ts
+// Server-side auth gate for protected routes. Runs before page HTML renders.
+// Public routes: /, /login, /auth/callback, static assets.
+// Protected: everything under app/(app)/ — /map, /fields, /operations, /applications, /products, /settings, /dashboard.
+
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/callback",
+];
+
+const PUBLIC_FILE_EXT = /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff2?|ttf|eot)$/;
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Always allow public paths + static files + Next internals
+  if (
+    pathname === "/" ||
+    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||  // API routes handle their own auth
+    PUBLIC_FILE_EXT.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
+
+  // Validate session via Supabase SSR
+  let response = NextResponse.next();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: "", ...options });
+        },
+      },
+    },
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return response;
+}
+
+export const config = {
+  matcher: [
+    // Run on all routes EXCEPT static files and Next internals (matched via PUBLIC paths above too — defense in depth)
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
+};
+```
+
+- [ ] **Step 3: Typecheck**
+
+```bash
+npm run typecheck
+```
+
+Expected: passes.
+
+- [ ] **Step 4: Dev test — unauthenticated user redirected**
+
+```bash
+npm run dev
+```
+
+In a private/incognito browser window, visit `http://localhost:3000/map` directly (no sign-in). Expected: browser redirects to `/login?redirect=/map` BEFORE any page HTML loads. Confirm via Network tab — the response status for `/map` is 307 redirect, not 200 with content.
+
+Visit `http://localhost:3000/login` directly. Expected: 200 OK (login page renders).
+
+- [ ] **Step 5: Sign in and verify protected routes work**
+
+Sign in via `/login`. Then visit `/map`, `/fields`, `/applications`, `/products` — all should render normally.
+
+- [ ] **Step 6: Verify (P3 gate)**
+
+```bash
+curl -i http://localhost:3000/map
+```
+
+Expected: 307 Temporary Redirect with `Location: /login?redirect=/map`. NOT 200 with HTML content.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add middleware.ts package.json package-lock.json
+git commit -m "security: middleware.ts server-side route protection (P3 route-protection-gap)"
+```
+
+---
+
+### Task 0.4: Trim OAuth scopes (P3 — `oauth-broad-scopes`)
+
+**Files:**
+- Modify: `lib/john-deere-client.ts:288`
+
+- [ ] **Step 1: Locate the scopes string**
+
+```bash
+grep -n "ag1 ag2 ag3" lib/john-deere-client.ts
+```
+
+Expected: one match around line 288.
+
+- [ ] **Step 2: Edit to read-only scope set**
+
+Change:
+
+```typescript
+scope: "ag1 ag2 ag3 org1 org2 work1 work2 offline_access",
+```
+
+To:
+
+```typescript
+scope: "ag1 org1 work1 offline_access",
+```
+
+- [ ] **Step 3: Document the change**
+
+Add an inline comment above the scope line:
+
+```typescript
+// Read-only scopes per spec/security audit (was: ag1-3 org1-2 work1-2). Bump back up if write functionality is ever added.
+```
+
+- [ ] **Step 4: Verify by triggering a new OAuth flow**
+
+In a private browser window, sign in and click Connect for John Deere. The JD consent screen should now show fewer permission categories than before. Approve, complete the flow, confirm field import still works (read scope is sufficient for everything this app does today).
+
+If JD's consent flow fails because an existing user's stored token had broader scopes than the new request, that's a one-time re-consent — not a regression.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/john-deere-client.ts
+git commit -m "security: trim John Deere OAuth scopes to read-only (P3 oauth-broad-scopes)"
+```
+
+---
+
+### Task 0.5: Update CLAUDE.md Resolved table + TECH-DEBT.md
+
+The Watch Tower SCAN:AUTO block is auto-managed and refreshes on the next scheduled scan. The Resolved table inside the block IS append-friendly — the next scan will see these items as "previously flagged → no longer triggers" and confirm. Per `reference_watchtower_accepted_risks.md`, manual edits to CLAUDE.md are the source of truth.
+
+**Files:**
+- Modify: `CLAUDE.md` (Resolved table inside SCAN:AUTO block)
+- Modify: `TECH-DEBT.md`
+
+- [ ] **Step 1: Append four entries to the CLAUDE.md Resolved table**
+
+In `CLAUDE.md`, locate the `### Resolved` table inside the SCAN:AUTO block. Add four rows at the top of the table body:
+
+```markdown
+| YYYY-MM-DD | cors-open               | Restricted `_shared/cors.ts` to explicit allowlist (`operations-center-api-demo.vercel.app` + localhost). Verified live: `curl -I -X OPTIONS ... -H "Origin: https://evil.com"` no longer echoes the evil origin. Deployed to all 4 functions. |
+| YYYY-MM-DD | error-response-leakage  | Added `_shared/generic-error.ts`. All 4 functions' catch blocks now return `{error: "request_failed", code: "<FN>_<STATUS>"}` only. Server logs the full error/stack server-side. Verified by curling an unauthorized request — no `error.message` in response body. |
+| YYYY-MM-DD | route-protection-gap    | Added `middleware.ts` using `@supabase/ssr`. Unauthenticated requests to `(app)/*` routes get 307 redirect to `/login?redirect=<path>` BEFORE any page HTML loads. Verified: `curl -i /map` returns 307 with no body content. |
+| YYYY-MM-DD | oauth-broad-scopes      | Trimmed scopes from `ag1 ag2 ag3 org1 org2 work1 work2 offline_access` → `ag1 org1 work1 offline_access` (read-only) in `lib/john-deere-client.ts`. Bump back up when write functionality lands. |
+```
+
+Replace `YYYY-MM-DD` with today's date. Leave the existing Resolved rows below intact.
+
+- [ ] **Step 2: Move corresponding TECH-DEBT entries to Resolved**
+
+In `TECH-DEBT.md`, find the four active items (CORS wildcard, Error response leakage, No server-side route protection, Overly broad OAuth scopes). Cut their bodies. Append them to the Resolved section at the bottom with the resolution note:
+
+```markdown
+### CORS wildcard on all Supabase Edge Functions — YYYY-MM-DD
+Resolved as part of spray-application sync build (Task 0.1). `_shared/cors.ts` now uses an explicit allowlist with `Vary: Origin`. Commit: <hash>.
+
+### Error response leakage in all Edge Functions — YYYY-MM-DD
+Resolved as part of spray-application sync build (Task 0.2). `_shared/generic-error.ts` added; all 4 functions' catch blocks retrofitted. Commit: <hash>.
+
+### No server-side route protection (middleware.ts) — YYYY-MM-DD
+Resolved as part of spray-application sync build (Task 0.3). `middleware.ts` added at project root using `@supabase/ssr`. Commit: <hash>.
+
+### Overly broad John Deere OAuth scopes — YYYY-MM-DD
+Resolved as part of spray-application sync build (Task 0.4). Scopes trimmed to `ag1 org1 work1 offline_access` in `lib/john-deere-client.ts`. Commit: <hash>.
+```
+
+Fill in commit hashes from `git log --oneline | head -5` after Tasks 0.1-0.4 commits.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add CLAUDE.md TECH-DEBT.md
+git commit -m "docs: mark 4 security findings resolved (cors-open, error-leakage, route-gap, oauth-scopes)"
+```
+
+---
+
 ### Task 1: Install and configure Vitest
 
 **Files:**
@@ -4845,6 +5288,25 @@ Per Galen's `feedback_hold_push.md` memory: commit locally, wait for explicit "p
 ## Self-Review
 
 Performed after writing the complete plan, checked against the spec at `docs/superpowers/specs/2026-05-28-spray-application-sync-design.md`.
+
+### Security hardening coverage (Group 0)
+
+Group 0 was added after the initial plan, in response to Galen's request to fold Watch Tower v6.7 security findings into this build where they touch surfaces we're already modifying.
+
+| v6.4/v6.7 flag | Severity | Resolution |
+|---|---|---|
+| `cors-open` | P1 | Task 0.1 — `_shared/cors.ts` allowlist |
+| `error-response-leakage` | P2 | Task 0.2 — `_shared/generic-error.ts` retrofitted to 4 functions |
+| `route-protection-gap` | P3 | Task 0.3 — `middleware.ts` via `@supabase/ssr` |
+| `oauth-broad-scopes` | P3 | Task 0.4 — trim to read-only |
+| `file-over-500` (john-deere-import) | P4 | Tasks 15-19 — file split |
+
+Flags NOT addressed in this build (deliberately, per the v6.7 audit triage):
+- `no-input-validation` on the 4 existing functions (new endpoints get Zod; legacy retrofit is follow-on)
+- `no-rate-limiting` (needs Upstash/Redis infrastructure)
+- `npm-cve-residual` (Next 13 → 16 migration sprint)
+- Other `file-over-500` files (orthogonal refactors)
+- New v6.7 DNS audits (DMARC/SPF/CAA — domain config, not code)
 
 ### Spec coverage check
 

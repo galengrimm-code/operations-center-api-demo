@@ -22,6 +22,15 @@
 
 ### Spec written
 - **`docs/superpowers/specs/2026-05-28-spray-application-sync-design.md`** — comprehensive design, all decisions locked. Includes: 3 migrations (products, field_operation_products, measurement_status column), RLS + GRANT discipline, file split of `john-deere-import/` to per-action modules, new UI surfaces (`/applications`, `/products`, field-detail tab), 404 handling, Zod validation, generic errors, restricted CORS.
+- Spec went through v1 → v4 with Codex consults at each pass. v3 fixed 2 internal contradictions Codex caught; v4 added the test tier matrix.
+
+### Implementation plan written
+- **`docs/superpowers/plans/2026-05-28-spray-application-sync.md`** — 45 atomic tasks across 10 phase groups (Group 0 security hardening + Groups A-I feature build). Each task has full SQL/TS code, exact commands, expected output, commit message. Self-reviewed against spec; coverage table confirms zero gaps.
+
+### Security audit + Group 0 folded in
+- Read current Watch Tower scan v6.7 (at `Public Watchtower/prompts/security-scan-prompt.md`). Compared against this project's SCAN:AUTO block (v6.4 from 2026-05-06).
+- Folded 4 fixes into the plan as Group 0 (runs BEFORE Group A): `cors-open` (P1), `error-response-leakage` (P2), `route-protection-gap` (P3), `oauth-broad-scopes` (P3). All touch surfaces the spray-sync build modifies anyway.
+- Explicitly NOT folded: `no-rate-limiting`, `npm-cve-residual`, other `file-over-500` files, `no-input-validation` legacy retrofit.
 
 ## Current state
 
