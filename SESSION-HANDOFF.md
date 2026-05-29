@@ -4,7 +4,7 @@
 
 ## What was done this session
 
-Resumed the spray-application-sync build at Task 23 (was 27/45). **Now 39/45.** 16 commits, all pushed to origin/main this session.
+Resumed the spray-application-sync build at Task 23 (was 27/45). **Now 39/45.** 18 commits, pushed to origin/main and **confirmed deployed green on Vercel** (`7e2471b`) — the full stack is live (Group 0 security fixes + F + G all landed together; they'd been stuck behind a failing CI gate).
 
 ### Group F — Frontend data layer (Tasks 23–26) ✅
 - `types/applications.ts` — type set (`c3775dd`)
@@ -35,6 +35,11 @@ Resumed the spray-application-sync build at Task 23 (was 27/45). **Now 39/45.** 
 - `236d967` Task 35 E2E: edit + revert flow — browser-verified against seed
 - Tasks 34, 36, 37 **deferred** — they trigger a **real JD import**; can't run on the placeholder-token test user
 - Task 38 (delete `debug-spray-shape`) **deferred** by Galen — function still live
+
+### Deploy gotcha fixed (`7e2471b`)
+- The Vercel build had been **failing at the prebuild test gate** — `extract-tankmix.test.ts` reads JSON fixtures via `node:fs`, and the global vitest env is `jsdom`, which makes Vite externalize node builtins on Linux/CI → file fails to load. **Local `npm run prebuild` passes anyway** (Windows tolerates it), so it wasn't caught until the actual Vercel log.
+- Fix: pinned that file to `// @vitest-environment node`.
+- **Lesson for next session:** any new vitest test that reads files (e.g. the deferred Task 37 multi-tankmix fixture) MUST start with `// @vitest-environment node`. And **a green local prebuild does NOT guarantee a green Vercel build** — confirm the actual deploy log, don't infer "deployed" from local.
 
 ## Current state
 - **Pushed to origin/main** (incl. the auth fix → live demo should be fixed once Vercel deploys).
