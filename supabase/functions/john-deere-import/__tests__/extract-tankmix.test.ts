@@ -1,3 +1,8 @@
+// @vitest-environment node
+// This is a Node/Deno-runtime logic test that reads JSON fixtures via node:fs.
+// The global vitest environment is jsdom (for browser-side code); under jsdom,
+// Vite externalizes node: builtins ("browser compatibility") and the file fails
+// to load on Linux/CI. Pinning this file to the node environment keeps fs/path real.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
