@@ -35,8 +35,7 @@ export async function fetchApplications(
         rate_value_jd_original, total_value_jd_original, area_value_jd_original,
         is_user_edited, edited_at, deleted_at, created_at, updated_at,
         product:products(*)
-      ),
-      field:fields(name)
+      )
     `,
     )
     .eq("operation_type", "application")
@@ -49,11 +48,18 @@ export async function fetchApplications(
   const { data, error } = await q;
   if (error) throw error;
 
+  // No FK from field_operations -> fields for a PostgREST embed; resolve field
+  // names via a separate query and map jd_field_id -> name.
+  const { data: fieldRows } = await (supabase.from("fields") as any).select("jd_field_id, name");
+  const fieldNameById = new Map<string, string>(
+    (fieldRows ?? []).map((f: any) => [f.jd_field_id, f.name]),
+  );
+
   // Reshape: lift field name + apply filters that span join boundaries client-side.
   return (data ?? [])
     .map((row: any) => ({
       ...row,
-      field_name: row.field?.name ?? "Unknown",
+      field_name: fieldNameById.get(row.jd_field_id) ?? "Unknown",
       product_lines: row.product_lines ?? [],
     }))
     .filter((row: ApplicationWithLines) => {
