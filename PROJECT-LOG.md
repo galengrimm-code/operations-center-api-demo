@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-05-29 — Auth must use cookie sessions (`createBrowserClient`), not localStorage; middleware regression
+
+**Finding/decision:** The `route-protection-gap` fix from 2026-05-28 (Task 0.3) shipped a **live regression**. `middleware.ts` validates the session server-side via `@supabase/ssr` `createServerClient`, which reads **cookies**. But `lib/supabase.ts` used `@supabase/supabase-js` `createClient`, which stores the session in **localStorage** — invisible to the server. Net effect: after login, every authenticated user was 307'd off all `(app)/*` routes back to `/login?redirect=…`. It shipped because Task 0.3's verification only tested the logged-out path (`curl /map → 307`), never an authenticated user reaching a protected route.
+
+**Resolution:** `lib/supabase.ts` switched to `createBrowserClient` (`@supabase/ssr`), which persists the session in cookies that both the browser client and the SSR middleware read. Preserved the `db: { schema: "operations_center" }` pin and `<Database>` typing. Verified with a production build + a Playwright login that reaches `/map` and a full e2e suite. Commit `0562dd0`.
+
+**Rule going forward:** Any Next.js app in this portfolio that uses `@supabase/ssr` middleware MUST use `createBrowserClient` (cookie sessions) on the client — never plain `createClient` (localStorage). The two are incompatible; localStorage sessions are invisible to server middleware. Verify auth fixes by confirming an *authenticated* user reaches a protected route, not just that an anonymous one is redirected.
+
+**Also this session (build progress, not decisions):** Groups F + G of the spray-sync build landed (data layer + full Applications UI), browser-verified against seeded test data. Two more plan bugs caught by verification: a `field:fields(name)` PostgREST embed with no backing FK (would throw on first real data — `4d1f599`), and a loading-state pattern that collapsed expanded rows on every refetch (`fe05754`). Build now 39/45; remaining tasks all require a real JD import (Task 39 cluster).
+
+---
+
 ## 2026-05-28 — Watch Tower v6.7 security audit; folded 4 fixes into spray-sync build
 
 **Decision:** Audited the current Watch Tower scan prompt (v6.7 in `Public Watchtower/prompts/security-scan-prompt.md`) against this project's SCAN:AUTO block (last scan v6.4, 2026-05-06). Folded 4 actionable findings into the spray-application-sync implementation plan as a new Group 0 (Security Hardening) that runs BEFORE feature work.

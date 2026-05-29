@@ -8,6 +8,20 @@
 
 ## Active
 
+### Spray-sync test data seeded into shared prod DB (delete before Task 39)
+- **Where:** `operations_center` rows with `org_id='seed-org'` (1 field, 3 products, 1 application, 3 product lines) + a placeholder `john_deere_connections` row for `dev@precisionfarms.test` (UID `178fdca1-ea1c-4995-bfee-110aaaee469b`), shared project `nuxofsjzrgdauzriraze`.
+- **What:** Seeded 2026-05-29 to browser-verify the Applications UI (Group G) against real data on a fresh test account.
+- **Why it's debt:** Fake data in the production DB. If a real JD import (Task 39) runs for this user before cleanup, fake + real mix.
+- **Cost to fix:** trivial — `DELETE FROM operations_center.<table> WHERE org_id='seed-org';` across the 4 tables + delete the placeholder connection row.
+- **Trigger:** **before Task 39** (real import). First thing next session.
+
+### `debug-spray-shape` edge function still deployed (Task 38 deferred)
+- **Where:** Supabase project `nuxofsjzrgdauzriraze`, function `debug-spray-shape` (v1); local source at `supabase/functions/debug-spray-shape/`.
+- **What:** Phase 0c read-only diagnostic for inspecting JD application-rate response shapes. Job done (schema locked).
+- **Why it's debt:** Extra deployed surface area. Deletion deferred 2026-05-29 (deleting a live fn on shared prod wants explicit authorization).
+- **Cost to fix:** trivial — dashboard delete or `npx supabase functions delete debug-spray-shape --project-ref nuxofsjzrgdauzriraze`, then remove local folder + commit.
+- **Trigger:** Task 38 / next session cleanup.
+
 ### `john-deere-import/index.ts` over 500 lines (689 and growing)
 - **Where:** `supabase/functions/john-deere-import/index.ts`
 - **What:** 689 lines, multiple actions (`import-fields`, `import-operations`, `import-field-operations`, `debug-field-boundaries`, `debug-field-operations`) and helper functions in one file. Up from 658 at the last scan.
