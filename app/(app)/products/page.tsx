@@ -40,7 +40,7 @@ export default function ProductsPage() {
         </select>
       </div>
       {error && <div className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-      {loading ? (
+      {loading && rows.length === 0 ? (
         <div className="text-slate-500">Loading...</div>
       ) : (
         <ProductsRollupTable

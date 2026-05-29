@@ -40,7 +40,7 @@ export default function ApplicationsPage() {
       </header>
       <ApplicationFilters value={filter} onChange={setFilter} />
       {error && <div className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-      {loading ? (
+      {loading && rows.length === 0 ? (
         <div className="mt-6 text-slate-500">Loading...</div>
       ) : (
         <ApplicationsList rows={rows} onChanged={() => setFilter({ ...filter })} />
