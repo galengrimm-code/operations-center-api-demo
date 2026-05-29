@@ -44,3 +44,4 @@ next-env.d.ts
 # Test env
 .env.test
 .env.test.local
+tests/e2e/.auth/
