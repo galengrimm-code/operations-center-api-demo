@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ProductLineRow } from "./product-line-row";
+import { ProductLineEditDialog } from "./product-line-edit-dialog";
+import { revertProductLine } from "@/lib/applications-client";
 import type { ApplicationWithLines } from "@/types/applications";
 
 const CATEGORY_ORDER = ["fertilizer", "chemical", "seed", "adjuvant", "other", null];
@@ -14,6 +16,7 @@ export function ApplicationExpanded({
   onChanged: () => void;
 }) {
   const [showCarriers, setShowCarriers] = useState(false);
+  const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const visibleLines = row.product_lines.filter(
     (l) => !l.deleted_at && (showCarriers || !l.is_carrier),
   );
@@ -40,7 +43,19 @@ export function ApplicationExpanded({
         return (
           <div key={cat ?? "uncategorized"} className="mt-1 rounded bg-white">
             {lines.map((line) => (
-              <ProductLineRow key={line.id} line={line as any} />
+              <ProductLineRow
+                key={line.id}
+                line={line as any}
+                onEdit={() => setEditingLineId(line.id)}
+                onRevert={async () => {
+                  try {
+                    await revertProductLine(line.id);
+                    onChanged();
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+              />
             ))}
           </div>
         );
@@ -55,6 +70,17 @@ export function ApplicationExpanded({
           Show carriers (water/UAN)
         </label>
       </div>
+      {editingLineId &&
+        (() => {
+          const line = visibleLines.find((l) => l.id === editingLineId);
+          return line ? (
+            <ProductLineEditDialog
+              line={line as any}
+              onClose={() => setEditingLineId(null)}
+              onSaved={onChanged}
+            />
+          ) : null;
+        })()}
     </div>
   );
 }
