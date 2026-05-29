@@ -6,6 +6,7 @@ import type {
   ApplicationWithLines,
   FieldOperationProductLine,
   Product,
+  ProductLineEdit,
 } from "@/types/applications";
 
 export interface ApplicationsListFilter {
@@ -124,4 +125,96 @@ export async function fetchProductsRollup(season?: string): Promise<
     field_count: acc.fields.size,
     operation_count: acc.operations.size,
   }));
+}
+
+export async function editProductLine(
+  lineId: string,
+  edits: ProductLineEdit,
+): Promise<FieldOperationProductLine> {
+  // Caller is responsible for Zod-validating numeric inputs.
+  const { data, error } = await (supabase.from("field_operation_products") as any)
+    .update({
+      ...edits,
+      is_user_edited: true,
+      edited_at: new Date().toISOString(),
+    })
+    .eq("id", lineId)
+    .select()
+    .single();
+  if (error) throw error;
+  return checkMutationResult(data, "edit product line", 1) as FieldOperationProductLine;
+}
+
+export async function revertProductLine(lineId: string): Promise<FieldOperationProductLine> {
+  const { data: row, error: readErr } = await (supabase.from("field_operation_products") as any)
+    .select("rate_value_jd_original, total_value_jd_original, area_value_jd_original")
+    .eq("id", lineId)
+    .single();
+  if (readErr) throw readErr;
+
+  const { data, error } = await (supabase.from("field_operation_products") as any)
+    .update({
+      rate_value: row.rate_value_jd_original,
+      total_value: row.total_value_jd_original,
+      area_value: row.area_value_jd_original,
+      product_category_override: null,
+      is_user_edited: false,
+      edited_at: null,
+    })
+    .eq("id", lineId)
+    .select()
+    .single();
+  if (error) throw error;
+  return checkMutationResult(data, "revert product line", 1) as FieldOperationProductLine;
+}
+
+export async function editProductCategory(productId: string, category: string): Promise<Product> {
+  const { data, error } = await (supabase.from("products") as any)
+    .update({
+      product_category: category,
+      product_category_source: "user",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", productId)
+    .select()
+    .single();
+  if (error) throw error;
+  return checkMutationResult(data, "edit product category", 1) as Product;
+}
+
+export async function editApplicationName(
+  operationId: string,
+  name: string,
+): Promise<ApplicationOperation> {
+  const { data, error } = await (supabase.from("field_operations") as any)
+    .update({
+      application_name: name,
+      application_name_user_edited: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", operationId)
+    .select()
+    .single();
+  if (error) throw error;
+  return checkMutationResult(data, "edit application name", 1) as ApplicationOperation;
+}
+
+export async function revertApplicationName(operationId: string): Promise<ApplicationOperation> {
+  const { data: row, error: readErr } = await (supabase.from("field_operations") as any)
+    .select("application_name_jd_original")
+    .eq("id", operationId)
+    .single();
+  if (readErr) throw readErr;
+
+  const { data, error } = await (supabase.from("field_operations") as any)
+    .update({
+      application_name: row.application_name_jd_original,
+      application_name_user_edited: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", operationId)
+    .select()
+    .single();
+  if (error) throw error;
+  return checkMutationResult(data, "revert application name", 1) as ApplicationOperation;
 }
