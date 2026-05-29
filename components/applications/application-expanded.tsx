@@ -28,8 +28,8 @@ export function ApplicationExpanded({
   }
 
   return (
-    <div className="border-t border-slate-100 bg-slate-50/50 px-4 pb-4">
-      <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs uppercase text-slate-500">
+    <div className="border-t border-white/[0.08] bg-white/[0.02] px-4 pb-4">
+      <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs uppercase text-slate-400">
         <div className="col-span-3">Product</div>
         <div className="col-span-2">Category</div>
         <div className="col-span-2">Rate</div>
@@ -41,7 +41,10 @@ export function ApplicationExpanded({
         const lines = grouped.get(cat);
         if (!lines || lines.length === 0) return null;
         return (
-          <div key={cat ?? "uncategorized"} className="mt-1 rounded bg-white">
+          <div
+            key={cat ?? "uncategorized"}
+            className="mt-1 rounded-lg border border-white/[0.05] bg-white/[0.02]"
+          >
             {lines.map((line) => (
               <ProductLineRow
                 key={line.id}
@@ -61,7 +64,7 @@ export function ApplicationExpanded({
         );
       })}
       <div className="mt-3">
-        <label className="flex items-center gap-2 text-xs text-slate-600">
+        <label className="flex items-center gap-2 text-xs text-slate-400">
           <input
             type="checkbox"
             checked={showCarriers}

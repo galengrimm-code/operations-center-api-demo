@@ -32,7 +32,7 @@ export function ApplicationFilters({
   return (
     <div className="flex flex-wrap items-center gap-3">
       <select
-        className="rounded border border-slate-200 px-2 py-1 text-sm"
+        className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-sm text-slate-200 focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
         value={value.fieldId ?? ""}
         onChange={(e) => onChange({ ...value, fieldId: e.target.value || undefined })}
       >
@@ -44,7 +44,7 @@ export function ApplicationFilters({
         ))}
       </select>
       <select
-        className="rounded border border-slate-200 px-2 py-1 text-sm"
+        className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-sm text-slate-200 focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
         value={value.season ?? ""}
         onChange={(e) => onChange({ ...value, season: e.target.value || undefined })}
       >
@@ -56,7 +56,7 @@ export function ApplicationFilters({
         ))}
       </select>
       <select
-        className="rounded border border-slate-200 px-2 py-1 text-sm"
+        className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-sm text-slate-200 focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
         value={value.category ?? ""}
         onChange={(e) => onChange({ ...value, category: e.target.value || undefined })}
       >

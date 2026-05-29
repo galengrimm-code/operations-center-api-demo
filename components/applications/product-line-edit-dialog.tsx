@@ -61,9 +61,9 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">Edit {line.product.name}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="w-full max-w-md rounded-xl border border-white/10 bg-slate-900 p-6 text-slate-200 shadow-2xl">
+        <h3 className="mb-4 text-lg font-semibold text-white">Edit {line.product.name}</h3>
         <div className="space-y-3">
           <Row label={`Rate (${displayUnit(line.rate_unit)})`} value={rate} setValue={setRate} />
           <Row
@@ -73,11 +73,11 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
           />
           <Row label={`Area (${displayUnit(line.area_unit)})`} value={area} setValue={setArea} />
           <div>
-            <label className="mb-1 block text-xs text-slate-600">
+            <label className="mb-1 block text-xs text-slate-400">
               Category override (optional)
             </label>
             <select
-              className="w-full rounded border border-slate-200 px-2 py-1.5"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1.5 text-slate-200 focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
               value={override}
               onChange={(e) => setOverride(e.target.value)}
             >
@@ -90,12 +90,14 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
             </select>
           </div>
         </div>
-        {error && <div className="mt-3 rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
+        {error && (
+          <div className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-400">{error}</div>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-slate-200 px-3 py-1.5 hover:bg-slate-50"
+            className="rounded-lg border border-white/[0.08] px-3 py-1.5 text-slate-300 hover:bg-white/[0.06]"
             disabled={saving}
           >
             Cancel
@@ -103,7 +105,7 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
           <button
             type="button"
             onClick={save}
-            className="rounded bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="bg-emerald-500/15 rounded-lg border border-emerald-500/20 px-3 py-1.5 font-medium text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-50"
             disabled={saving}
           >
             {saving ? "Saving..." : "Save"}
@@ -125,11 +127,11 @@ function Row({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs text-slate-600">{label}</label>
+      <label className="mb-1 block text-xs text-slate-400">{label}</label>
       <input
         type="number"
         step="any"
-        className="w-full rounded border border-slate-200 px-2 py-1.5"
+        className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1.5 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />

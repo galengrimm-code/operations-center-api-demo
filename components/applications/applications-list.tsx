@@ -12,7 +12,7 @@ export function ApplicationsList({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="mt-6 rounded border border-dashed border-slate-200 p-8 text-center text-slate-500">
+      <div className="mt-6 rounded-xl border border-dashed border-white/10 p-8 text-center text-slate-400">
         No applications to show. Import from John Deere via Settings.
       </div>
     );

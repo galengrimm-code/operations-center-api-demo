@@ -21,13 +21,15 @@ export default function FieldApplicationsPage() {
   useEffect(load, [fieldId]);
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Field applications</h1>
-      {loading && rows.length === 0 ? (
-        <div className="mt-4 text-slate-500">Loading...</div>
-      ) : (
-        <ApplicationsList rows={rows} onChanged={load} />
-      )}
+    <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">
+      <div className="mx-auto max-w-7xl">
+        <h1 className="text-2xl font-semibold text-white">Field applications</h1>
+        {loading && rows.length === 0 ? (
+          <div className="mt-4 text-slate-400">Loading...</div>
+        ) : (
+          <ApplicationsList rows={rows} onChanged={load} />
+        )}
+      </div>
     </div>
   );
 }

@@ -15,7 +15,7 @@ export function InconsistencyBadge({
   if (Math.abs(total - expected) <= eps) return null;
   return (
     <span
-      className="rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700"
+      className="rounded-md bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300"
       title={`Rate × area = ${expected.toFixed(2)}, but total is ${total}. Save still works.`}
     >
       ⚠ inconsistent

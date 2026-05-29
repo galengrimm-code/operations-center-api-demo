@@ -31,20 +31,26 @@ export default function ApplicationsPage() {
   }, [filter]);
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Applications</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Spray applications imported from John Deere Operations Center.
-        </p>
-      </header>
-      <ApplicationFilters value={filter} onChange={setFilter} />
-      {error && <div className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-      {loading && rows.length === 0 ? (
-        <div className="mt-6 text-slate-500">Loading...</div>
-      ) : (
-        <ApplicationsList rows={rows} onChanged={() => setFilter({ ...filter })} />
-      )}
+    <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold text-white">Applications</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Spray applications imported from John Deere Operations Center.
+          </p>
+        </header>
+        <ApplicationFilters value={filter} onChange={setFilter} />
+        {error && (
+          <div className="glass mt-4 rounded-xl border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+        {loading && rows.length === 0 ? (
+          <div className="mt-6 text-slate-400">Loading...</div>
+        ) : (
+          <ApplicationsList rows={rows} onChanged={() => setFilter({ ...filter })} />
+        )}
+      </div>
     </div>
   );
 }
