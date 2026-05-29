@@ -58,6 +58,17 @@ This is the **"Task 39 real-import" session** — everything left needs your liv
 4. **Task 38:** delete `debug-spray-shape` (dashboard or authorize CLI).
 5. **Task 40:** `/code-review` the full branch + update CHANGELOG/PROJECT-LOG.
 
+## Design directives raised 2026-05-29 (factor in before calling the build done)
+
+### 1. Org-level data filtering — LOCKED design, build next session
+- **Problem:** Precision Farms does custom spray work; via JD the connection can see **separate organizations** for those custom spray accounts, and we currently get all their data. The existing "custom filter" is a `farm_name` dropdown that's **client-side / localStorage only**, not persisted, and **the new Applications/Products pages apply no filtering at all** (show everything).
+- **Decision (Galen):** block by **organization**, enforced **at import** — when an org is blocked in Settings, the import never ingests it; already-imported blocked-org rows get purged on next run. Org allow/block list persisted in DB (extend `john_deere_connections`), configured in Settings (toggle the orgs the connection can see). Server-enforced — not a client-side filter.
+- **Open Q to confirm at build time:** does Galen work across **multiple of his own orgs** (→ allowlist of several) or just **one own org** + exclude the rest? Reshapes the current single-`selected_org_id` model. Show him the actual org list from his connection (`jd_list_organizations`) to decide.
+
+### 2. IA / data-display restructure — DISCUSSION pending (Galen: "let's talk it through")
+- **Must-fix regardless:** `/applications` + `/products` render a **light theme** on an otherwise **dark app** (`bg-slate-950`). Re-theme to match — not optional.
+- **Structural (pending Galen's call):** my lean is to **consolidate rather than add top-nav items** (nav is at 7): spray applications are field operations, so an **"Applications" tab inside `/operations`** (next to Harvest/Planting/Irrigation); **products rollup** under `/reports` or as a sub-view; **per-field applications as a tab in the field detail** — which also removes the duplicate field surfaces (`/map/field/[id]` side-panel vs. the standalone `/fields/[id]/applications` route I added). Galen wants to discuss the day-to-day navigation/reading flow before locking a structure.
+
 ## How to resume
 ```bash
 cd "C:/Users/galen/Documents/Websites/OPS Center API"
