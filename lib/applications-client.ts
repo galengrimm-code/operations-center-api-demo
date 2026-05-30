@@ -49,17 +49,21 @@ export async function fetchApplications(
   if (error) throw error;
 
   // No FK from field_operations -> fields for a PostgREST embed; resolve field
-  // names via a separate query and map jd_field_id -> name.
-  const { data: fieldRows } = await (supabase.from("fields") as any).select("jd_field_id, name");
-  const fieldNameById = new Map<string, string>(
-    (fieldRows ?? []).map((f: any) => [f.jd_field_id, f.name]),
+  // names via a separate query. Fields uniqueness is (user_id, org_id, jd_field_id),
+  // so jd_field_id alone is not a safe key across orgs — key on org_id + jd_field_id.
+  const { data: fieldRows, error: fieldErr } = await (supabase.from("fields") as any).select(
+    "org_id, jd_field_id, name",
+  );
+  if (fieldErr) throw fieldErr;
+  const fieldNameByKey = new Map<string, string>(
+    (fieldRows ?? []).map((f: any) => [`${f.org_id}:${f.jd_field_id}`, f.name]),
   );
 
   // Reshape: lift field name + apply filters that span join boundaries client-side.
   return (data ?? [])
     .map((row: any) => ({
       ...row,
-      field_name: fieldNameById.get(row.jd_field_id) ?? "Unknown",
+      field_name: fieldNameByKey.get(`${row.org_id}:${row.jd_field_id}`) ?? "Unknown",
       product_lines: row.product_lines ?? [],
     }))
     .filter((row: ApplicationWithLines) => {

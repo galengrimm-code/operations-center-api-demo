@@ -12,10 +12,13 @@ interface Props {
 }
 
 export function ProductLineRow({ line, onEdit, onRevert }: Props) {
-  const effectiveCategory = line.product_category_override ?? line.product.product_category;
+  const effectiveCategory =
+    line.product_category_override ?? line.product?.product_category ?? null;
   return (
     <div className="grid grid-cols-12 items-center gap-2 border-b border-white/[0.05] px-3 py-2 text-sm last:border-b-0">
-      <div className="col-span-3 font-medium text-white">{line.product.name}</div>
+      <div className="col-span-3 font-medium text-white">
+        {line.product?.name ?? "(unknown product)"}
+      </div>
       <div className="col-span-2">
         <CategoryBadge category={effectiveCategory} />
       </div>

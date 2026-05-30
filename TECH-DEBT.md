@@ -8,6 +8,13 @@
 
 ## Active
 
+### Applications/Products read path does full-table client-side processing
+- **Where:** `lib/applications-client.ts` — `fetchApplications` filters `productId`/`category` in JS (not SQL); `fetchProductsRollup` pulls all product-line rows and aggregates in the browser. Every applications filter change refetches the full nested payload.
+- **What:** O(all of the user's rows) shipped to the browser per load. Deliberate v1 choice (the plan explicitly chose client-side aggregation).
+- **Why it's debt:** fine at farm scale (dozens–hundreds of ops); slow at thousands of ops/lines.
+- **Cost to fix:** medium — move the rollup to a Supabase RPC / SQL aggregate; push `productId`/`category` filters into the query (join through `field_operation_products`/`products`).
+- **Trigger:** when an org's spray history grows large, or when adding cross-season analytics. Flagged by Codex adversarial review 2026-05-29 (P2).
+
 ### Spray-sync test data seeded into shared prod DB (delete before Task 39)
 - **Where:** `operations_center` rows with `org_id='seed-org'` (1 field, 3 products, 1 application, 3 product lines) + a placeholder `john_deere_connections` row for `dev@precisionfarms.test` (UID `178fdca1-ea1c-4995-bfee-110aaaee469b`), shared project `nuxofsjzrgdauzriraze`.
 - **What:** Seeded 2026-05-29 to browser-verify the Applications UI (Group G) against real data on a fresh test account.

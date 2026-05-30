@@ -22,7 +22,7 @@ export function ApplicationExpanded({
   );
   const grouped = new Map<string | null, typeof visibleLines>();
   for (const line of visibleLines) {
-    const cat = line.product_category_override ?? line.product.product_category ?? null;
+    const cat = line.product_category_override ?? line.product?.product_category ?? null;
     if (!grouped.has(cat)) grouped.set(cat, []);
     grouped.get(cat)!.push(line);
   }

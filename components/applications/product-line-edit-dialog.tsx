@@ -63,7 +63,9 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-slate-900 p-6 text-slate-200 shadow-2xl">
-        <h3 className="mb-4 text-lg font-semibold text-white">Edit {line.product.name}</h3>
+        <h3 className="mb-4 text-lg font-semibold text-white">
+          Edit {line.product?.name ?? "product"}
+        </h3>
         <div className="space-y-3">
           <Row label={`Rate (${displayUnit(line.rate_unit)})`} value={rate} setValue={setRate} />
           <Row
