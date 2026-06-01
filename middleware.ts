@@ -9,7 +9,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
 const PUBLIC_FILE_EXT =
-  /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff2?|ttf|eot)$/;
+  /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff2?|ttf|eot|webmanifest|txt)$/;
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
