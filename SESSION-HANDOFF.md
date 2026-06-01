@@ -72,7 +72,7 @@ This is the **"Task 39 real-import" session** — everything left needs your liv
 
 ## How to resume
 ```bash
-cd "C:/Users/galen/Documents/Websites/OPS Center API"
+cd "C:/Users/galen/Documents/Websites/Farm Data Hub"
 git pull
 npm run prebuild   # 47 tests green
 ```
