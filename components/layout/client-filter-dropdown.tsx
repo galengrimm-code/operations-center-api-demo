@@ -40,7 +40,7 @@ export function ClientFilterDropdown() {
       <select
         value={selectedFarm || ""}
         onChange={(e) => setSelectedFarm(e.target.value || null)}
-        className="rounded-md border border-slate-700 bg-transparent px-2 py-1 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+        className="rounded-md border border-slate-700 bg-transparent px-2 py-1 text-xs text-slate-200 [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-emerald-500"
       >
         <option value="">All Farms</option>
         {availableFarms.map((f) => (
