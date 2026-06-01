@@ -160,6 +160,31 @@ export async function importOperations() {
   return response.json();
 }
 
+export interface ImportApplicationsResult {
+  operations_processed: number;
+  product_lines_written: number;
+  measurements_not_found: number;
+  measurements_error: number;
+}
+
+export async function importApplications(): Promise<ImportApplicationsResult> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${SUPABASE_URL}/functions/v1/john-deere-import?action=import-applications`,
+    {
+      method: "POST",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to import applications");
+  }
+
+  return response.json();
+}
+
 export async function importFieldOperations(fieldId: string): Promise<{ totalImported: number }> {
   const headers = await getAuthHeaders();
   const response = await fetch(
