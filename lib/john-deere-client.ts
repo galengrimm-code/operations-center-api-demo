@@ -167,10 +167,13 @@ export interface ImportApplicationsResult {
   measurements_error: number;
 }
 
-export async function importApplications(): Promise<ImportApplicationsResult> {
+export async function importApplications(fieldId?: string): Promise<ImportApplicationsResult> {
   const headers = await getAuthHeaders();
+  // Per-field scoping keeps each request small so it can't hit the gateway
+  // timeout — the page drives the loop over all fields and shows progress.
+  const scope = fieldId ? `&fieldId=${encodeURIComponent(fieldId)}` : "";
   const response = await fetch(
-    `${SUPABASE_URL}/functions/v1/john-deere-import?action=import-applications`,
+    `${SUPABASE_URL}/functions/v1/john-deere-import?action=import-applications${scope}`,
     {
       method: "POST",
       headers,
@@ -178,8 +181,8 @@ export async function importApplications(): Promise<ImportApplicationsResult> {
   );
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to import applications");
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to import applications (${response.status})`);
   }
 
   return response.json();
