@@ -8,11 +8,13 @@ import {
   importApplications,
   type ImportApplicationsResult,
 } from "@/lib/john-deere-client";
+import { useClientFilter } from "@/contexts/client-filter-context";
 import type { ApplicationWithLines } from "@/types/applications";
 import { ApplicationsList } from "@/components/applications/applications-list";
 import { ApplicationFilters } from "@/components/applications/application-filters";
 
 export default function ApplicationsPage() {
+  const { selectedFarm } = useClientFilter();
   const [rows, setRows] = useState<ApplicationWithLines[]>([]);
   const [filter, setFilter] = useState({});
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,7 @@ export default function ApplicationsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchApplications(filter)
+    fetchApplications({ ...filter, farm: selectedFarm ?? undefined })
       .then((data) => {
         if (!cancelled) setRows(data);
       })
@@ -103,7 +105,7 @@ export default function ApplicationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [filter]);
+  }, [filter, selectedFarm]);
 
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">

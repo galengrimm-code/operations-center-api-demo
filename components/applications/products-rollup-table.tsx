@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { displayUnit } from "@/lib/unit-display";
 import type { Product } from "@/types/applications";
 
@@ -11,6 +13,8 @@ interface RollupRow {
   operation_count: number;
 }
 
+type SortKey = "name" | "category" | "total" | "fields" | "operations";
+
 export function ProductsRollupTable({
   rows,
   onEditCategory,
@@ -18,6 +22,45 @@ export function ProductsRollupTable({
   rows: RollupRow[];
   onEditCategory: (productId: string, category: string) => Promise<void>;
 }) {
+  const [sortKey, setSortKey] = useState<SortKey>("total");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const sorted = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "name":
+          cmp = a.product.name.localeCompare(b.product.name);
+          break;
+        case "category":
+          cmp = (a.product.product_category ?? "").localeCompare(b.product.product_category ?? "");
+          break;
+        case "total":
+          cmp = a.total_value_sum - b.total_value_sum;
+          break;
+        case "fields":
+          cmp = a.field_count - b.field_count;
+          break;
+        case "operations":
+          cmp = a.operation_count - b.operation_count;
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // text columns default A→Z, numeric columns default high→low
+      setSortDir(key === "name" || key === "category" ? "asc" : "desc");
+    }
+  }
+
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-slate-400">
@@ -25,25 +68,48 @@ export function ProductsRollupTable({
       </div>
     );
   }
+
+  function Header({ k, label, align = "left" }: { k: SortKey; label: string; align?: "left" | "right" }) {
+    return (
+      <th className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
+        <button
+          type="button"
+          onClick={() => toggleSort(k)}
+          className={`inline-flex items-center gap-1 uppercase transition-colors hover:text-slate-200 ${
+            sortKey === k ? "text-slate-200" : ""
+          } ${align === "right" ? "flex-row-reverse" : ""}`}
+        >
+          {label}
+          {sortKey === k &&
+            (sortDir === "asc" ? (
+              <ChevronUp className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            ))}
+        </button>
+      </th>
+    );
+  }
+
   return (
     <div className="glass overflow-hidden rounded-xl">
       <table className="w-full text-sm">
         <thead className="border-b border-white/[0.08] text-xs uppercase text-slate-400">
           <tr>
-            <th className="px-3 py-2 text-left">Product</th>
-            <th className="px-3 py-2 text-left">Category</th>
-            <th className="px-3 py-2 text-right">Total Applied</th>
-            <th className="px-3 py-2 text-right">Fields</th>
-            <th className="px-3 py-2 text-right">Operations</th>
+            <Header k="name" label="Product" />
+            <Header k="category" label="Category" />
+            <Header k="total" label="Total Applied" align="right" />
+            <Header k="fields" label="Fields" align="right" />
+            <Header k="operations" label="Operations" align="right" />
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {sorted.map((r) => (
             <tr key={r.product.id} className="border-b border-white/[0.05] last:border-b-0">
               <td className="px-3 py-2 font-medium text-white">{r.product.name}</td>
               <td className="px-3 py-2">
                 <select
-                  className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-xs text-slate-200 focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+                  className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-xs text-slate-200 [color-scheme:dark] focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
                   value={r.product.product_category ?? ""}
                   onChange={(e) => onEditCategory(r.product.id, e.target.value)}
                 >

@@ -3,21 +3,31 @@
 import { useEffect, useState } from "react";
 import { fetchProductsRollup, editProductCategory } from "@/lib/applications-client";
 import { ProductsRollupTable } from "@/components/applications/products-rollup-table";
+import { useClientFilter } from "@/contexts/client-filter-context";
+
+const SELECT_CLASS =
+  "rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-sm text-slate-200 [color-scheme:dark] focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20";
 
 export default function ProductsPage() {
+  const { selectedFarm } = useClientFilter();
   const [rows, setRows] = useState<any[]>([]);
   const [season, setSeason] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
-    fetchProductsRollup(season || undefined)
+    fetchProductsRollup(season || undefined, selectedFarm ?? undefined)
       .then(setRows)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }
-  useEffect(load, [season]);
+  useEffect(load, [season, selectedFarm]);
+
+  const visibleRows = category
+    ? rows.filter((r) => (r.product?.product_category ?? "") === category)
+    : rows;
 
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">
@@ -29,15 +39,23 @@ export default function ProductsPage() {
           </p>
         </header>
         <div className="mb-4 flex items-center gap-3">
-          <select
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-sm text-slate-200 focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
-            value={season}
-            onChange={(e) => setSeason(e.target.value)}
-          >
+          <select className={SELECT_CLASS} value={season} onChange={(e) => setSeason(e.target.value)}>
             <option value="">All seasons</option>
             <option value="2026">2026</option>
             <option value="2025">2025</option>
             <option value="2024">2024</option>
+          </select>
+          <select
+            className={SELECT_CLASS}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">All categories</option>
+            <option value="fertilizer">Fertilizer</option>
+            <option value="chemical">Chemical</option>
+            <option value="seed">Seed</option>
+            <option value="adjuvant">Adjuvant</option>
+            <option value="other">Other</option>
           </select>
         </div>
         {error && (
@@ -49,7 +67,7 @@ export default function ProductsPage() {
           <div className="text-slate-400">Loading...</div>
         ) : (
           <ProductsRollupTable
-            rows={rows}
+            rows={visibleRows}
             onEditCategory={async (productId, cat) => {
               await editProductCategory(productId, cat);
               load();

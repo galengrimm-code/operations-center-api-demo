@@ -77,6 +77,7 @@ export interface ApplicationOperation {
 
 export interface ApplicationWithLines extends ApplicationOperation {
   field_name: string;
+  farm_name: string | null;
   product_lines: Array<FieldOperationProductLine & { product: Product }>;
 }
 

@@ -14,6 +14,7 @@ export interface ApplicationsListFilter {
   productId?: string;
   season?: string;
   category?: string;
+  farm?: string;
 }
 
 export async function fetchApplications(
@@ -49,24 +50,32 @@ export async function fetchApplications(
   if (error) throw error;
 
   // No FK from field_operations -> fields for a PostgREST embed; resolve field
-  // names via a separate query. Fields uniqueness is (user_id, org_id, jd_field_id),
+  // name + farm via a separate query. Fields uniqueness is (user_id, org_id, jd_field_id),
   // so jd_field_id alone is not a safe key across orgs — key on org_id + jd_field_id.
   const { data: fieldRows, error: fieldErr } = await (supabase.from("fields") as any).select(
-    "org_id, jd_field_id, name",
+    "org_id, jd_field_id, name, farm_name",
   );
   if (fieldErr) throw fieldErr;
-  const fieldNameByKey = new Map<string, string>(
-    (fieldRows ?? []).map((f: any) => [`${f.org_id}:${f.jd_field_id}`, f.name]),
+  const fieldByKey = new Map<string, { name: string; farm_name: string | null }>(
+    (fieldRows ?? []).map((f: any) => [
+      `${f.org_id}:${f.jd_field_id}`,
+      { name: f.name, farm_name: f.farm_name ?? null },
+    ]),
   );
 
-  // Reshape: lift field name + apply filters that span join boundaries client-side.
+  // Reshape: lift field name + farm, then apply filters that span join boundaries client-side.
   return (data ?? [])
-    .map((row: any) => ({
-      ...row,
-      field_name: fieldNameByKey.get(`${row.org_id}:${row.jd_field_id}`) ?? "Unknown",
-      product_lines: row.product_lines ?? [],
-    }))
+    .map((row: any) => {
+      const field = fieldByKey.get(`${row.org_id}:${row.jd_field_id}`);
+      return {
+        ...row,
+        field_name: field?.name ?? "Unknown",
+        farm_name: field?.farm_name ?? null,
+        product_lines: row.product_lines ?? [],
+      };
+    })
     .filter((row: ApplicationWithLines) => {
+      if (filter.farm && row.farm_name !== filter.farm) return false;
       if (filter.productId && !row.product_lines.some((l) => l.product_id === filter.productId))
         return false;
       if (filter.category) {
@@ -80,7 +89,10 @@ export async function fetchApplications(
     });
 }
 
-export async function fetchProductsRollup(season?: string): Promise<
+export async function fetchProductsRollup(
+  season?: string,
+  farm?: string,
+): Promise<
   Array<{
     product: Product;
     total_value_sum: number;
@@ -94,12 +106,24 @@ export async function fetchProductsRollup(season?: string): Promise<
     .select(
       `
       total_value, total_unit, product_id, field_operation_id,
-      field_operation:field_operations!inner(crop_season, jd_field_id),
+      field_operation:field_operations!inner(crop_season, jd_field_id, org_id),
       product:products(*)
     `,
     )
     .is("deleted_at", null);
   if (error) throw error;
+
+  // Resolve farm per field (no FK embed available) so the global farm filter applies here too.
+  let farmByKey: Map<string, string | null> | null = null;
+  if (farm) {
+    const { data: fieldRows, error: fieldErr } = await (supabase.from("fields") as any).select(
+      "org_id, jd_field_id, farm_name",
+    );
+    if (fieldErr) throw fieldErr;
+    farmByKey = new Map<string, string | null>(
+      (fieldRows ?? []).map((f: any) => [`${f.org_id}:${f.jd_field_id}`, f.farm_name ?? null]),
+    );
+  }
 
   const byProduct = new Map<
     string,
@@ -113,6 +137,10 @@ export async function fetchProductsRollup(season?: string): Promise<
   >();
   for (const row of (data ?? []) as any[]) {
     if (season && row.field_operation?.crop_season !== season) continue;
+    if (farmByKey) {
+      const key = `${row.field_operation?.org_id}:${row.field_operation?.jd_field_id}`;
+      if (farmByKey.get(key) !== farm) continue;
+    }
     const pid = row.product_id as string;
     if (!byProduct.has(pid)) {
       byProduct.set(pid, {
