@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Tractor } from "lucide-react";
+import Image from "next/image";
 import { NavLinks } from "./nav-links";
 import { UserMenu } from "./user-menu";
 import { ClientFilterDropdown } from "./client-filter-dropdown";
@@ -12,9 +12,14 @@ export function TopBar() {
       <div className="flex h-full items-center justify-between px-4">
         {/* Logo */}
         <Link href="/map" className="group flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 shadow-lg shadow-emerald-500/20 transition-shadow group-hover:shadow-emerald-500/40">
-            <Tractor className="h-4 w-4 text-white" />
-          </div>
+          <Image
+            src="/android-chrome-192x192.png"
+            alt="Farm Data Hub"
+            width={28}
+            height={28}
+            priority
+            className="h-7 w-7 rounded-lg shadow-lg shadow-emerald-500/20 transition-shadow group-hover:shadow-emerald-500/40"
+          />
           <span className="hidden text-sm font-semibold tracking-tight text-slate-200 sm:inline">
             Farm Data Hub
           </span>
