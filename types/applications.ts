@@ -20,6 +20,7 @@ export interface Product {
   product_category: ProductCategory | string | null;  // free text but typed for known set
   product_category_source: "seed" | "user" | null;
   default_unit: string | null;
+  density_lbs_per_gal: number | null;
   first_seen_at: string;
   last_seen_at: string;
   created_at: string;
@@ -78,7 +79,29 @@ export interface ApplicationOperation {
 export interface ApplicationWithLines extends ApplicationOperation {
   field_name: string;
   farm_name: string | null;
-  product_lines: Array<FieldOperationProductLine & { product: Product }>;
+  product_lines: Array<FieldOperationProductLine & { product: Product; cost?: LineCost; applied_acres?: number | null }>;
+}
+
+export interface ProductPrice {
+  id: string;
+  user_id: string;
+  org_id: string;
+  product_id: string;
+  year: number;
+  price_per_unit: number;
+  price_unit: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// per-line derived cost, attached at fetch time.
+// null fields mean "unknown" (unpriced / unconvertible / bad area) and render as "—", never $0.00.
+export interface LineCost {
+  cost_per_acre: number | null;
+  total_cost: number | null;
+  price_per_unit: number | null;
+  price_unit: string | null;
+  needs_density: boolean; // cross-family with no density set
 }
 
 export interface ProductLineEdit {

@@ -3,10 +3,10 @@
 import { displayRate, displayTotal, displayUnit } from "@/lib/unit-display";
 import { CategoryBadge } from "./category-badge";
 import { InconsistencyBadge } from "./inconsistency-badge";
-import type { FieldOperationProductLine, Product } from "@/types/applications";
+import type { FieldOperationProductLine, LineCost, Product } from "@/types/applications";
 
 interface Props {
-  line: FieldOperationProductLine & { product: Product };
+  line: FieldOperationProductLine & { product: Product; cost?: LineCost };
   onEdit?: () => void;
   onRevert?: () => void;
 }
@@ -25,8 +25,21 @@ export function ProductLineRow({ line, onEdit, onRevert }: Props) {
       <div className="font-mono-data col-span-2 text-slate-200">
         {displayRate(line.rate_value, line.rate_unit)}
       </div>
-      <div className="font-mono-data col-span-2 text-slate-200">
-        {displayTotal(line.total_value, line.total_unit)}
+      <div className="col-span-2">
+        <div className="font-mono-data text-slate-200">
+          {displayTotal(line.total_value, line.total_unit)}
+        </div>
+        {line.cost && (
+          line.cost.cost_per_acre != null ? (
+            <div className="font-mono-data text-xs text-emerald-400/80">
+              ${line.cost.cost_per_acre.toFixed(2)}/ac · ${line.cost.price_per_unit!.toFixed(2)}/{line.cost.price_unit === "ozm" ? "oz" : displayUnit(line.cost.price_unit)}
+            </div>
+          ) : line.cost.needs_density ? (
+            <a href="/products" className="text-xs text-amber-400 hover:underline">set density</a>
+          ) : (
+            <div className="text-xs text-slate-600">—</div>
+          )
+        )}
       </div>
       <div className="font-mono-data col-span-1 text-slate-200">
         {line.area_value} {displayUnit(line.area_unit)}

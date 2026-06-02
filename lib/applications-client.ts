@@ -7,7 +7,10 @@ import type {
   FieldOperationProductLine,
   Product,
   ProductLineEdit,
+  ProductPrice,
 } from "@/types/applications";
+import { lineTotalCost, costPerAcre, acresFrom } from "./cost-calc";
+import { unitFamily } from "./unit-convert";
 
 export interface ApplicationsListFilter {
   fieldId?: string;
@@ -63,15 +66,60 @@ export async function fetchApplications(
     ]),
   );
 
+  // Prices for every (product, year) touched by the result set. A load failure must NOT
+  // look like "unpriced" — throw it.
+  const years = Array.from(
+    new Set(
+      (data ?? [])
+        .map((r: any) => (/^\d{4}$/.test(String(r.crop_season ?? "")) ? Number(r.crop_season) : null))
+        .filter((y: number | null): y is number => y != null),
+    ),
+  );
+  let priceRows: any[] = [];
+  if (years.length > 0) {
+    // No org filter needed: product_id is a UUID PK belonging to exactly one org, and RLS
+    // already scopes to the authenticated user, so product_id:year keys cannot collide across orgs.
+    const { data: pData, error: pErr } = await (supabase.from("product_prices") as any)
+      .select("*")
+      .in("year", years);
+    if (pErr) throw pErr;
+    priceRows = pData ?? [];
+  }
+  const priceByKey = new Map<string, { price_per_unit: number; price_unit: string }>(
+    priceRows.map((p: any) => [`${p.product_id}:${p.year}`, p]),
+  );
+
   // Reshape: lift field name + farm, then apply filters that span join boundaries client-side.
   return (data ?? [])
     .map((row: any) => {
       const field = fieldByKey.get(`${row.org_id}:${row.jd_field_id}`);
+      const yearNum = /^\d{4}$/.test(String(row.crop_season ?? "")) ? Number(row.crop_season) : null;
+      const product_lines = (row.product_lines ?? []).map((l: any) => {
+        const price = yearNum != null ? (priceByKey.get(`${l.product_id}:${yearNum}`) ?? null) : null;
+        const density = l.product?.density_lbs_per_gal ?? null;
+        const priceRef = price ? { ...price, density_lbs_per_gal: density } : null;
+        const total = lineTotalCost(l.total_value, l.total_unit, priceRef);
+        const acres = acresFrom(l.area_value ?? null, l.area_unit ?? null);
+        const cpa = costPerAcre(total, acres);
+        const needs_density =
+          !!price && total === null && unitFamily(l.total_unit) !== unitFamily(price.price_unit);
+        return {
+          ...l,
+          applied_acres: acres,
+          cost: {
+            cost_per_acre: cpa,
+            total_cost: total,
+            price_per_unit: price?.price_per_unit ?? null,
+            price_unit: price?.price_unit ?? null,
+            needs_density,
+          },
+        };
+      });
       return {
         ...row,
         field_name: field?.name ?? "Unknown",
         farm_name: field?.farm_name ?? null,
-        product_lines: row.product_lines ?? [],
+        product_lines,
       };
     })
     .filter((row: ApplicationWithLines) => {
@@ -255,4 +303,88 @@ export async function revertApplicationName(operationId: string): Promise<Applic
     .single();
   if (error) throw error;
   return checkMutationResult(data, "revert application name", 1) as ApplicationOperation;
+}
+
+export async function fetchProductPrices(year: number, orgId: string): Promise<ProductPrice[]> {
+  const { data, error } = await (supabase.from("product_prices") as any)
+    .select("*").eq("year", year).eq("org_id", orgId);
+  if (error) throw error;
+  return (data ?? []) as ProductPrice[];
+}
+
+// Years that actually have application data (drives the year selector — no hardcoded list).
+export async function fetchSeasonYears(orgId: string): Promise<number[]> {
+  const { data, error } = await (supabase.from("field_operations") as any)
+    .select("crop_season").eq("org_id", orgId).eq("operation_type", "application");
+  if (error) throw error;
+  const years = new Set<number>();
+  for (const r of (data ?? []) as any[]) {
+    if (/^\d{4}$/.test(String(r.crop_season ?? ""))) years.add(Number(r.crop_season));
+  }
+  return Array.from(years).sort((a, b) => b - a); // newest first
+}
+
+// average price_per_unit per product across all years (for "All seasons", read-only).
+// Only averages rows that share the product's modal price_unit to avoid mixing units.
+export async function fetchProductPriceAverages(orgId: string): Promise<Map<string, { avg: number; unit: string }>> {
+  const { data, error } = await (supabase.from("product_prices") as any)
+    .select("product_id, price_per_unit, price_unit").eq("org_id", orgId);
+  if (error) throw error;
+  const byProduct = new Map<string, { sums: Map<string, { total: number; n: number }> }>();
+  for (const r of (data ?? []) as any[]) {
+    const e = byProduct.get(r.product_id) ?? { sums: new Map() };
+    const s = e.sums.get(r.price_unit) ?? { total: 0, n: 0 };
+    s.total += Number(r.price_per_unit); s.n += 1;
+    e.sums.set(r.price_unit, s); byProduct.set(r.product_id, e);
+  }
+  const out = new Map<string, { avg: number; unit: string }>();
+  for (const [pid, e] of Array.from(byProduct)) {
+    // pick the unit with the most rows; average within it
+    let best: { unit: string; total: number; n: number } | null = null;
+    for (const [unit, s] of Array.from(e.sums)) if (!best || s.n > best.n) best = { unit, ...s };
+    if (best) out.set(pid, { avg: best.total / best.n, unit: best.unit });
+  }
+  return out;
+}
+
+export async function upsertProductPrice(input: {
+  productId: string; orgId: string; year: number; pricePerUnit: number; priceUnit: string;
+}): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  const userId = u.user?.id;
+  if (!userId) throw new Error("not authenticated");
+  const { error } = await (supabase.from("product_prices") as any).upsert(
+    {
+      user_id: userId, org_id: input.orgId, product_id: input.productId,
+      year: input.year, price_per_unit: input.pricePerUnit, price_unit: input.priceUnit,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,org_id,product_id,year" },
+  );
+  if (error) throw error;
+}
+
+export async function setProductDensity(productId: string, density: number | null): Promise<void> {
+  const { error } = await (supabase.from("products") as any)
+    .update({ density_lbs_per_gal: density, updated_at: new Date().toISOString() })
+    .eq("id", productId);
+  if (error) throw error;
+}
+
+// Bulk-copy a year's prices into another year (HP "Inputs Copy"). Does not overwrite existing.
+export async function copyPricesFromYear(fromYear: number, toYear: number, orgId: string): Promise<number> {
+  const { data: u } = await supabase.auth.getUser();
+  const userId = u.user?.id;
+  if (!userId) throw new Error("not authenticated");
+  // org-scoped on BOTH sides — never copy another org's price onto this org's product.
+  const src = await fetchProductPrices(fromYear, orgId);
+  const existing = new Set((await fetchProductPrices(toYear, orgId)).map((p) => p.product_id));
+  const rows = src.filter((p) => !existing.has(p.product_id)).map((p) => ({
+    user_id: userId, org_id: orgId, product_id: p.product_id, year: toYear,
+    price_per_unit: p.price_per_unit, price_unit: p.price_unit,
+  }));
+  if (rows.length === 0) return 0;
+  const { error } = await (supabase.from("product_prices") as any).insert(rows);
+  if (error) throw error;
+  return rows.length;
 }

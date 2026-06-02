@@ -33,7 +33,7 @@ export function ApplicationExpanded({
         <div className="col-span-3">Product</div>
         <div className="col-span-2">Category</div>
         <div className="col-span-2">Rate</div>
-        <div className="col-span-2">Total</div>
+        <div className="col-span-2">Total / $/ac</div>
         <div className="col-span-1">Area</div>
         <div className="col-span-2 text-right">Actions</div>
       </div>

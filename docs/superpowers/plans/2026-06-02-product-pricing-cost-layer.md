@@ -281,6 +281,7 @@ git commit -m "feat(cost): unit converter (weight/volume + cross-family via dens
 import { describe, it, expect } from "vitest";
 import {
   lineTotalCost,
+  acresFrom,
   costPerAcre,
   fieldCostPerAcre,
   type PriceRef,
@@ -509,8 +510,6 @@ Extend the product-line shape in `ApplicationWithLines.product_lines[]` to optio
 - [ ] **Step 2: Add price CRUD functions** to `lib/applications-client.ts`
 
 ```ts
-import { convertAmount } from "./unit-convert"; // for needs_density detection
-
 export async function fetchProductPrices(year: number, orgId: string): Promise<ProductPrice[]> {
   const { data, error } = await (supabase.from("product_prices") as any)
     .select("*").eq("year", year).eq("org_id", orgId);
