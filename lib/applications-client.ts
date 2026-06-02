@@ -9,6 +9,8 @@ import type {
   ProductLineEdit,
   ProductPrice,
 } from "@/types/applications";
+import { lineTotalCost, costPerAcre, acresFrom } from "./cost-calc";
+import { unitFamily } from "./unit-convert";
 
 export interface ApplicationsListFilter {
   fieldId?: string;
@@ -64,15 +66,58 @@ export async function fetchApplications(
     ]),
   );
 
+  // Prices for every (product, year) touched by the result set. A load failure must NOT
+  // look like "unpriced" — throw it.
+  const years = Array.from(
+    new Set(
+      (data ?? [])
+        .map((r: any) => (/^\d{4}$/.test(String(r.crop_season ?? "")) ? Number(r.crop_season) : null))
+        .filter((y: number | null): y is number => y != null),
+    ),
+  );
+  let priceRows: any[] = [];
+  if (years.length > 0) {
+    const { data: pData, error: pErr } = await (supabase.from("product_prices") as any)
+      .select("*")
+      .in("year", years);
+    if (pErr) throw pErr;
+    priceRows = pData ?? [];
+  }
+  const priceByKey = new Map<string, { price_per_unit: number; price_unit: string }>(
+    priceRows.map((p: any) => [`${p.product_id}:${p.year}`, p]),
+  );
+
   // Reshape: lift field name + farm, then apply filters that span join boundaries client-side.
   return (data ?? [])
     .map((row: any) => {
       const field = fieldByKey.get(`${row.org_id}:${row.jd_field_id}`);
+      const yearNum = /^\d{4}$/.test(String(row.crop_season ?? "")) ? Number(row.crop_season) : null;
+      const product_lines = (row.product_lines ?? []).map((l: any) => {
+        const price = yearNum != null ? (priceByKey.get(`${l.product_id}:${yearNum}`) ?? null) : null;
+        const density = l.product?.density_lbs_per_gal ?? null;
+        const priceRef = price ? { ...price, density_lbs_per_gal: density } : null;
+        const total = lineTotalCost(l.total_value, l.total_unit, priceRef);
+        const acres = acresFrom(l.area_value ?? null, l.area_unit ?? null);
+        const cpa = costPerAcre(total, acres);
+        const needs_density =
+          !!price && total === null && unitFamily(l.total_unit) !== unitFamily(price.price_unit);
+        return {
+          ...l,
+          applied_acres: acres,
+          cost: {
+            cost_per_acre: cpa,
+            total_cost: total,
+            price_per_unit: price?.price_per_unit ?? null,
+            price_unit: price?.price_unit ?? null,
+            needs_density,
+          },
+        };
+      });
       return {
         ...row,
         field_name: field?.name ?? "Unknown",
         farm_name: field?.farm_name ?? null,
-        product_lines: row.product_lines ?? [],
+        product_lines,
       };
     })
     .filter((row: ApplicationWithLines) => {
