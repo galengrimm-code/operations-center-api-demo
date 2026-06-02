@@ -70,12 +70,12 @@ export function FieldCostSummary({
     const notes: string[] = [];
     if (needsDensityCount > 0) {
       notes.push(
-        `${needsDensityCount} input${needsDensityCount !== 1 ? "s" : ""} need a density set to price.`,
+        `${needsDensityCount} input${needsDensityCount !== 1 ? "s" : ""} ${needsDensityCount !== 1 ? "need" : "needs"} a density set to price.`,
       );
     }
     if (unpricedCount > 0) {
       notes.push(
-        `${unpricedCount} input${unpricedCount !== 1 ? "s" : ""} have no price set.`,
+        `${unpricedCount} input${unpricedCount !== 1 ? "s" : ""} ${unpricedCount !== 1 ? "have" : "has"} no price set.`,
       );
     }
 
