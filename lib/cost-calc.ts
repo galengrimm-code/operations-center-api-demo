@@ -70,5 +70,16 @@ export function fieldCostPerAcre(
   return priced.reduce((sum, l) => sum + l.totalCost, 0) / fieldAcres;
 }
 
+/**
+ * Sum of cost_per_acre across all product lines for one application.
+ * Null cost_per_acre values and lines without a cost object are skipped (treated as 0 in the sum).
+ * Returns 0 when nothing is priced — callers guard with `anyPriced` before rendering.
+ */
+export function applicationCostPerAcre(
+  lines: Array<{ cost?: { cost_per_acre: number | null } }>,
+): number {
+  return lines.reduce((s, l) => s + (l.cost?.cost_per_acre ?? 0), 0);
+}
+
 /** convenience: a known unit guard for UI (re-export). */
 export { unitFamily };

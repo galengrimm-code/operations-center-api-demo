@@ -5,6 +5,7 @@ import {
   acresFrom,
   costPerAcre,
   fieldCostPerAcre,
+  applicationCostPerAcre,
   type PriceRef,
   type CostLine,
 } from "../cost-calc";
@@ -89,5 +90,20 @@ describe("fieldCostPerAcre", () => {
   });
   it("all-null lines -> null (nothing priced), not 0", () => {
     expect(fieldCostPerAcre([{ totalCost: null, appliedAcres: 10 }], "spread", 150)).toBeNull();
+  });
+});
+
+describe("applicationCostPerAcre", () => {
+  it("sums line cost_per_acre, ignoring nulls", () => {
+    const lines = [
+      { cost: { cost_per_acre: 9.73 } },
+      { cost: { cost_per_acre: 2.0 } },
+      { cost: { cost_per_acre: null } },
+      {}, // no cost at all
+    ];
+    expect(applicationCostPerAcre(lines)).toBeCloseTo(11.73, 2);
+  });
+  it("returns 0 when nothing priced", () => {
+    expect(applicationCostPerAcre([{ cost: { cost_per_acre: null } }, {}])).toBe(0);
   });
 });
