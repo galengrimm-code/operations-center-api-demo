@@ -77,6 +77,8 @@ export async function fetchApplications(
   );
   let priceRows: any[] = [];
   if (years.length > 0) {
+    // No org filter needed: product_id is a UUID PK belonging to exactly one org, and RLS
+    // already scopes to the authenticated user, so product_id:year keys cannot collide across orgs.
     const { data: pData, error: pErr } = await (supabase.from("product_prices") as any)
       .select("*")
       .in("year", years);

@@ -8,10 +8,13 @@ import { acresFrom } from "@/lib/cost-calc";
 import type { ApplicationWithLines } from "@/types/applications";
 import { ApplicationsList } from "@/components/applications/applications-list";
 import { FieldCostSummary } from "@/components/applications/field-cost-summary";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function FieldApplicationsPage() {
   const params = useParams();
   const fieldId = params.fieldId as string;
+  const { johnDeereConnection } = useAuth();
+  const orgId = johnDeereConnection?.selected_org_id ?? null;
   const [rows, setRows] = useState<ApplicationWithLines[]>([]);
   const [fieldAcres, setFieldAcres] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -19,12 +22,21 @@ export default function FieldApplicationsPage() {
   async function load() {
     setLoading(true);
     try {
+      // Field-acres query must be org-scoped: jd_field_id is not unique across orgs,
+      // so querying by jd_field_id alone can return multiple rows and cause maybeSingle()
+      // to reject. Skip the field lookup (pass 0 acres) if orgId is not yet available.
+      const fieldPromise =
+        orgId != null
+          ? (supabase.from("fields") as any)
+              .select("boundary_area_value, boundary_area_unit")
+              .eq("org_id", orgId)
+              .eq("jd_field_id", fieldId)
+              .maybeSingle()
+          : Promise.resolve({ data: null });
+
       const [appRows, fieldResult] = await Promise.all([
         fetchApplications({ fieldId }),
-        (supabase.from("fields") as any)
-          .select("boundary_area_value, boundary_area_unit")
-          .eq("jd_field_id", fieldId)
-          .maybeSingle(),
+        fieldPromise,
       ]);
       setRows(appRows);
       const fieldRow = fieldResult.data;
@@ -39,7 +51,7 @@ export default function FieldApplicationsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldId]);
+  }, [fieldId, orgId]);
 
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">

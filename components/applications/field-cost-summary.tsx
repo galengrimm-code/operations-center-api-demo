@@ -62,7 +62,7 @@ export function FieldCostSummary({
     for (const l of allRawLines) {
       if (l.cost?.needs_density) {
         needsDensityCount++;
-      } else if (l.cost?.cost_per_acre == null) {
+      } else if (l.cost?.price_per_unit == null) {
         unpricedCount++;
       }
     }
