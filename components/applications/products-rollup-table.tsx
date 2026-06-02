@@ -48,18 +48,6 @@ function PriceCell({
     existing ? (existing.price_unit as PriceUnit) : defaultPriceUnit(row.product),
   );
 
-  // Sync if external data changes (e.g. after copy-from-year reloads prices)
-  const existingKey = existing
-    ? `${existing.price_per_unit}:${existing.price_unit}`
-    : "";
-  useMemo(() => {
-    if (existing) {
-      setInputVal(String(existing.price_per_unit));
-      setUnit(existing.price_unit as PriceUnit);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingKey]);
-
   function commit() {
     const trimmed = inputVal.trim();
     if (trimmed === "") return;
@@ -298,6 +286,7 @@ export function ProductsRollupTable({
                   </span>
                 ) : (
                   <PriceCell
+                    key={`price-${r.product.id}-${priceByProduct.get(r.product.id)?.price_per_unit ?? "x"}-${priceByProduct.get(r.product.id)?.price_unit ?? "x"}`}
                     row={r}
                     priceByProduct={priceByProduct}
                     onSetPrice={onSetPrice}
