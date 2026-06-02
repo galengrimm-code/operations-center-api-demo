@@ -258,6 +258,14 @@ git add lib/unit-convert.ts lib/__tests__/unit-convert.test.ts
 git commit -m "feat(cost): unit converter (weight/volume + cross-family via density)"
 ```
 
+> **Unit-vocabulary note (#8):** the converter's known units (`ozm`/`lb`/`ton`/`floz`/`pt`/`qt`/`gal`)
+> are the source of truth for both line units and `price_unit`. JD's dry-ounce token is `ozm` (not
+> `oz`); `lib/unit-display.ts` knows `oz`, so when displaying a `price_unit`/`total_unit` add an
+> `ozm → "oz"` label mapping (display only — the stored/compared token stays `ozm`). The price-unit
+> `<select>` in Task 7 offers exactly these 7 tokens. Metric volume (`l`/`ml`/`kg`) is absent from
+> the real data and intentionally unsupported in v1 — a line in an unknown unit yields `cost = null`
+> ("—"), never a silent wrong number.
+
 ---
 
 ## Task 4: `lib/cost-calc.ts` (pure cost math, TDD)
@@ -311,6 +319,15 @@ describe("lineTotalCost", () => {
   });
 });
 
+describe("acresFrom", () => {
+  it("ac passes through", () => expect(acresFrom(135.61, "ac")).toBeCloseTo(135.61, 4));
+  it("ha -> ac (×2.47105)", () => expect(acresFrom(10, "ha")).toBeCloseTo(24.7105, 3));
+  it("null/unknown unit -> null (never silently treat as acres)", () => {
+    expect(acresFrom(10, null)).toBeNull();
+    expect(acresFrom(10, "bogus")).toBeNull();
+  });
+});
+
 describe("costPerAcre", () => {
   it("total cost / applied acres", () => {
     expect(costPerAcre(1320.06, 135.6144)).toBeCloseTo(9.734, 3);
@@ -318,8 +335,9 @@ describe("costPerAcre", () => {
   it("null total -> null", () => {
     expect(costPerAcre(null, 100)).toBeNull();
   });
-  it("zero/empty acres -> null (avoid div by zero)", () => {
+  it("zero/null acres -> null (NOT 0 — unknown, not free)", () => {
     expect(costPerAcre(100, 0)).toBeNull();
+    expect(costPerAcre(100, null)).toBeNull();
   });
 });
 
@@ -340,8 +358,15 @@ describe("fieldCostPerAcre", () => {
     const withNull: CostLine[] = [...lines, { totalCost: null, appliedAcres: 50 }];
     expect(fieldCostPerAcre(withNull, "spread", 150)).toBeCloseTo(2.667, 3);
   });
-  it("spread with zero field acres -> 0 (avoid div by zero)", () => {
-    expect(fieldCostPerAcre(lines, "spread", 0)).toBe(0);
+  it("actual skips lines with non-positive appliedAcres (unknown, not 0)", () => {
+    const withBad: CostLine[] = [...lines, { totalCost: 99, appliedAcres: 0 }];
+    expect(fieldCostPerAcre(withBad, "actual", 150)).toBeCloseTo(12, 6); // bad line excluded, not +0
+  });
+  it("spread with zero/invalid field acres -> null (NOT 0 — unknown)", () => {
+    expect(fieldCostPerAcre(lines, "spread", 0)).toBeNull();
+  });
+  it("all-null lines -> null (nothing priced), not 0", () => {
+    expect(fieldCostPerAcre([{ totalCost: null, appliedAcres: 10 }], "spread", 150)).toBeNull();
   });
 });
 ```
@@ -387,26 +412,43 @@ export function lineTotalCost(
   return amountInPriceUnit * price.price_per_unit;
 }
 
-/** $/ac for one line = total dollars / acres covered. null total or non-positive acres -> null. */
-export function costPerAcre(totalCost: number | null, appliedAcres: number): number | null {
-  if (totalCost == null || appliedAcres <= 0) return null;
+const HA_TO_AC = 2.4710538147;
+
+/** Normalize an area value+unit to acres. Returns null for null/unknown units — never assume acres. */
+export function acresFrom(value: number | null, unit: string | null): number | null {
+  if (value == null) return null;
+  if (unit === "ac") return value;
+  if (unit === "ha") return value * HA_TO_AC;
+  return null; // unknown unit: cost not computable, do not guess
+}
+
+/** $/ac for one line = total dollars / acres covered. null total or non-positive/null acres -> null. */
+export function costPerAcre(totalCost: number | null, appliedAcres: number | null): number | null {
+  if (totalCost == null || appliedAcres == null || appliedAcres <= 0) return null;
   return totalCost / appliedAcres;
 }
 
 /**
- * Field per-acre input cost.
- *  - "actual": each line divided by the acres it covered, summed (what each covered acre cost).
- *  - "spread": all dollars spent on the field divided by field acres (cost added to the whole field).
- * Lines with null totalCost are skipped (unpriced / unconvertible).
+ * Field per-acre input cost. Returns null when nothing is priced or the denominator is invalid
+ * (null = "unknown", rendered as "—"; never a fabricated 0).
+ *  - "actual": Σ (lineTotalCost / lineAppliedAcres) over lines with positive acres.
+ *  - "spread": Σ lineTotalCost / fieldAcres.
+ * Lines with null totalCost or non-positive appliedAcres are excluded (not summed as 0).
  */
-export function fieldCostPerAcre(lines: CostLine[], basis: FieldBasis, fieldAcres: number): number {
-  const priced = lines.filter((l) => l.totalCost != null) as Array<{ totalCost: number; appliedAcres: number }>;
+export function fieldCostPerAcre(
+  lines: CostLine[],
+  basis: FieldBasis,
+  fieldAcres: number,
+): number | null {
+  const priced = lines.filter(
+    (l) => l.totalCost != null && l.appliedAcres > 0,
+  ) as Array<{ totalCost: number; appliedAcres: number }>;
+  if (priced.length === 0) return null;
   if (basis === "actual") {
-    return priced.reduce((sum, l) => sum + (l.appliedAcres > 0 ? l.totalCost / l.appliedAcres : 0), 0);
+    return priced.reduce((sum, l) => sum + l.totalCost / l.appliedAcres, 0);
   }
-  if (fieldAcres <= 0) return 0;
-  const totalDollars = priced.reduce((sum, l) => sum + l.totalCost, 0);
-  return totalDollars / fieldAcres;
+  if (fieldAcres <= 0) return null;
+  return priced.reduce((sum, l) => sum + l.totalCost, 0) / fieldAcres;
 }
 
 /** convenience: a known unit guard for UI (re-export). */
@@ -450,9 +492,10 @@ export interface ProductPrice {
   updated_at: string;
 }
 
-// per-line derived cost, attached at fetch time
+// per-line derived cost, attached at fetch time.
+// null fields mean "unknown" (unpriced / unconvertible / bad area) and render as "—", never $0.00.
 export interface LineCost {
-  cost_per_acre: number | null; // null = unpriced or unconvertible
+  cost_per_acre: number | null;
   total_cost: number | null;
   price_per_unit: number | null;
   price_unit: string | null;
@@ -460,25 +503,38 @@ export interface LineCost {
 }
 ```
 
-Extend the product-line shape in `ApplicationWithLines.product_lines[]` to optionally carry `cost?: LineCost`.
+Extend the product-line shape in `ApplicationWithLines.product_lines[]` to optionally carry
+`cost?: LineCost` and `applied_acres?: number | null` (normalized acres from Task 6).
 
 - [ ] **Step 2: Add price CRUD functions** to `lib/applications-client.ts`
 
 ```ts
 import { convertAmount } from "./unit-convert"; // for needs_density detection
 
-export async function fetchProductPrices(year: number): Promise<ProductPrice[]> {
+export async function fetchProductPrices(year: number, orgId: string): Promise<ProductPrice[]> {
   const { data, error } = await (supabase.from("product_prices") as any)
-    .select("*").eq("year", year);
+    .select("*").eq("year", year).eq("org_id", orgId);
   if (error) throw error;
   return (data ?? []) as ProductPrice[];
 }
 
+// Years that actually have application data (drives the year selector — no hardcoded list).
+export async function fetchSeasonYears(orgId: string): Promise<number[]> {
+  const { data, error } = await (supabase.from("field_operations") as any)
+    .select("crop_season").eq("org_id", orgId).eq("operation_type", "application");
+  if (error) throw error;
+  const years = new Set<number>();
+  for (const r of (data ?? []) as any[]) {
+    if (/^\d{4}$/.test(String(r.crop_season ?? ""))) years.add(Number(r.crop_season));
+  }
+  return Array.from(years).sort((a, b) => b - a); // newest first
+}
+
 // average price_per_unit per product across all years (for "All seasons", read-only).
 // Only averages rows that share the product's modal price_unit to avoid mixing units.
-export async function fetchProductPriceAverages(): Promise<Map<string, { avg: number; unit: string }>> {
+export async function fetchProductPriceAverages(orgId: string): Promise<Map<string, { avg: number; unit: string }>> {
   const { data, error } = await (supabase.from("product_prices") as any)
-    .select("product_id, price_per_unit, price_unit");
+    .select("product_id, price_per_unit, price_unit").eq("org_id", orgId);
   if (error) throw error;
   const byProduct = new Map<string, { sums: Map<string, { total: number; n: number }> }>();
   for (const r of (data ?? []) as any[]) {
@@ -526,8 +582,9 @@ export async function copyPricesFromYear(fromYear: number, toYear: number, orgId
   const { data: u } = await supabase.auth.getUser();
   const userId = u.user?.id;
   if (!userId) throw new Error("not authenticated");
-  const src = await fetchProductPrices(fromYear);
-  const existing = new Set((await fetchProductPrices(toYear)).map((p) => p.product_id));
+  // org-scoped on BOTH sides — never copy another org's price onto this org's product.
+  const src = await fetchProductPrices(fromYear, orgId);
+  const existing = new Set((await fetchProductPrices(toYear, orgId)).map((p) => p.product_id));
   const rows = src.filter((p) => !existing.has(p.product_id)).map((p) => ({
     user_id: userId, org_id: orgId, product_id: p.product_id, year: toYear,
     price_per_unit: p.price_per_unit, price_unit: p.price_unit,
@@ -567,12 +624,14 @@ After the existing field-name resolution in `fetchApplications`, before the fina
 const years = Array.from(
   new Set((data ?? []).map((r: any) => Number(r.crop_season)).filter((y: number) => Number.isFinite(y))),
 );
-const priceRows =
-  years.length === 0
-    ? []
-    : ((
-        await (supabase.from("product_prices") as any).select("*").in("year", years)
-      ).data ?? []);
+let priceRows: any[] = [];
+if (years.length > 0) {
+  const { data: pData, error: pErr } = await (supabase.from("product_prices") as any)
+    .select("*")
+    .in("year", years);
+  if (pErr) throw pErr; // do NOT swallow: a load failure must not masquerade as "everything unpriced"
+  priceRows = pData ?? [];
+}
 // key: `${product_id}:${year}` -> { price_per_unit, price_unit }
 const priceByKey = new Map<string, { price_per_unit: number; price_unit: string }>(
   priceRows.map((p: any) => [`${p.product_id}:${p.year}`, p]),
@@ -584,17 +643,21 @@ Inside the `.map((row) => ...)` reshape, compute each line's cost from `total_va
 `./unit-convert`):
 
 ```ts
-const year = Number(row.crop_season);
+// crop_season is a 4-digit year string in real data; guard non-numeric so a bad value
+// drops to "unpriced" deterministically rather than NaN-keying.
+const yearNum = /^\d{4}$/.test(String(row.crop_season ?? "")) ? Number(row.crop_season) : null;
 const product_lines = (row.product_lines ?? []).map((l: any) => {
-  const price = priceByKey.get(`${l.product_id}:${year}`) ?? null;
+  const price = yearNum != null ? (priceByKey.get(`${l.product_id}:${yearNum}`) ?? null) : null;
   const density = l.product?.density_lbs_per_gal ?? null;
   const priceRef = price ? { ...price, density_lbs_per_gal: density } : null;
   const total = lineTotalCost(l.total_value, l.total_unit, priceRef);
-  const cpa = costPerAcre(total, l.area_value ?? 0);
+  const acres = acresFrom(l.area_value ?? null, l.area_unit ?? null);
+  const cpa = costPerAcre(total, acres);
   const needs_density =
     !!price && total === null && unitFamily(l.total_unit) !== unitFamily(price.price_unit);
   return {
     ...l,
+    applied_acres: acres, // normalized acres (ac or ha->ac), reused by the field rollup
     cost: {
       cost_per_acre: cpa,
       total_cost: total,
@@ -608,8 +671,10 @@ return { ...row, field_name: ..., farm_name: ..., product_lines };
 ```
 
 > Confirmed against real data: `total_unit` is the bare unit (`lb`, `floz`, `gal`, …) while
-> `rate_unit` is a JD token (`lb1ac-1`). Cost derives from `total_value`/`total_unit` so no
-> token parsing is needed, and uses JD's authoritative applied total.
+> `rate_unit` is a JD token (`lb1ac-1`). Cost derives from `total_value`/`total_unit` (no token
+> parsing, JD-authoritative). Area is normalized via `acresFrom(area_value, area_unit)` — today all
+> rows are `ac`, but `ha` is possible and must convert, not divide raw. Import `acresFrom` from
+> `./cost-calc`.
 
 - [ ] **Step 2: Add a unit test** for the year-keying in `lib/__tests__/cost-calc.test.ts` is N/A (this is glue) — instead verify via the E2E in Task 11. Typecheck now:
 
@@ -632,9 +697,20 @@ git commit -m "feat(pricing): attach derived per-line cost to fetchApplications"
 
 - [ ] **Step 1: Products page — add year state + load prices.**
 
-Add a `year` state (default: latest year present — derive from the rollup rows' seasons, else current calendar year passed via a constant; simplest: a fixed list `[2026,2025,2024]` matching the season filter, default `2026`). Load `fetchProductPrices(year)` (when a specific year) or `fetchProductPriceAverages()` (when "All seasons"), and pass a `priceByProduct` map + an `allSeasons` flag into `ProductsRollupTable`. Wire `upsertProductPrice` / `setProductDensity` / `copyPricesFromYear` handlers (reload on success).
+Load real season years via `fetchSeasonYears(orgId)` (no hardcoded list — #10). Default `year` to the
+newest returned (fallback: current calendar year). Add an `"all"` sentinel for All-seasons. Load
+`fetchProductPrices(year, orgId)` for a specific year, or `fetchProductPriceAverages(orgId)` when
+"all". Pass a `priceByProduct` map + an `allSeasons` flag into `ProductsRollupTable`. Wire
+`upsertProductPrice` / `setProductDensity` / `copyPricesFromYear` handlers (reload on success).
 
-Header gains a year `<select>` (`[color-scheme:dark]`, options 2024/2025/2026 + "All seasons") and, when a specific year is selected, a **"Copy from {year-1}"** button calling `copyPricesFromYear(year-1, year, orgId)` then reload.
+> Replace the existing hardcoded `[2026,2025,2024]` season `<select>` in this file with the
+> data-driven year list from `fetchSeasonYears` (the season filter and the price-year selector
+> should share it). This fixes the pre-existing hardcoded-years shortcut, not just avoid adding a new one.
+
+Header gains a year `<select>` (`[color-scheme:dark]`, options = `fetchSeasonYears` result + "All
+seasons") and, when a specific year is selected, a **"Copy from {year-1}"** button calling
+`copyPricesFromYear(year-1, year, orgId)` then reload (button shown only when `year-1` is in the
+season list, so you can't copy from a year with no data).
 
 - [ ] **Step 2: Rollup table — add Price / Unit / Density columns.**
 
@@ -671,7 +747,7 @@ git commit -m "feat(pricing): set price/unit/density per year on Products + all-
 In `product-line-row.tsx`, read `line.cost`. Render in the cost area:
 - if `cost.cost_per_acre != null`: `` `$${cost.cost_per_acre.toFixed(2)}/ac • $${cost.price_per_unit!.toFixed(2)}/${displayUnit(cost.price_unit)}` ``
 - else if `cost.needs_density`: amber "set density" text linking to /products
-- else: muted `$0.00/ac` (unpriced)
+- else: muted **`—`** (no price set — unknown, NOT `$0.00`; #6). `$0.00` is reserved for a real $0 price.
 
 - [ ] **Step 2: Expanded + collapsed header — application $/ac total.**
 
@@ -703,11 +779,13 @@ git commit -m "feat(pricing): per-line \$/ac • \$/unit + application \$/ac tot
 
 - [ ] **Step 1: Build `FieldCostSummary`.**
 
-Props: `rows: ApplicationWithLines[]` (the field's applications, already cost-attached), `fieldAcres: number`. Local `basis` state (`"spread" | "actual"`, default `"spread"`). Flatten every line into `CostLine[] = { totalCost: line.cost.total_cost, appliedAcres: line.area_value }`, call `fieldCostPerAcre(lines, basis, fieldAcres)`. Render a card: big `$X.XX/ac`, an **Actual / Spread** segmented toggle, and a per-category breakdown (group lines by effective category, sum each, divide per basis). Show a footnote when any line `needs_density` ("N inputs need a density set to price").
+Props: `rows: ApplicationWithLines[]` (the field's applications, already cost-attached), `fieldAcres: number` (already normalized to acres by the caller). Local `basis` state (`"spread" | "actual"`, default `"spread"`). Flatten every line into `CostLine[] = { totalCost: line.cost.total_cost, appliedAcres: line.applied_acres ?? 0 }` (use the normalized `applied_acres` attached in Task 6, NOT raw `area_value`). Call `fieldCostPerAcre(lines, basis, fieldAcres)` for the headline number; render `"—"` when it returns `null` (unpriced / unknown), never `$0.00`.
+
+**Per-category breakdown — same basis formula per group (#4 fix):** group the flattened lines by effective category, then for each group call `fieldCostPerAcre(groupLines, basis, fieldAcres)`. Do NOT sum category dollars and divide once — for `actual` that double-counts mixed-acre lines. Categories whose group returns `null` show "—". Show a footnote when any line `cost.needs_density` ("N inputs need a density set to price") and another when any line is unpriced ("N inputs have no {year} price set").
 
 - [ ] **Step 2: Wire into the field applications page.**
 
-Read the field's boundary acres (from the `fields` row: `boundary_area_value` converted to acres via existing `lib/area-utils`, or `irrigated`/`boundary` as already displayed elsewhere — reuse the field detail's acre value). Render `<FieldCostSummary rows={rows} fieldAcres={acres} />` above the per-field applications list.
+Read the field's boundary acres from the `fields` row and normalize: `acresFrom(boundary_area_value, boundary_area_unit)` (import from `lib/cost-calc`). `boundary_area_unit` can be `ha` just like line area — same ~2.47× trap. If it returns null, pass 0 (the summary will render spread as "—"). Render `<FieldCostSummary rows={rows} fieldAcres={acres ?? 0} />` above the per-field applications list.
 
 - [ ] **Step 3: Typecheck + lint + commit**
 
@@ -740,7 +818,7 @@ Expected: typecheck clean, all Vitest tests PASS (existing 47 + new unit-convert
 
 - [ ] **Step 2: Run** `npx playwright test pricing --project=chromium` → PASS.
 
-- [ ] **Step 3: Real-data sanity (MCP, read-only).** After the build is deployed and Galen sets a couple real prices, spot-check via `execute_sql`: pick one application, compute expected `$/ac` by hand from `rate_value`, `rate_unit`, the price, and density; confirm the UI matches. (Galen-in-the-loop, like the import verification.)
+- [ ] **Step 3: Real-data sanity (MCP, read-only).** After the build is deployed and Galen sets a couple real prices, spot-check via `execute_sql`: pick one application line, compute expected cost by hand from **`total_value` + `total_unit`** (NOT `rate_value`/`rate_unit` — those are the tokenized rate), the price (`price_per_unit`/`price_unit`), and `density_lbs_per_gal` if cross-family; then `$/ac = total_cost / acresFrom(area_value, area_unit)`. Confirm the UI matches. Include at least one cross-family case (priced $/ton, applied in gal) and verify a no-price line shows "—", not $0.00. (Galen-in-the-loop, like the import verification.)
 
 - [ ] **Step 4: Commit**
 
@@ -754,5 +832,17 @@ git commit -m "test(e2e): pricing entry + application cost display"
 ## Self-Review notes
 
 - **Spec coverage:** year-keyed prices (T1), density (T2), converter incl. cross-family (T3), line+field cost incl. actual/spread (T4), CRUD+averages+copy-year (T5), application attach (T6), Products UI + all-seasons average (T7), application $/ac display (T8), field rollup + toggle (T9), tests (T10–11). All spec sections mapped.
-- **Graceful states:** unpriced → $0.00/ac; cross-family no density → "set density" (T6 `needs_density`, surfaced T8/T9).
+- **Graceful states:** unpriced → "—" (NOT $0.00); cross-family no density → "set density" (T6 `needs_density`, surfaced T8/T9); bad/zero denominator → "—".
 - **Resolved (data-checked):** `total_unit` is bare (`lb`/`floz`/`gal`); `rate_unit` is a JD token (`lb1ac-1`). Cost derives from `total_value`/`total_unit` — no token parsing, JD-authoritative total. Verified on real rows (Lime 696,134 lb / 139.23 ac, etc.).
+
+### Codex review (gpt-5.4, 2026-06-02) — findings folded in
+- **#1 spec/verify cited rate_value** → fixed spec Cost-computation section + T11 verification to use `total_value`/`total_unit`.
+- **#2 `area_value` assumed acres** (real bug — `ha` would be ~2.47× wrong) → added `acresFrom(value,unit)` in T4; T6 attaches normalized `applied_acres`; T9 normalizes field acres. Data today is 100% `ac`, but the guard prevents a silent future error.
+- **#3 cross-org price→product** → `fetchProductPrices`/averages/`copyPricesFromYear` all org-scoped (T5).
+- **#4 category breakdown actual basis** → per-group `fieldCostPerAcre(groupLines, basis, …)`, never sum-dollars-then-divide (T9).
+- **#5/#6 fabricated zeros** → `fieldCostPerAcre`/`costPerAcre` return `null` (not 0) for empty/invalid; UI renders "—". $0.00 only for a real $0 price.
+- **#7 `Number(crop_season)`** → guarded with `/^\d{4}$/` test (T6); all 1,013 rows are clean today.
+- **#8 `ozm` vs `oz` / metric** → converter unit-set is source of truth; add `ozm→"oz"` display label; unknown units → null (T3 note). No metric in real data.
+- **#9 swallowed price-load error** → T6 now `throw pErr` instead of `?? []`.
+- **#10 hardcoded year list** → `fetchSeasonYears(orgId)` drives the selector; replaces the existing hardcoded `[2026,2025,2024]` (T5/T7).
+- **Data verification (2026-06-02):** 100% `area_unit='ac'`, 100% 4-digit `crop_season` — so #2/#7 don't bite current data, but guards added for safety.

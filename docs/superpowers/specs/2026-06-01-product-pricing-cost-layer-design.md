@@ -93,18 +93,24 @@ as "cost not computable" and surface a graceful prompt rather than a wrong numbe
 
 ## Cost computation
 
-Pure module (`lib/cost-calc.ts`), unit-tested. Given a product line + its product's price/density:
+Pure module (`lib/cost-calc.ts`), unit-tested. Cost derives from the line's **total applied
+quantity** (`total_value` in the bare `total_unit`, e.g. `lb`/`floz`/`gal`) — NOT the rate
+(`rate_unit` is a JD token like `lb1ac-1`). `total_value` is JD-authoritative.
 
 ```
-lineCostPerAcre   = convertAmount(rate_value, rate_unit, price_unit, density) × price_per_unit
-lineTotalCost     = lineCostPerAcre × area_value          // area_value = acres this line covered
+lineTotalCost  = convertAmount(total_value, total_unit, price_unit, density) × price_per_unit
+lineCostPerAcre = lineTotalCost / appliedAcres            // appliedAcres = acres(area_value, area_unit)
 ```
 
-- **Price selection:** a line's price = `product_prices` row for `(product_id, application.crop_season)`.
-  No row → no price → `$0.00/ac` (graceful, like HP).
-- **No density when needed:** `convertAmount` returns null → line shows "set density", contributes
-  $0 to totals until resolved.
-- **Application total** (`$/ac`) = sum of line `$/ac` across the application's lines.
+- **Area is normalized to acres first.** `area_unit` can be `ac` or `ha` (the app already renders
+  `ha`). `appliedAcres = area_value` when `ac`, `area_value × 2.47105` when `ha`. Dividing by a raw
+  hectare value would understate $/ac by ~2.47×. Unknown area unit → cost not computable (null).
+- **Price selection:** a line's price = `product_prices` row for `(product_id, application.crop_season year)`.
+  No row → price unknown → `cost = null` (renders as "—"/unpriced, **not** `$0.00`).
+- **No density when needed:** `convertAmount` returns null → line shows "set density", `cost = null`.
+- **Null vs zero:** `null` means "unknown" (unpriced, unconvertible, bad denominator) and renders
+  "—"; a genuine `$0.00` only appears when a real $0 price is set. Aggregates exclude null lines.
+- **Application total** (`$/ac`) = sum of priced line `$/ac` (nulls excluded).
 
 ### Field-level rollup — Actual vs Spread toggle
 
@@ -112,13 +118,18 @@ For a field's per-acre input cost, a partial-field application (e.g. 10 ac spray
 field) can be expressed two ways. The field view exposes a toggle (HP's "Imported Machine Rate"
 equivalent):
 
-- **Actual** (per applied acre): `lineTotalCost / area_value` — what it cost on the ground covered.
-- **Spread** (per field acre): `lineTotalCost / field_boundary_acres` — what it adds to the whole
-  field's per-acre cost. This is the "$1/ac across 150 ac" number for true field cost.
+- **Actual** (per applied acre): `Σ (lineTotalCost / lineAppliedAcres)` — what it cost on the
+  ground covered. **Per-line division, summed** — never sum dollars then divide once (mixed-acre
+  lines would give a wrong number).
+- **Spread** (per field acre): `Σ lineTotalCost / field_acres` — what it adds to the whole field's
+  per-acre cost. This is the "$1/ac across 150 ac" number for true field cost.
 
-Both derive from the same stored data (`lineTotalCost`, `area_value`, field boundary acres).
-Application **detail lines** always show applied-acre (matches HP detail); only the **field
-rollup** honors the toggle.
+Both derive from the same stored data (`lineTotalCost`, normalized applied acres, field acres —
+field acres also normalized from `boundary_area_value`/`boundary_area_unit`). The **per-category
+breakdown uses the same basis formula per group** (so "actual" sums per-line $/ac within the
+category, not category-dollars ÷ once). Lines with `null` cost are excluded from both bases.
+`field_acres ≤ 0` → spread is `null` ("—"), not `0`. Application **detail lines** always show
+applied-acre; only the **field rollup** honors the toggle.
 
 ---
 
