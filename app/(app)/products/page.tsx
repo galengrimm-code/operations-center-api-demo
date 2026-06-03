@@ -17,7 +17,7 @@ import {
 import { ProductsRollupTable } from "@/components/applications/products-rollup-table";
 import { exportProductsExcel, exportProductsPdf } from "@/lib/products-export";
 import { useClientFilter } from "@/contexts/client-filter-context";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Wrench } from "lucide-react";
 
 const SELECT_CLASS =
   "rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-sm text-slate-200 [color-scheme:dark] focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20";
@@ -54,6 +54,9 @@ export default function ProductsPage() {
   const [bulkUnit, setBulkUnit] = useState<string>("ton");
   const [applyingBulkUnit, setApplyingBulkUnit] = useState(false);
   const [bulkUnitCount, setBulkUnitCount] = useState<number | null>(null);
+  // Bulk/occasional actions (copy-year, set-unit-by-category) live behind a deliberate toggle so
+  // they can't be hit by accident from the filter row.
+  const [showBulkTools, setShowBulkTools] = useState(false);
 
   // Bumped by mutation handlers to trigger a reload through the single loader effect below.
   const [refreshKey, setRefreshKey] = useState(0);
@@ -210,6 +213,20 @@ export default function ProductsPage() {
               <FileText className="h-4 w-4" />
               PDF
             </button>
+            {orgId && !allSeasons && (
+              <button
+                type="button"
+                onClick={() => setShowBulkTools((v) => !v)}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                  showBulkTools
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-white/[0.08] bg-white/[0.03] text-slate-200 hover:border-emerald-500/30 hover:text-emerald-300"
+                }`}
+              >
+                <Wrench className="h-4 w-4" />
+                Bulk tools
+              </button>
+            )}
           </div>
         </header>
         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -242,63 +259,67 @@ export default function ProductsPage() {
             <option value="other">Other</option>
           </select>
 
-          {/* Editing controls (copy-year, bulk set-unit) only in a specific year — hidden when
-              "All seasons" is showing averaged, read-only prices. */}
-          {orgId && !allSeasons && (
-            <>
-              {/* Copy-from-prior-year button */}
-              {showCopyButton && (
-                <button
-                  type="button"
-                  disabled={copyingPrices}
-                  onClick={handleCopyFromPriorYear}
-                  className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-sm text-slate-300 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
-                >
-                  {copyingPrices ? "Copying…" : `Copy from ${yearNum! - 1}`}
-                </button>
-              )}
+        </div>
 
-              {/* Bulk unit setter */}
-              <span className="text-xs text-slate-500">Bulk:</span>
-              <select
-                className={SELECT_CLASS}
-                value={bulkCategory}
-                onChange={(e) => setBulkCategory(e.target.value)}
-              >
-                <option value="fertilizer">Fertilizer</option>
-                <option value="chemical">Chemical</option>
-                <option value="seed">Seed</option>
-                <option value="adjuvant">Adjuvant</option>
-                <option value="other">Other</option>
-              </select>
-              <select
-                className={SELECT_CLASS}
-                value={bulkUnit}
-                onChange={(e) => setBulkUnit(e.target.value)}
-              >
-                <option value="ozm">ozm</option>
-                <option value="lb">lb</option>
-                <option value="ton">ton</option>
-                <option value="floz">floz</option>
-                <option value="pt">pt</option>
-                <option value="qt">qt</option>
-                <option value="gal">gal</option>
-              </select>
+        {/* Bulk tools panel — collapsed by default; deliberate open avoids accidental bulk writes.
+            Set unit per-category here only for genuinely uniform categories (e.g. fertilizer -> ton);
+            mixed categories like chemicals should use the per-product unit picker in each row. */}
+        {orgId && !allSeasons && showBulkTools && (
+          <div className="glass mb-4 flex flex-wrap items-center gap-3 rounded-xl p-3">
+            {showCopyButton && (
               <button
                 type="button"
-                disabled={applyingBulkUnit}
-                onClick={handleApplyBulkUnit}
-                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-sm text-slate-300 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
+                disabled={copyingPrices}
+                onClick={handleCopyFromPriorYear}
+                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-sm text-slate-300 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
               >
-                {applyingBulkUnit
-                  ? "Applying…"
-                  : bulkUnitCount !== null
-                    ? `Set unit on all ${bulkCategory} (${bulkUnitCount})`
-                    : `Set unit on all ${bulkCategory}`}
+                {copyingPrices ? "Copying…" : `Copy prices from ${yearNum! - 1}`}
               </button>
-            </>
-          )}
-        </div>
+            )}
+
+            <span className="text-xs text-slate-500">Set unit for all</span>
+            <select
+              className={SELECT_CLASS}
+              value={bulkCategory}
+              onChange={(e) => setBulkCategory(e.target.value)}
+            >
+              <option value="fertilizer">Fertilizer</option>
+              <option value="chemical">Chemical</option>
+              <option value="seed">Seed</option>
+              <option value="adjuvant">Adjuvant</option>
+              <option value="other">Other</option>
+            </select>
+            <span className="text-xs text-slate-500">to</span>
+            <select
+              className={SELECT_CLASS}
+              value={bulkUnit}
+              onChange={(e) => setBulkUnit(e.target.value)}
+            >
+              <option value="ozm">ozm</option>
+              <option value="lb">lb</option>
+              <option value="ton">ton</option>
+              <option value="floz">floz</option>
+              <option value="pt">pt</option>
+              <option value="qt">qt</option>
+              <option value="gal">gal</option>
+            </select>
+            <button
+              type="button"
+              disabled={applyingBulkUnit}
+              onClick={handleApplyBulkUnit}
+              className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              {applyingBulkUnit
+                ? "Applying…"
+                : bulkUnitCount !== null
+                  ? `Apply (${bulkUnitCount} set)`
+                  : "Apply"}
+            </button>
+            <span className="text-xs text-slate-500">
+              Tip: chemicals vary by product — set those per row instead.
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className="glass rounded-xl border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
