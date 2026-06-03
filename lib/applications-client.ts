@@ -97,7 +97,13 @@ export async function fetchApplications(
       const product_lines = (row.product_lines ?? []).map((l: any) => {
         const price = yearNum != null ? (priceByKey.get(`${l.product_id}:${yearNum}`) ?? null) : null;
         const density = l.product?.density_lbs_per_gal ?? null;
-        const priceRef = price ? { ...price, density_lbs_per_gal: density } : null;
+        const priceRef = price
+          ? {
+              ...price,
+              density_lbs_per_gal: density,
+              nutrient_content_pct: l.product?.nutrient_content_pct ?? null,
+            }
+          : null;
         const total = lineTotalCost(l.total_value, l.total_unit, priceRef);
         const acres = acresFrom(l.area_value ?? null, l.area_unit ?? null);
         const cpa = costPerAcre(total, acres);
@@ -369,6 +375,60 @@ export async function setProductDensity(productId: string, density: number | nul
     .update({ density_lbs_per_gal: density, updated_at: new Date().toISOString() })
     .eq("id", productId);
   if (error) throw error;
+}
+
+// % of the priced product that the applied substance represents (e.g. NH3 = 82% N).
+// Null = 100% (applied is the product). The cost engine scales the converted amount by this.
+export async function setProductNutrientContent(
+  productId: string,
+  pct: number | null,
+): Promise<void> {
+  const { error } = await (supabase.from("products") as any)
+    .update({ nutrient_content_pct: pct, updated_at: new Date().toISOString() })
+    .eq("id", productId);
+  if (error) throw error;
+}
+
+// Bulk-set the preferred pricing unit for every product in a category (e.g. all fertilizers -> ton).
+// Updates products.price_unit_default (drives the price picker's default) AND, when `year` is given,
+// rewrites the price_unit on that year's existing price rows so displayed costs reflect it immediately.
+// Returns the number of products whose default was set.
+export async function setCategoryPriceUnit(
+  category: string,
+  unit: string,
+  orgId: string,
+  year?: number,
+): Promise<number> {
+  const { data: u } = await supabase.auth.getUser();
+  const userId = u.user?.id;
+  if (!userId) throw new Error("not authenticated");
+
+  // Which products in this category (org-scoped)?
+  const { data: prods, error: prodErr } = await (supabase.from("products") as any)
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("product_category", category);
+  if (prodErr) throw prodErr;
+  const ids = (prods ?? []).map((p: any) => p.id as string);
+  if (ids.length === 0) return 0;
+
+  // Set the per-product default pricing unit.
+  const { error: defErr } = await (supabase.from("products") as any)
+    .update({ price_unit_default: unit, updated_at: new Date().toISOString() })
+    .in("id", ids);
+  if (defErr) throw defErr;
+
+  // Re-unit this year's existing price rows so the change shows immediately (org + user scoped).
+  if (year != null) {
+    const { error: priceErr } = await (supabase.from("product_prices") as any)
+      .update({ price_unit: unit, updated_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("org_id", orgId)
+      .eq("year", year)
+      .in("product_id", ids);
+    if (priceErr) throw priceErr;
+  }
+  return ids.length;
 }
 
 // Bulk-copy a year's prices into another year (HP "Inputs Copy"). Does not overwrite existing.
