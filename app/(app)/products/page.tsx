@@ -55,15 +55,19 @@ export default function ProductsPage() {
   const [applyingBulkUnit, setApplyingBulkUnit] = useState(false);
   const [bulkUnitCount, setBulkUnitCount] = useState<number | null>(null);
 
-  // Load season years once orgId is available
+  // Bumped by mutation handlers to trigger a reload through the single loader effect below.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const reload = () => setRefreshKey((k) => k + 1);
+
+  // Load season years once orgId is available.
   useEffect(() => {
     if (!orgId) return;
     fetchSeasonYears(orgId)
       .then((years) => {
         setSeasonYears(years);
-        // Default to the newest year (editable) rather than the averaged read-only view.
+        // Default to the newest year (editable) — but never clobber a choice the user already made.
         if (years.length > 0) {
-          setYear(String(years[0]));
+          setYear((prev) => (prev === "all" ? String(years[0]) : prev));
         }
       })
       .catch(() => {
@@ -71,42 +75,50 @@ export default function ProductsPage() {
       });
   }, [orgId]);
 
-  function loadRollup() {
+  // ONE loader for both the rollup totals AND the year's prices, so they can never desync.
+  // A `cancelled` guard drops stale results when the year/farm changes mid-flight.
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     fetchProductsRollup(year === "all" ? undefined : year, selectedFarm ?? undefined)
-      .then(setRows)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false));
-  }
-  useEffect(loadRollup, [year, selectedFarm]);
+      .then((data) => {
+        if (!cancelled) setRows(data);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  // Load prices for the selected year (averaged + read-only when "all").
-  function loadPrices() {
-    if (!orgId) return;
-    if (year === "all") {
-      fetchProductPriceAverages(orgId)
-        .then(setAvgByProduct)
-        .catch(() => {
-          // Non-fatal
-        });
-      setPriceByProduct(new Map());
-    } else {
-      const yr = Number(year);
-      fetchProductPrices(yr, orgId)
-        .then((prices) => {
-          const map = new Map<string, { price_per_unit: number; price_unit: string }>();
-          for (const p of prices) {
-            map.set(p.product_id, { price_per_unit: p.price_per_unit, price_unit: p.price_unit });
-          }
-          setPriceByProduct(map);
-        })
-        .catch(() => {
-          // Non-fatal
-        });
-      setAvgByProduct(new Map());
+    if (orgId) {
+      if (year === "all") {
+        fetchProductPriceAverages(orgId)
+          .then((m) => {
+            if (!cancelled) {
+              setAvgByProduct(m);
+              setPriceByProduct(new Map());
+            }
+          })
+          .catch(() => {});
+      } else {
+        fetchProductPrices(Number(year), orgId)
+          .then((prices) => {
+            if (cancelled) return;
+            const map = new Map<string, { price_per_unit: number; price_unit: string }>();
+            for (const p of prices) {
+              map.set(p.product_id, { price_per_unit: p.price_per_unit, price_unit: p.price_unit });
+            }
+            setPriceByProduct(map);
+            setAvgByProduct(new Map());
+          })
+          .catch(() => {});
+      }
     }
-  }
-  useEffect(loadPrices, [year, orgId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [year, selectedFarm, orgId, refreshKey]);
 
   const visibleRows = category
     ? rows.filter((r) => (r.product?.product_category ?? "") === category)
@@ -127,12 +139,12 @@ export default function ProductsPage() {
       pricePerUnit: value,
       priceUnit: unit,
     });
-    loadPrices();
+    reload();
   }
 
   async function handleSetDensity(productId: string, value: number | null) {
     await setProductDensity(productId, value);
-    loadRollup();
+    reload();
   }
 
   async function handleCopyFromPriorYear() {
@@ -140,7 +152,7 @@ export default function ProductsPage() {
     setCopyingPrices(true);
     try {
       await copyPricesFromYear(yearNum - 1, yearNum, orgId);
-      loadPrices();
+      reload();
     } finally {
       setCopyingPrices(false);
     }
@@ -148,7 +160,7 @@ export default function ProductsPage() {
 
   async function handleSetContent(productId: string, value: number | null) {
     await setProductNutrientContent(productId, value);
-    loadRollup();
+    reload();
   }
 
   async function handleApplyBulkUnit() {
@@ -163,8 +175,7 @@ export default function ProductsPage() {
         allSeasons ? undefined : Number(year),
       );
       setBulkUnitCount(count);
-      loadPrices();
-      loadRollup();
+      reload();
     } finally {
       setApplyingBulkUnit(false);
     }
@@ -205,20 +216,15 @@ export default function ProductsPage() {
           {/* ONE year selector: drives the rollup totals AND the prices shown/edited.
               "All seasons" => all totals + averaged read-only prices; a year => that year's totals + editable prices. */}
           <span className="text-xs text-slate-500">Season:</span>
+          {/* Only real season years are offered — no hardcoded fallback, so you can't price into a
+              year that has no data while the list is still loading. */}
           <select className={SELECT_CLASS} value={year} onChange={(e) => setYear(e.target.value)}>
             <option value="all">All seasons (avg prices)</option>
-            {seasonYears.length > 0
-              ? seasonYears.map((y) => (
-                  <option key={y} value={String(y)}>
-                    {y}
-                  </option>
-                ))
-              : /* Fallback to static list until years load */
-                [2026, 2025, 2024].map((y) => (
-                  <option key={y} value={String(y)}>
-                    {y}
-                  </option>
-                ))}
+            {seasonYears.map((y) => (
+              <option key={y} value={String(y)}>
+                {y}
+              </option>
+            ))}
           </select>
 
           {/* Category filter */}
@@ -235,7 +241,9 @@ export default function ProductsPage() {
             <option value="other">Other</option>
           </select>
 
-          {orgId && (
+          {/* Editing controls (copy-year, bulk set-unit) only in a specific year — hidden when
+              "All seasons" is showing averaged, read-only prices. */}
+          {orgId && !allSeasons && (
             <>
               {/* Copy-from-prior-year button */}
               {showCopyButton && (
@@ -309,7 +317,7 @@ export default function ProductsPage() {
             onSetContent={handleSetContent}
             onEditCategory={async (productId, cat) => {
               await editProductCategory(productId, cat);
-              loadRollup();
+              reload();
             }}
           />
         )}
