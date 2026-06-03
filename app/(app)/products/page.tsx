@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import {
   fetchProductsRollup,
@@ -62,15 +62,26 @@ export default function ProductsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const reload = () => setRefreshKey((k) => k + 1);
 
+  const didInitialDefault = useRef(false);
+  const lastLoadedYear = useRef<string | null>(null);
+
   // Load season years once orgId is available.
   useEffect(() => {
     if (!orgId) return;
     fetchSeasonYears(orgId)
       .then((years) => {
         setSeasonYears(years);
-        // Default to the newest year (editable) — but never clobber a choice the user already made.
-        if (years.length > 0) {
+        if (years.length === 0) return;
+        if (!didInitialDefault.current) {
+          // First landing: newest year — but don't clobber a choice the user made during load.
+          didInitialDefault.current = true;
           setYear((prev) => (prev === "all" ? String(years[0]) : prev));
+        } else {
+          // Org changed: keep "all" or a year that's valid for the new org; otherwise fall back
+          // to the newest so the selector never strands an invalid/empty year.
+          setYear((prev) =>
+            prev === "all" || years.includes(Number(prev)) ? prev : String(years[0]),
+          );
         }
       })
       .catch(() => {
@@ -83,6 +94,15 @@ export default function ProductsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // When the YEAR changes (not just a mutation refresh), drop the prior year's price maps up
+    // front so we never render last year's prices against this year's totals — worst case a brief
+    // "—" while the new prices load, never a wrong number.
+    if (lastLoadedYear.current !== year) {
+      setPriceByProduct(new Map());
+      setAvgByProduct(new Map());
+    }
+    lastLoadedYear.current = year;
+
     fetchProductsRollup(year === "all" ? undefined : year, selectedFarm ?? undefined)
       .then((data) => {
         if (!cancelled) setRows(data);
@@ -103,7 +123,10 @@ export default function ProductsPage() {
               setPriceByProduct(new Map());
             }
           })
-          .catch(() => {});
+          .catch(() => {
+            // On failure, leave prices empty ("—") rather than showing stale prices for another year.
+            if (!cancelled) setAvgByProduct(new Map());
+          });
       } else {
         fetchProductPrices(Number(year), orgId)
           .then((prices) => {
@@ -115,7 +138,9 @@ export default function ProductsPage() {
             setPriceByProduct(map);
             setAvgByProduct(new Map());
           })
-          .catch(() => {});
+          .catch(() => {
+            if (!cancelled) setPriceByProduct(new Map());
+          });
       }
     }
     return () => {
@@ -167,7 +192,9 @@ export default function ProductsPage() {
   }
 
   async function handleApplyBulkUnit() {
-    if (!orgId) return;
+    // Read-only contract: never write while averaging across seasons (defense-in-depth; the
+    // panel is also hidden in this mode).
+    if (!orgId || allSeasons) return;
     setApplyingBulkUnit(true);
     setBulkUnitCount(null);
     try {
