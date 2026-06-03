@@ -216,15 +216,16 @@ export default function ProductsPage() {
           {/* ONE year selector: drives the rollup totals AND the prices shown/edited.
               "All seasons" => all totals + averaged read-only prices; a year => that year's totals + editable prices. */}
           <span className="text-xs text-slate-500">Season:</span>
-          {/* Only real season years are offered — no hardcoded fallback, so you can't price into a
+          {/* Specific seasons first (newest = default), then the all-seasons average last.
+              Only real season years are offered — no hardcoded fallback, so you can't price into a
               year that has no data while the list is still loading. */}
           <select className={SELECT_CLASS} value={year} onChange={(e) => setYear(e.target.value)}>
-            <option value="all">All seasons (avg prices)</option>
             {seasonYears.map((y) => (
               <option key={y} value={String(y)}>
                 {y}
               </option>
             ))}
+            <option value="all">All Seasons (avg)</option>
           </select>
 
           {/* Category filter */}
