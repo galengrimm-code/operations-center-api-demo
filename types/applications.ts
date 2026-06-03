@@ -21,6 +21,8 @@ export interface Product {
   product_category_source: "seed" | "user" | null;
   default_unit: string | null;
   density_lbs_per_gal: number | null;
+  nutrient_content_pct: number | null;
+  price_unit_default: string | null;
   first_seen_at: string;
   last_seen_at: string;
   created_at: string;
