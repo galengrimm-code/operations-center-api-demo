@@ -15,7 +15,9 @@ import {
   setCategoryPriceUnit,
 } from "@/lib/applications-client";
 import { ProductsRollupTable } from "@/components/applications/products-rollup-table";
+import { exportProductsExcel, exportProductsPdf } from "@/lib/products-export";
 import { useClientFilter } from "@/contexts/client-filter-context";
+import { Download, FileText } from "lucide-react";
 
 const SELECT_CLASS =
   "rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-sm text-slate-200 [color-scheme:dark] focus:border-emerald-500/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/20";
@@ -174,11 +176,33 @@ export default function ProductsPage() {
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold text-white">Products</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Quantities applied across all fields, grouped by product.
-          </p>
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Products</h1>
+            <p className="mt-1 text-sm text-slate-400">
+              Quantities applied across all fields, grouped by product.
+            </p>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => exportProductsExcel(visibleRows, priceByProduct, allSeasons, avgByProduct)}
+              disabled={visibleRows.length === 0}
+              className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => exportProductsPdf(visibleRows, priceByProduct, allSeasons, avgByProduct)}
+              disabled={visibleRows.length === 0}
+              className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
+            >
+              <FileText className="h-4 w-4" />
+              PDF
+            </button>
+          </div>
         </header>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           {/* Season filter (application data) */}
