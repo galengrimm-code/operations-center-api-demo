@@ -19,6 +19,8 @@ const PRICE_UNITS = ["ozm", "lb", "ton", "floz", "pt", "qt", "gal"] as const;
 type PriceUnit = (typeof PRICE_UNITS)[number];
 
 function defaultPriceUnit(product: Product): PriceUnit {
+  const saved = product.price_unit_default ?? "";
+  if ((PRICE_UNITS as readonly string[]).includes(saved)) return saved as PriceUnit;
   const du = product.default_unit ?? "";
   if ((PRICE_UNITS as readonly string[]).includes(du)) return du as PriceUnit;
   return "lb";
@@ -93,6 +95,55 @@ function PriceCell({
   );
 }
 
+// Per-row nutrient content % editor
+function ContentCell({
+  row,
+  onSetContent,
+}: {
+  row: RollupRow;
+  onSetContent: (productId: string, value: number | null) => void;
+}) {
+  const [inputVal, setInputVal] = useState<string>(
+    row.product.nutrient_content_pct != null ? String(row.product.nutrient_content_pct) : "",
+  );
+
+  function commit() {
+    const trimmed = inputVal.trim();
+    if (trimmed === "") {
+      onSetContent(row.product.id, null);
+      return;
+    }
+    const num = Number(trimmed);
+    if (isNaN(num) || num <= 0 || num > 100) return;
+    onSetContent(row.product.id, num);
+  }
+
+  const isEmpty = inputVal.trim() === "";
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        min={0.01}
+        max={100}
+        step="any"
+        placeholder="100"
+        value={inputVal}
+        onChange={(e) => setInputVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        onBlur={commit}
+        className={`${INPUT_CLASS} ${isEmpty ? "text-slate-500 placeholder:text-slate-600" : ""}`}
+      />
+      {!isEmpty && <span className="text-xs text-slate-500">%</span>}
+    </div>
+  );
+}
+
 // Per-row density editor
 function DensityCell({
   row,
@@ -148,6 +199,7 @@ export function ProductsRollupTable({
   avgByProduct,
   onSetPrice,
   onSetDensity,
+  onSetContent,
   onEditCategory,
 }: {
   rows: RollupRow[];
@@ -156,6 +208,7 @@ export function ProductsRollupTable({
   avgByProduct?: Map<string, { avg: number; unit: string }>;
   onSetPrice: (productId: string, value: number, unit: string) => void;
   onSetDensity: (productId: string, value: number | null) => void;
+  onSetContent: (productId: string, value: number | null) => void;
   onEditCategory: (productId: string, category: string) => Promise<void>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("total");
@@ -254,6 +307,7 @@ export function ProductsRollupTable({
             <Header k="category" label="Category" />
             <Header k="price" label="Price" />
             <th className="px-3 py-2 text-left text-xs uppercase text-slate-400">Density</th>
+            <th className="px-3 py-2 text-left text-xs uppercase text-slate-400">Content</th>
             <Header k="total" label="Total Applied" align="right" />
             <Header k="fields" label="Fields" align="right" />
             <Header k="operations" label="Operations" align="right" />
@@ -295,6 +349,9 @@ export function ProductsRollupTable({
               </td>
               <td className="px-3 py-2">
                 <DensityCell row={r} onSetDensity={onSetDensity} />
+              </td>
+              <td className="px-3 py-2">
+                <ContentCell row={r} onSetContent={onSetContent} />
               </td>
               <td className="font-mono-data px-3 py-2 text-right text-slate-200">
                 {r.total_value_sum.toFixed(2)} {displayUnit(r.total_unit)}

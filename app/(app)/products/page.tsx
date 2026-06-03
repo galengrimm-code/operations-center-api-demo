@@ -11,6 +11,8 @@ import {
   upsertProductPrice,
   setProductDensity,
   copyPricesFromYear,
+  setProductNutrientContent,
+  setCategoryPriceUnit,
 } from "@/lib/applications-client";
 import { ProductsRollupTable } from "@/components/applications/products-rollup-table";
 import { useClientFilter } from "@/contexts/client-filter-context";
@@ -44,6 +46,12 @@ export default function ProductsPage() {
   >(new Map());
 
   const [copyingPrices, setCopyingPrices] = useState(false);
+
+  // Bulk unit-setter state
+  const [bulkCategory, setBulkCategory] = useState<string>("fertilizer");
+  const [bulkUnit, setBulkUnit] = useState<string>("ton");
+  const [applyingBulkUnit, setApplyingBulkUnit] = useState(false);
+  const [bulkUnitCount, setBulkUnitCount] = useState<number | null>(null);
 
   // Load season years once orgId is available
   useEffect(() => {
@@ -139,6 +147,30 @@ export default function ProductsPage() {
     }
   }
 
+  async function handleSetContent(productId: string, value: number | null) {
+    await setProductNutrientContent(productId, value);
+    loadRollup();
+  }
+
+  async function handleApplyBulkUnit() {
+    if (!orgId) return;
+    setApplyingBulkUnit(true);
+    setBulkUnitCount(null);
+    try {
+      const count = await setCategoryPriceUnit(
+        bulkCategory,
+        bulkUnit,
+        orgId,
+        allSeasons ? undefined : Number(priceYear),
+      );
+      setBulkUnitCount(count);
+      loadPrices();
+      loadRollup();
+    } finally {
+      setApplyingBulkUnit(false);
+    }
+  }
+
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-950 p-6">
       <div className="mx-auto max-w-7xl">
@@ -208,6 +240,45 @@ export default function ProductsPage() {
                   {copyingPrices ? "Copying…" : `Copy from ${priceYearNum! - 1}`}
                 </button>
               )}
+
+              {/* Bulk unit setter */}
+              <span className="text-xs text-slate-500">Bulk:</span>
+              <select
+                className={SELECT_CLASS}
+                value={bulkCategory}
+                onChange={(e) => setBulkCategory(e.target.value)}
+              >
+                <option value="fertilizer">Fertilizer</option>
+                <option value="chemical">Chemical</option>
+                <option value="seed">Seed</option>
+                <option value="adjuvant">Adjuvant</option>
+                <option value="other">Other</option>
+              </select>
+              <select
+                className={SELECT_CLASS}
+                value={bulkUnit}
+                onChange={(e) => setBulkUnit(e.target.value)}
+              >
+                <option value="ozm">ozm</option>
+                <option value="lb">lb</option>
+                <option value="ton">ton</option>
+                <option value="floz">floz</option>
+                <option value="pt">pt</option>
+                <option value="qt">qt</option>
+                <option value="gal">gal</option>
+              </select>
+              <button
+                type="button"
+                disabled={applyingBulkUnit}
+                onClick={handleApplyBulkUnit}
+                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-sm text-slate-300 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
+              >
+                {applyingBulkUnit
+                  ? "Applying…"
+                  : bulkUnitCount !== null
+                    ? `Set unit on all ${bulkCategory} (${bulkUnitCount})`
+                    : `Set unit on all ${bulkCategory}`}
+              </button>
             </>
           )}
         </div>
@@ -227,6 +298,7 @@ export default function ProductsPage() {
             avgByProduct={avgByProduct}
             onSetPrice={handleSetPrice}
             onSetDensity={handleSetDensity}
+            onSetContent={handleSetContent}
             onEditCategory={async (productId, cat) => {
               await editProductCategory(productId, cat);
               loadRollup();
