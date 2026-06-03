@@ -196,3 +196,18 @@
 .irrigation-dark-wrapper .bg-slate-300 {
   background-color: #475569 !important;
 }
+
+/* Native dropdowns: dark popup + readable option text on all platforms.
+   color-scheme:dark alone doesn't fix faint option text on Windows Chrome —
+   the option elements need explicit colors. Applies app-wide. */
+select {
+  color-scheme: dark;
+}
+select option {
+  background-color: #1e293b; /* slate-800 */
+  color: #f1f5f9; /* slate-100 */
+}
+select option:checked {
+  background-color: #334155; /* slate-700 */
+  color: #ffffff;
+}
