@@ -3,7 +3,27 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { displayUnit } from "@/lib/unit-display";
+import { appliedInPriceUnit } from "@/lib/cost-calc";
 import type { Product } from "@/types/applications";
+
+function unitLabel(u: string | null): string {
+  return u === "ozm" ? "oz" : displayUnit(u);
+}
+
+// "Total Applied" shown in the product's purchase unit when one is set (e.g. 97,000 floz -> 757.81 gal;
+// lb N -> tons of product via content). Falls back to the raw applied total when not convertible.
+function totalAppliedDisplay(r: RollupRow, priceUnit: string | null): string {
+  if (priceUnit) {
+    const converted = appliedInPriceUnit(r.total_value_sum, r.total_unit, {
+      price_per_unit: 0, // unused for the applied-amount calc
+      price_unit: priceUnit,
+      density_lbs_per_gal: r.product.density_lbs_per_gal,
+      nutrient_content_pct: r.product.nutrient_content_pct,
+    });
+    if (converted != null) return `${converted.toFixed(2)} ${unitLabel(priceUnit)}`;
+  }
+  return `${r.total_value_sum.toFixed(2)} ${unitLabel(r.total_unit)}`;
+}
 
 interface RollupRow {
   product: Product;
@@ -354,7 +374,12 @@ export function ProductsRollupTable({
                 <ContentCell row={r} onSetContent={onSetContent} />
               </td>
               <td className="font-mono-data px-3 py-2 text-right text-slate-200">
-                {r.total_value_sum.toFixed(2)} {displayUnit(r.total_unit)}
+                {totalAppliedDisplay(
+                  r,
+                  allSeasons
+                    ? (avgByProduct?.get(r.product.id)?.unit ?? null)
+                    : (priceByProduct.get(r.product.id)?.price_unit ?? null),
+                )}
               </td>
               <td className="font-mono-data px-3 py-2 text-right text-slate-200">
                 {r.field_count}

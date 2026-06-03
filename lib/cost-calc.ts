@@ -23,18 +23,33 @@ export type FieldBasis = "actual" | "spread";
  * (`total_value` in bare `total_unit`, e.g. "lb") — NOT the rate (whose `rate_unit` is a
  * JD token like "lb1ac-1"). null when no price or conversion is impossible.
  */
-export function lineTotalCost(
+/**
+ * The applied total expressed in the product's PRICE/PURCHASE unit (convert + content adjustment,
+ * NO price multiply). e.g. 97,000 floz applied -> 757.8 gal purchased; 14,642 lb N -> 8.928 ton of
+ * NH3 product at 82%. Used to show "Total Applied" in the unit you actually buy/price in. null when
+ * not convertible (cross-family with no density, unknown unit, etc.).
+ */
+export function appliedInPriceUnit(
   totalValue: number | null,
   totalUnit: string | null,
   price: PriceRef | null,
 ): number | null {
   if (price == null || totalValue == null || totalUnit == null) return null;
-  let amountInPriceUnit = convertAmount(totalValue, totalUnit, price.price_unit, price.density_lbs_per_gal);
-  if (amountInPriceUnit == null) return null;
-  // Applied substance is a fraction of the priced product (e.g. lb N within a ton of NH3 at 82%):
-  // scale the converted amount up to the product basis before pricing.
+  let amt = convertAmount(totalValue, totalUnit, price.price_unit, price.density_lbs_per_gal);
+  if (amt == null) return null;
+  // Applied substance is a fraction of the priced product (e.g. lb N within a ton of NH3 at 82%).
   const content = price.nutrient_content_pct;
-  if (content != null && content > 0) amountInPriceUnit = amountInPriceUnit / (content / 100);
+  if (content != null && content > 0) amt = amt / (content / 100);
+  return amt;
+}
+
+export function lineTotalCost(
+  totalValue: number | null,
+  totalUnit: string | null,
+  price: PriceRef | null,
+): number | null {
+  const amountInPriceUnit = appliedInPriceUnit(totalValue, totalUnit, price);
+  if (amountInPriceUnit == null || price == null) return null;
   return amountInPriceUnit * price.price_per_unit;
 }
 
