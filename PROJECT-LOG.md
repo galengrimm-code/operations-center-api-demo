@@ -13,6 +13,23 @@
 
 ---
 
+## 2026-06-03 — Input-pricing cost layer shipped; NH3 nutrient-vs-product cost model; JD scope requirement
+
+**Milestone:** Built and shipped the full **input-pricing cost layer** — the Harvest-Profit-style per-acre input cost feature. Year-keyed prices set on the Products page flow into `$/ac` on every application line + a per-field cost summary (Actual vs Spread basis). This is the core of the plan to retire the $1,600/yr Harvest Profit subscription. Spec at `docs/superpowers/specs/2026-06-01-product-pricing-cost-layer-design.md`, plan at `docs/superpowers/plans/2026-06-02-product-pricing-cost-layer.md`. Built via subagent-driven TDD (11 tasks), Codex-reviewed twice.
+
+**Key data-model decisions:**
+- **Year-keyed prices, not effective-date.** `operations_center.product_prices (user_id, org_id, product_id, year, price_per_unit, price_unit)`, unique on `(user_id, org_id, product_id, year)`. Supersedes the `product_price_events(effective_date,...)` sketch in the spray-sync spec — year granularity matches how Galen prices (and the `crop_season` on operations) and is simpler. An application picks its price by `(product_id, crop_season year)`.
+- **Cost derives from `total_value`/`total_unit` (bare unit like `lb`/`floz`/`gal`), NEVER `rate_unit`** (which is a JD token like `lb1ac-1`). `total_value` is JD-authoritative. Verified against real rows. Area always normalized to acres via `acresFrom` (ha→ac ×2.47105) before any `$/ac` division — a raw hectare value would undercount ~2.47×.
+- **Unit conversion** (`lib/unit-convert.ts`): weight (ozm/lb/ton) + volume (floz/pt/qt/gal) fixed factors; cross-family (priced $/ton, applied in gal) via per-product `density_lbs_per_gal` (lbs/gal). Returns null (renders "—") when not convertible — never a fabricated $0.00.
+
+**NH3 nutrient-content model (`products.nutrient_content_pct`):** John Deere records anhydrous ammonia application as **pounds of actual N**, but it's purchased/priced by the **ton of total product**, and NH3 is **82% N**. So a plain lb→ton conversion undercounts the cost by ~18% (gives tons-of-N, not tons-of-product). The fix: a per-product "nutrient content %" (default 100% = applied is the product). Cost scales `lb N ÷ (pct/100) → lb product → tons → × $/ton`. This generalizes to any input recorded by nutrient but bought by product. Most fertilizers (potash, gypsum, MAP) are recorded *as product* and need no factor — just lb→ton. **NH3 is the main case.** Real data: NH3 in org 600550 is 74 lines, applied in `lb`, avg 14,642 lb/op.
+
+**Operational finding — JD OAuth scopes:** Spray/application/chemical/tank-mix data requires **`ag2`+`ag3`** scopes; `ag1` alone only exposes harvest/seeding. The 2026-05-28 security trim (to `ag1 org1 work1`) silently broke the spray import — JD 403s the application calls, swallowed as "0 results." Restored to `ag1 ag2 ag3 org1 work1 offline_access` (`lib/john-deere-client.ts`). Scopes bake into the OAuth grant at consent — a token refresh can't add them; the user must reconnect. **Rule:** don't trim `ag2`/`ag3` without breaking the applications feature.
+
+**Real spray data is now imported:** 1,013 application ops across 69 fields (org 600550). The all-fields import must be **chunked per-field** — a single all-fields call 504s on real data (~600 sequential JD calls).
+
+---
+
 ## 2026-05-29 — Auth must use cookie sessions (`createBrowserClient`), not localStorage; middleware regression
 
 **Finding/decision:** The `route-protection-gap` fix from 2026-05-28 (Task 0.3) shipped a **live regression**. `middleware.ts` validates the session server-side via `@supabase/ssr` `createServerClient`, which reads **cookies**. But `lib/supabase.ts` used `@supabase/supabase-js` `createClient`, which stores the session in **localStorage** — invisible to the server. Net effect: after login, every authenticated user was 307'd off all `(app)/*` routes back to `/login?redirect=…`. It shipped because Task 0.3's verification only tested the logged-out path (`curl /map → 307`), never an authenticated user reaching a protected route.

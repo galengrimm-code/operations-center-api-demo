@@ -8,6 +8,34 @@
 
 ## Active
 
+### Mixed-unit products show "—" for cost/total (no per-product unit handling)
+- **Where:** Products + Applications cost display. Affects products applied in **different unit families across operations** — confirmed in org 600550: `24D` (floz + ozm), `Absorb 100` (floz + ozm + pt + qt), `Accent Q` (floz + gal + ozm).
+- **What:** A single product `price_unit` can't value lines in two families (floz is volume, ozm is weight; no density bridge for a generic chemical). Those lines fall to `null` → render "—". `appliedInPriceUnit`/`lineTotalCost` correctly return null rather than a wrong number.
+- **Why it's debt:** A handful of products won't price cleanly until handled per-line/per-unit.
+- **Cost to fix:** medium — likely a per-line unit override, or splitting the product, or a density bridge. Decide when it bites real data.
+- **Trigger:** Galen's real-data pricing pass — if a real line unexpectedly shows "—".
+
+### Unit converter doesn't know bare `oz` (only `ozm` / `floz`)
+- **Where:** `lib/unit-convert.ts` weight set is `ozm/lb/ton`, volume `floz/pt/qt/gal`.
+- **What:** Real JD data uses `ozm` (dry) and `floz` (fluid) — both handled. But the synthetic seed data uses bare `oz` (Liberty 280 SL), which the converter doesn't recognize → "—". Real data has no bare `oz`, so production is fine.
+- **Why it's debt:** Only a gap if a real import ever brings bare `oz`. Low risk.
+- **Cost to fix:** trivial — add an `oz` alias (but must decide dry vs fluid; ambiguous, which is why it's not aliased).
+- **Trigger:** a real line shows "—" and its unit is bare `oz`.
+
+### Seed test price rows in shared prod DB
+- **Where:** `operations_center.product_prices` rows for `org_id='seed-org'` (AMS $400/ton, UAN $3.50/gal, year 2025), shared project `nuxofsjzrgdauzriraze`. Added 2026-06-03 to prove the pricing flow end-to-end.
+- **What:** Test pricing data in prod (scoped to the seed test user `178fdca1-…`, separate from real org 600550).
+- **Why it's debt:** Fake data in prod. Harmless (seed-org only), but tidy-up worthy with the rest of the seed data.
+- **Cost to fix:** trivial — `DELETE FROM operations_center.product_prices WHERE org_id='seed-org';`
+- **Trigger:** general seed-data cleanup (also see the `org_id='seed-org'` rows item below).
+
+### Export is Products-rollup only
+- **Where:** `lib/products-export.ts` (Excel + PDF). Scoped to the Products rollup by deliberate v1 choice.
+- **What:** No Applications-level export (per-field application detail, $/ac) and no field-cost-summary export.
+- **Why it's debt:** Galen will likely want a per-field / landlord-operator report.
+- **Cost to fix:** small-medium — reuse the same exceljs/jspdf path over the applications + field-summary data.
+- **Trigger:** when Galen needs to share/print application or field cost detail.
+
 ### Applications/Products read path does full-table client-side processing
 - **Where:** `lib/applications-client.ts` — `fetchApplications` filters `productId`/`category` in JS (not SQL); `fetchProductsRollup` pulls all product-line rows and aggregates in the browser. Every applications filter change refetches the full nested payload.
 - **What:** O(all of the user's rows) shipped to the browser per load. Deliberate v1 choice (the plan explicitly chose client-side aggregation).
