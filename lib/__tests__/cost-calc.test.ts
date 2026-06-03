@@ -40,6 +40,27 @@ describe("lineTotalCost", () => {
     const p: PriceRef = { price_per_unit: 600, price_unit: "ton", density_lbs_per_gal: null };
     expect(lineTotalCost(1, "gal", p)).toBeNull();
   });
+  it("applies nutrient_content_pct (NH3: lb N applied, $/ton product, 82% N)", () => {
+    // 14642 lb N / 0.82 = 17856 lb product = 8.928 ton * $730/ton = $6517.48
+    const nh3: PriceRef = {
+      price_per_unit: 730,
+      price_unit: "ton",
+      density_lbs_per_gal: null,
+      nutrient_content_pct: 82,
+    };
+    expect(lineTotalCost(14642, "lb", nh3)).toBeCloseTo(6517.48, 1);
+  });
+  it("content_pct null or 100 leaves cost unchanged", () => {
+    const at100: PriceRef = {
+      price_per_unit: 730,
+      price_unit: "ton",
+      density_lbs_per_gal: null,
+      nutrient_content_pct: 100,
+    };
+    // 14642 lb / 2000 * 730 = $5344.33 (no content adjustment)
+    expect(lineTotalCost(14642, "lb", at100)).toBeCloseTo(5344.33, 1);
+    expect(lineTotalCost(14642, "lb", { ...at100, nutrient_content_pct: null })).toBeCloseTo(5344.33, 1);
+  });
 });
 
 describe("acresFrom", () => {
