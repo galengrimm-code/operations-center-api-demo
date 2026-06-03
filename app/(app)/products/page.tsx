@@ -28,16 +28,16 @@ export default function ProductsPage() {
 
   const { selectedFarm } = useClientFilter();
   const [rows, setRows] = useState<any[]>([]);
-  const [season, setSeason] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Season years (drives both the season filter and the price-year selector)
+  // Season years available in the data.
   const [seasonYears, setSeasonYears] = useState<number[]>([]);
 
-  // Price-year selector: "all" or a specific year string
-  const [priceYear, setPriceYear] = useState<string>("all");
+  // ONE year selector drives both the rollup totals AND which year's prices show.
+  // "all" => all-season totals + averaged, read-only prices; a year => that year's totals + editable prices.
+  const [year, setYear] = useState<string>("all");
 
   // Prices loaded for the selected price-year
   const [priceByProduct, setPriceByProduct] = useState<
@@ -61,29 +61,29 @@ export default function ProductsPage() {
     fetchSeasonYears(orgId)
       .then((years) => {
         setSeasonYears(years);
-        // Default price-year to newest year from the list
+        // Default to the newest year (editable) rather than the averaged read-only view.
         if (years.length > 0) {
-          setPriceYear(String(years[0]));
+          setYear(String(years[0]));
         }
       })
       .catch(() => {
-        // Non-fatal — price-year stays "all"
+        // Non-fatal — year stays "all"
       });
   }, [orgId]);
 
   function loadRollup() {
     setLoading(true);
-    fetchProductsRollup(season || undefined, selectedFarm ?? undefined)
+    fetchProductsRollup(year === "all" ? undefined : year, selectedFarm ?? undefined)
       .then(setRows)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }
-  useEffect(loadRollup, [season, selectedFarm]);
+  useEffect(loadRollup, [year, selectedFarm]);
 
-  // Load prices whenever priceYear or orgId changes
+  // Load prices for the selected year (averaged + read-only when "all").
   function loadPrices() {
     if (!orgId) return;
-    if (priceYear === "all") {
+    if (year === "all") {
       fetchProductPriceAverages(orgId)
         .then(setAvgByProduct)
         .catch(() => {
@@ -91,7 +91,7 @@ export default function ProductsPage() {
         });
       setPriceByProduct(new Map());
     } else {
-      const yr = Number(priceYear);
+      const yr = Number(year);
       fetchProductPrices(yr, orgId)
         .then((prices) => {
           const map = new Map<string, { price_per_unit: number; price_unit: string }>();
@@ -106,27 +106,24 @@ export default function ProductsPage() {
       setAvgByProduct(new Map());
     }
   }
-  useEffect(loadPrices, [priceYear, orgId]);
+  useEffect(loadPrices, [year, orgId]);
 
   const visibleRows = category
     ? rows.filter((r) => (r.product?.product_category ?? "") === category)
     : rows;
 
-  const allSeasons = priceYear === "all";
+  const allSeasons = year === "all";
 
-  // Show "Copy from {priceYear-1}" only when a specific year is selected AND the prior year exists
-  const priceYearNum = allSeasons ? null : Number(priceYear);
-  const showCopyButton =
-    !allSeasons &&
-    priceYearNum !== null &&
-    seasonYears.includes(priceYearNum - 1);
+  // Show "Copy from {year-1}" only when a specific year is selected AND the prior year exists.
+  const yearNum = allSeasons ? null : Number(year);
+  const showCopyButton = !allSeasons && yearNum !== null && seasonYears.includes(yearNum - 1);
 
   async function handleSetPrice(productId: string, value: number, unit: string) {
     if (!orgId || allSeasons) return;
     await upsertProductPrice({
       productId,
       orgId,
-      year: priceYearNum!,
+      year: yearNum!,
       pricePerUnit: value,
       priceUnit: unit,
     });
@@ -139,10 +136,10 @@ export default function ProductsPage() {
   }
 
   async function handleCopyFromPriorYear() {
-    if (!orgId || !priceYearNum) return;
+    if (!orgId || !yearNum) return;
     setCopyingPrices(true);
     try {
-      await copyPricesFromYear(priceYearNum - 1, priceYearNum, orgId);
+      await copyPricesFromYear(yearNum - 1, yearNum, orgId);
       loadPrices();
     } finally {
       setCopyingPrices(false);
@@ -163,7 +160,7 @@ export default function ProductsPage() {
         bulkCategory,
         bulkUnit,
         orgId,
-        allSeasons ? undefined : Number(priceYear),
+        allSeasons ? undefined : Number(year),
       );
       setBulkUnitCount(count);
       loadPrices();
@@ -205,9 +202,11 @@ export default function ProductsPage() {
           </div>
         </header>
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          {/* Season filter (application data) */}
-          <select className={SELECT_CLASS} value={season} onChange={(e) => setSeason(e.target.value)}>
-            <option value="">All seasons</option>
+          {/* ONE year selector: drives the rollup totals AND the prices shown/edited.
+              "All seasons" => all totals + averaged read-only prices; a year => that year's totals + editable prices. */}
+          <span className="text-xs text-slate-500">Season:</span>
+          <select className={SELECT_CLASS} value={year} onChange={(e) => setYear(e.target.value)}>
+            <option value="all">All seasons (avg prices)</option>
             {seasonYears.length > 0
               ? seasonYears.map((y) => (
                   <option key={y} value={String(y)}>
@@ -236,23 +235,8 @@ export default function ProductsPage() {
             <option value="other">Other</option>
           </select>
 
-          {/* Price-year selector */}
           {orgId && (
             <>
-              <span className="text-xs text-slate-500">Prices:</span>
-              <select
-                className={SELECT_CLASS}
-                value={priceYear}
-                onChange={(e) => setPriceYear(e.target.value)}
-              >
-                <option value="all">All seasons (avg)</option>
-                {seasonYears.map((y) => (
-                  <option key={y} value={String(y)}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-
               {/* Copy-from-prior-year button */}
               {showCopyButton && (
                 <button
@@ -261,7 +245,7 @@ export default function ProductsPage() {
                   onClick={handleCopyFromPriorYear}
                   className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-sm text-slate-300 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
                 >
-                  {copyingPrices ? "Copying…" : `Copy from ${priceYearNum! - 1}`}
+                  {copyingPrices ? "Copying…" : `Copy from ${yearNum! - 1}`}
                 </button>
               )}
 
