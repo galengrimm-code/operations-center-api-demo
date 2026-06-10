@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useClientFilter } from "@/contexts/client-filter-context";
 import { ReportsFilters } from "./reports-filters";
@@ -56,7 +56,13 @@ export function ReportsView() {
   const { user, johnDeereConnection } = useAuth();
   const { selectedFarm: globalFarm } = useClientFilter();
   const orgId = johnDeereConnection?.selected_org_id;
-  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
+  // Keyed on contents (not array identity) so loadData only re-creates
+  // when the hidden-crop set actually changes.
+  const hiddenCropsKey = (johnDeereConnection?.hidden_crop_names || []).join(",");
+  const hiddenCrops = useMemo(
+    () => (hiddenCropsKey ? hiddenCropsKey.split(",") : []),
+    [hiddenCropsKey],
+  );
 
   const [activeTab, setActiveTab] = useState<ReportTab>("harvest");
   const [harvestView, setHarvestView] = useState<HarvestView>("table");
@@ -331,7 +337,7 @@ export function ReportsView() {
     selectedCrop,
     selectedField,
     globalFarm,
-    hiddenCrops.join(","),
+    hiddenCrops,
   ]);
 
   useEffect(() => {

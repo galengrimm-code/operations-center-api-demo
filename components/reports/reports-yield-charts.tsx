@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   fetchHarvestOperations,
   fetchAnalysisResults,
@@ -216,7 +216,13 @@ function buildPrintHtml(
 
 export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYieldChartsProps) {
   const { johnDeereConnection } = useAuth();
-  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
+  // Keyed on contents (not array identity) so the effect below only re-runs
+  // when the hidden-crop set actually changes.
+  const hiddenCropsKey = (johnDeereConnection?.hidden_crop_names || []).join(",");
+  const hiddenCrops = useMemo(
+    () => (hiddenCropsKey ? hiddenCropsKey.split(",") : []),
+    [hiddenCropsKey],
+  );
   const [loading, setLoading] = useState(true);
   const [byCrop, setByCrop] = useState<Map<string, ChartPoint[]>>(new Map());
   const chartRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -364,7 +370,7 @@ export function ReportsYieldCharts({ userId, orgId, irrigatedFields }: ReportsYi
       }
     };
     load();
-  }, [userId, orgId, irrigatedFields, hiddenCrops.join(",")]);
+  }, [userId, orgId, irrigatedFields, hiddenCrops]);
 
   if (loading) {
     return (

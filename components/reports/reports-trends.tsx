@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   fetchHarvestOperations,
   fetchAnalysisResults,
@@ -37,7 +37,13 @@ interface TrendRow {
 
 export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsProps) {
   const { johnDeereConnection } = useAuth();
-  const hiddenCrops = johnDeereConnection?.hidden_crop_names || [];
+  // Keyed on contents (not array identity) so the effects below only re-run
+  // when the hidden-crop set actually changes.
+  const hiddenCropsKey = (johnDeereConnection?.hidden_crop_names || []).join(",");
+  const hiddenCrops = useMemo(
+    () => (hiddenCropsKey ? hiddenCropsKey.split(",") : []),
+    [hiddenCropsKey],
+  );
   const [selectedField, setSelectedField] = useState("");
   const [selectedCrop, setSelectedCrop] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,12 +75,10 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
         new Set(ops.map((o) => effectiveCropName(o)).filter((c): c is string => !!c)),
       ).sort();
       setAvailableCrops(crops);
-      if (crops.length > 0 && !crops.includes(selectedCrop)) {
-        setSelectedCrop(crops[0]);
-      }
+      setSelectedCrop((prev) => (crops.length > 0 && !crops.includes(prev) ? crops[0] : prev));
     };
     loadCrops();
-  }, [selectedField, userId, orgId, irrigatedFields, hiddenCrops.join(",")]);
+  }, [selectedField, userId, orgId, irrigatedFields, hiddenCrops]);
 
   // Load trend data when field+crop changes
   useEffect(() => {
@@ -147,7 +151,7 @@ export function ReportsTrends({ userId, orgId, irrigatedFields }: ReportsTrendsP
     };
 
     loadTrends();
-  }, [selectedField, selectedCrop, userId, orgId, irrigatedFields]);
+  }, [selectedField, selectedCrop, userId, orgId, irrigatedFields, hiddenCrops]);
 
   // Weighted averages for summary row
   const avgRow = (() => {
