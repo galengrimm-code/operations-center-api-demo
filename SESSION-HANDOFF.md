@@ -1,65 +1,44 @@
-# Session Handoff — 2026-06-03 (Pricing cost layer end-to-end + real spray data flowing)
+# Session Handoff — 2026-06-10 (Repo audit + full Watchtower flag sweep — ALL 7 FLAGS CLEARED)
 
 > **Ephemeral.** Rewritten end of session.
 
 ## What was done this session
 
-Big session. Renamed the project, got real John Deere spray data flowing, then built and shipped a complete **input-pricing cost layer** (the Harvest-Profit-style $/ac feature), plus a stack of real-use refinements. Everything below is **merged to `main` and live in production** unless noted.
+### 1. Repo audit (Standard tier) — Grade A
 
-### 1. Project renamed → "Farm Data Hub"
+Report at `~/Downloads/repo-audits/farm-data-hub-AUDIT-2026-06-10.md`. Phase 0 all green; no HIGHs.
 
-- `package.json` name `nextjs` → `farm-data-hub`; handoff resume path corrected. Branding was already "Farm Data Hub" in the UI/docs; this cleaned the leftovers. (Infra still named `operations-center-api-demo` — repo + Vercel + the `operations_center` DB schema — intentionally left; eventual URL is `data.precisionfarms.llc`.)
+### 2. Watchtower flag sweep — all 7 flags handled (commits LOCAL, unpushed per portfolio sweep plan)
 
-### 2. Real spray data flowing (the import was returning 0)
+- **minimatch ReDoS highs** — npm override → 9.0.9 (7 vulns → 4). Commit `a569c5f`.
+- **Prettier P3** — format sweep (47 files), commit `6d9e71a`, blame-ignored.
+- **`debug-spray-shape`** — deployed fn deleted from `nuxofsjzrgdauzriraze` (verified) + source removed (`610f52b`). Clears 2 P3s.
+- **Error-response leakage** — 6 leak sites → `logAndRespond`; Codex review caught the UI losing the stable codes → `apiErrorMessage()` in `lib/john-deere-client.ts` (all 14 sites). Commit `1f59c83`. **Deployed live: john-deere-api v7, john-deere-irrigation v12**, verified serving.
+- **Accepted risks** — dep CVEs (Next-16-sprint parked) + CSP unsafe-inline documented in CLAUDE.md (`51834af`) + Watch Tower `data/apps.js` (`1caf2c3` in that repo).
+- **Seed-data cleanup (dirty-repo P4)** — Galen gave explicit go: 11 rows deleted in one transaction (5 tables × `org_id='seed-org'` + `dev@precisionfarms.test` connection). Verified 0 remain; real data intact (71 fields, 1,686 ops, 1 connection). Obsolete `tests/e2e/applications-view.spec.ts` deleted.
 
-- **Root cause:** the spray import wrote nothing because the JD OAuth token had **`ag1` scope only** (the 2026-05-28 security trim dropped `ag2`/`ag3`). Harvest/seeding live in `ag1` (why those worked); **application/chemical/tank-mix data needs `ag2`+`ag3`**. JD 403'd those calls and the paginator swallowed it as "0". Restored scopes in `lib/john-deere-client.ts:314` (`ag1 ag2 ag3 org1 work1 offline_access`); Galen reconnected JD (scopes bake in at consent — refresh can't add them).
-- **Chunked import:** the all-fields `import-applications` call **504'd** on real data (~600 sequential JD calls in one request). Rebuilt as **per-field chunks with a progress bar** (`app/(app)/applications/page.tsx` + `importApplications(fieldId)` in `lib/john-deere-client.ts`). Result: **1,013 application ops across 69 fields imported** (Precision Farms 939, Grimm Bros. 43, Custom Acres 31).
-- Fixed a P1 deploy-time middleware bug along the way: `/manifest.webmanifest` + `.txt` were hitting the auth gate (307) — added to `middleware.ts` `PUBLIC_FILE_EXT`.
+### 3. Audit quick wins (commits `bb9fc3e` + `92d7187`)
 
-### 3. Icon swap + filter/dropdown fixes
-
-- New "Farm Data Hub" production icon set (favicon, app icon, apple-touch, PWA) from `Downloads/farm_data_hub_production_icon_library.zip`, plus the satellite mark as the top-bar logo.
-- Global farm filter now applies to Applications + Products; Products got sortable headers + category filter (earlier in session).
-
-### 4. **Pricing cost layer** (the main build — 11 TDD tasks, subagent-driven, Codex + holistic reviewed)
-
-- **DB (applied to shared prod `nuxofsjzrgdauzriraze`, `operations_center` schema):** `product_prices` table (year-keyed, RLS, 4 policies); `products.density_lbs_per_gal`.
-- **Pure math (fully unit-tested):** `lib/unit-convert.ts` (weight/volume + cross-family via density), `lib/cost-calc.ts` (line/field cost, actual/spread basis, null-not-zero).
-- **Flow:** prices set per year on Products → `$/ac • $/unit` on each application line + application header total → per-field cost summary with **Actual/Spread toggle**.
-- **Cost derives from `total_value`/`total_unit` (bare), NOT `rate_unit` (JD token `lb1ac-1`).** Area normalized via `acresFrom` (ha→ac).
-
-### 5. Real-use refinements (after Galen started using it)
-
-- **NH3 nutrient content:** `products.nutrient_content_pct` — JD records NH3 as **lb of N**, but it's bought by the **ton of product** (NH3 = 82% N). Cost math scales: `lb N ÷ (pct/100) → product → tons → × $/ton`. Without it, NH3 cost was ~18% low. Proven live (50% content doubled a line's $/ac).
-- **Bulk unit-setter** (`setCategoryPriceUnit`) — "set all fertilizer → ton". `products.price_unit_default` drives the per-product picker default.
-- **Total Applied in purchase unit** — `appliedInPriceUnit` converts the rollup total to the priced unit (97,000 floz → gal; lb N → product tons). Per-product.
-- **Dropdown gray fix** — global `select`/`option` dark CSS in `app/globals.css` (color-scheme alone wasn't enough on Windows Chrome).
-- **Excel (category-colored) + PDF export** of the Products rollup — `lib/products-export.ts`, dynamic-imported exceljs + jspdf/autotable. Colors match the in-app category badges.
-
-### 6. Season/price selector unification (last thing, Codex-reviewed twice)
-
-- Merged the two confusing controls (season filter + price-year) into **one "Season" selector**: specific years (newest = default, editable prices) + "All Seasons (avg)" (averaged read-only prices over all-time totals).
-- **Bulk tools** (copy-prices, category-unit-set) moved out of the filter row behind a **"Bulk tools" toggle** so they can't be hit by accident. Per-product unit picker is the daily path (right tool for mixed-unit chemicals).
-- Codex review #1 caught a stale-fetch desync; review #2 caught stale-prices-on-year-switch, failed-load-stale-prices, an unguarded bulk handler in all-seasons, and an org-switch stranded-year edge — **all fixed** (single guarded loader, clear price maps on year-change/failure, `allSeasons` guard, invalid-year reset).
+- **exhaustive-deps fixed in THREE reports components** (audit had undercounted from clipped lint output): `hiddenCrops` memoized on join-key in yield-charts/trends/view; trends crop-snap via functional setState. Zero exhaustive-deps warnings left; only 3 informational `<img>` notices remain repo-wide. Codex-reviewed, no findings.
+- **Docs truth-up:** CLAUDE.md test line fixed; `database.md` now documents all 9 tables (was 3); architecture.md doc-map count; TECH-DEBT 5 items moved to Resolved.
+- Orphaned `area-unit-toggle.tsx` deleted.
 
 ## Current state
 
-- **Everything above is live** at `operations-center-api-demo.vercel.app`. `main` is the latest; all feature branches merged + deleted.
-- **DB columns live in prod:** `product_prices` (+RLS), `products.density_lbs_per_gal`, `products.nutrient_content_pct`, `products.price_unit_default`.
-- **Test suite:** 88 unit tests + E2E (`tests/e2e/pricing.spec.ts`). Production build green.
-- **Seed test prices set** for `seed-org`: AMS $400/ton, UAN $3.50/gal (used to prove the flow; the AMS content=50 demo was reverted to null).
-- **Codex CLI:** all `-codex` model variants now 400 on Galen's ChatGPT account; **`gpt-5.4` is what works**. `~/.codex/config.toml` updated to `gpt-5.4`.
+- `main` is 9 commits ahead of origin; Watch Tower repo 1 ahead. **Holding pushes** — one Watchtower v7.0 scan flushes everything.
+- Edge functions live: api v7, irrigation v12. Prod DB clean of seed data.
+- Full verification at session end: typecheck OK, production build green, 88/88 tests, prettier clean, zero exhaustive-deps warnings.
 
-## Open questions / decisions pending
+## Open questions
 
-- **Real-data validation (Galen's, the last mile):** on the real account — set NH3 content **82%** + unit **ton** + price; bulk-set fertilizer → ton; set chemicals' units **per-product** (mixed units); enter real prices; confirm a field's $/ac matches known cost. Only Galen can do this.
-- **Mixed-unit products** (24D, Absorb 100, Accent Q — applied in both floz and dry-oz across ops): one price unit can't value both families → those lines show "—". Needs per-product handling if it bites real data.
+None blocking. Behavioral note: the reports hooks change preserves contents-based re-run semantics by construction (Codex concurred); a quick eyeball of the Reports page charts after next deploy wouldn't hurt.
 
-## Next steps (immediate)
+## Immediate next steps
 
-1. Galen's real-data pricing pass (above) — validates the whole layer against actual numbers.
-2. If validation surfaces "—" on real lines, tell me the product (likely the mixed-unit case or a bare `oz` unit the converter doesn't know — it handles `ozm`/`floz`, not bare `oz`).
+1. Push both repos when the portfolio sweep says go, then one-off v7.0 scan (SCAN:AUTO block + dashboard refresh — current P2 flag text is stale).
+2. **Galen's real-data pricing validation pass** (NH3 82%/ton/price, bulk fertilizer units, real prices, $/ac sanity check) — gates the profit layer.
+3. **Profit layer** (yields × grain price − input costs = margin/acre) — retires the $1,600/yr Harvest Profit bill.
 
 ## How to resume
 
-The pricing cost layer is complete and live; the remaining work is Galen entering real prices and validating $/ac, then the **profit layer** (yields × grain price − input costs = margin/acre) which is what fully retires the $1,600/yr Harvest Profit bill. `git pull`, `npm run prebuild` (88 green), and the Products page is where the pricing UI lives.
+`git log --oneline -9` = the sweep. Audit report in Downloads/repo-audits. Everything verified; nothing in flight.
