@@ -83,6 +83,133 @@ updated_at          timestamptz
 UNIQUE(user_id, org_id, jd_operation_id)
 ```
 
+**Application extensions (2026-05-28):** `measurement_status` text ('available' | 'not_found' | 'error' | 'unknown' — JD measurement fetch state), `application_name` text (editable tank-mix label), `application_name_jd_original` text, `application_name_user_edited` boolean.
+
+## `operations_center.irrigation_analysis_results`
+
+```sql
+id                  uuid PK
+user_id             uuid FK → auth.users (CASCADE DELETE)
+field_id            uuid
+jd_field_id         text
+jd_operation_id     text
+operation_type      text
+crop_name           text
+crop_season         text
+irrigated_acres     double precision
+dryland_acres       double precision
+total_acres         double precision
+irrigated_yield     double precision (nullable)
+dryland_yield       double precision (nullable)
+total_yield         double precision (nullable)
+irrigated_moisture  double precision (nullable)
+dryland_moisture    double precision (nullable)
+total_moisture      double precision (nullable)
+irrigated_bushels   double precision (nullable)
+dryland_bushels     double precision (nullable)
+polygon_count       integer (default 0)
+analyzed_at         timestamptz
+created_at          timestamptz
+UNIQUE(user_id, jd_operation_id)
+```
+
+Cached shapefile-analysis output (irrigated/dryland yield splits) so charts render without re-running analysis.
+
+## `operations_center.field_seasons`
+
+```sql
+id              uuid PK
+user_id         uuid FK → auth.users (CASCADE DELETE)
+field_id        uuid FK → operations_center.fields (CASCADE DELETE)
+season_year     integer
+intended_crop   text (nullable, planning)
+intended_acres  double precision (nullable)
+planted_date    date (nullable, manual override when JD record missing/wrong)
+planted_acres   double precision (nullable)
+notes           text (nullable)
+created_at      timestamptz
+updated_at      timestamptz
+UNIQUE(user_id, field_id, season_year)
+```
+
+## `operations_center.products`
+
+```sql
+id                       uuid PK
+user_id                  uuid FK → auth.users (CASCADE DELETE)
+org_id                   text
+jd_product_id            text
+name                     text
+name_normalized          text (trim/lowercase/collapse-whitespace key)
+brand                    text (nullable)
+is_carrier_default       boolean (default false)
+product_kind             text (nullable)
+product_category         text (nullable: chemical/fertilizer/seed/carrier/other)
+product_category_source  text (nullable: seed-pattern vs user)
+default_unit             text (nullable)
+density_lbs_per_gal      numeric (nullable, cross-family unit conversion bridge)
+nutrient_content_pct     numeric (nullable, e.g. NH3 = 82 — JD logs lb of N, priced per ton of product)
+price_unit_default       text (nullable, default for the per-product price-unit picker)
+first_seen_at            timestamptz
+last_seen_at             timestamptz
+raw_response             jsonb (nullable)
+created_at               timestamptz
+updated_at               timestamptz
+UNIQUE(user_id, org_id, jd_product_id)
+```
+
+## `operations_center.field_operation_products`
+
+```sql
+id                         uuid PK
+user_id                    uuid (auto-filled from field_operation via trigger)
+org_id                     text (auto-filled via trigger)
+field_operation_id         uuid FK → field_operations (CASCADE DELETE)
+product_id                 uuid FK → products (RESTRICT DELETE)
+line_index                 integer
+product_category_override  text (nullable)
+is_carrier                 boolean (default false)
+rate_value / rate_unit / rate_variable       (live editable)
+total_value / total_unit / total_variable    (live editable — COST MATH USES total, NOT rate)
+area_value / area_unit                       (live editable)
+rate_value_jd_original / total_value_jd_original / area_value_jd_original  (set on import, never user-modified)
+is_user_edited             boolean (default false)
+edited_at                  timestamptz (nullable)
+deleted_at                 timestamptz (nullable, soft-delete for re-import merge)
+raw_response               jsonb (nullable)
+created_at / updated_at    timestamptz
+UNIQUE(field_operation_id, line_index)
+```
+
+## `operations_center.product_prices`
+
+```sql
+id              uuid PK
+user_id         uuid FK → auth.users (CASCADE DELETE)
+org_id          text
+product_id      uuid FK → products (CASCADE DELETE)
+year            integer
+price_per_unit  numeric (>= 0)
+price_unit      text (CHECK: ozm|lb|ton|floz|pt|qt|gal)
+created_at      timestamptz
+updated_at      timestamptz
+UNIQUE(user_id, org_id, product_id, year)
+```
+
+Year-keyed pricing; the Products page Season selector picks the year (or averages across all years in "All Seasons" mode).
+
+## `operations_center.product_category_seeds`
+
+```sql
+name_pattern      text PK
+match_type        text (CHECK: contains|exact)
+product_category  text
+notes             text (nullable)
+created_at        timestamptz
+```
+
+Global (not per-user) name-pattern → category seed list used to auto-categorize imported products (21 rows, e.g. 'glyphosate' → chemical).
+
 ## Migration discipline
 
 All migrations live in `supabase/migrations/` and must target `operations_center.<table>` explicitly. Before pushing: confirm the linked Supabase project ref is `nuxofsjzrgdauzriraze`, not the wrong project.

@@ -13,7 +13,7 @@ npm run lint         # ESLint via next lint
 npm run typecheck    # tsc --noEmit (type check without building)
 ```
 
-There are no automated tests. Use `npm run build` and `npm run typecheck` to validate changes before committing.
+Validate changes with `npm run prebuild` (lint + typecheck + 88 vitest unit tests — also runs automatically before every `npm run build`). Playwright E2E lives in `tests/e2e/` (`npm run test:e2e`, needs a running dev server + auth setup).
 
 ---
 
@@ -107,10 +107,10 @@ _None_
 
 ### Accepted Risks
 
-| Date       | Category                 | Justification                                                                                                                                                                                                                                                                                                                  |
-| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Date       | Category                 | Justification                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-06-10 | dependency-vulnerability | Remaining audit findings (next@13.5 advisory set, postcss, uuid-via-exceljs) are parked for the deliberate Next 16 migration sprint (TECH-DEBT.md). next CVEs are mostly DoS/cache classes behind Vercel's layered protections; exceljs is write-only (generates exports, never parses untrusted files); the only exceljs "fix" is a breaking downgrade. minimatch highs fixed 2026-06-10 via npm override (7 → 4 vulns). |
-| 2026-06-10 | csp-unsafe-inline        | `'unsafe-inline'`/`'unsafe-eval'` in script-src is required by Mapbox GL + Next 13. React escaping is the primary XSS defense; all JD/LLM-derived strings render through framework escaping. Revisit with nonce-based CSP during the Next 16 migration.                                                                          |
+| 2026-06-10 | csp-unsafe-inline        | `'unsafe-inline'`/`'unsafe-eval'` in script-src is required by Mapbox GL + Next 13. React escaping is the primary XSS defense; all JD/LLM-derived strings render through framework escaping. Revisit with nonce-based CSP during the Next 16 migration.                                                                                                                                                                   |
 
 ### Resolved
 

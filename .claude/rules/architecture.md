@@ -31,6 +31,6 @@
 | --------------------------------- | --------------------------------------------------------------------------------------------- |
 | `CLAUDE.md` SCAN:AUTO block       | Stack, folder structure, key files, data flow, security flags — auto-loaded every session     |
 | `.claude/rules/architecture.md`   | This file — design rationale + shared-Supabase warning — auto-loaded every session            |
-| `.claude/rules/database.md`       | `operations_center` schema (3 tables) — auto-loaded every session                             |
+| `.claude/rules/database.md`       | `operations_center` schema (9 tables) — auto-loaded every session                             |
 | `.claude/rules/conventions.md`    | Coding conventions + common task recipes — auto-loaded every session                          |
 | `.claude/rules/edge-functions.md` | Edge Functions deployment + verifyJWT rule — auto-loaded when editing `supabase/functions/**` |

@@ -24,14 +24,6 @@
 - **Cost to fix:** trivial — add an `oz` alias (but must decide dry vs fluid; ambiguous, which is why it's not aliased).
 - **Trigger:** a real line shows "—" and its unit is bare `oz`.
 
-### Seed test price rows in shared prod DB
-
-- **Where:** `operations_center.product_prices` rows for `org_id='seed-org'` (AMS $400/ton, UAN $3.50/gal, year 2025), shared project `nuxofsjzrgdauzriraze`. Added 2026-06-03 to prove the pricing flow end-to-end.
-- **What:** Test pricing data in prod (scoped to the seed test user `178fdca1-…`, separate from real org 600550).
-- **Why it's debt:** Fake data in prod. Harmless (seed-org only), but tidy-up worthy with the rest of the seed data.
-- **Cost to fix:** trivial — `DELETE FROM operations_center.product_prices WHERE org_id='seed-org';`
-- **Trigger:** general seed-data cleanup (also see the `org_id='seed-org'` rows item below).
-
 ### Export is Products-rollup only
 
 - **Where:** `lib/products-export.ts` (Excel + PDF). Scoped to the Products rollup by deliberate v1 choice.
@@ -47,36 +39,6 @@
 - **Why it's debt:** fine at farm scale (dozens–hundreds of ops); slow at thousands of ops/lines.
 - **Cost to fix:** medium — move the rollup to a Supabase RPC / SQL aggregate; push `productId`/`category` filters into the query (join through `field_operation_products`/`products`).
 - **Trigger:** when an org's spray history grows large, or when adding cross-season analytics. Flagged by Codex adversarial review 2026-05-29 (P2).
-
-### Spray-sync test data seeded into shared prod DB (delete before Task 39)
-
-- **Where:** `operations_center` rows with `org_id='seed-org'` (1 field, 3 products, 1 application, 3 product lines) + a placeholder `john_deere_connections` row for `dev@precisionfarms.test` (UID `178fdca1-ea1c-4995-bfee-110aaaee469b`), shared project `nuxofsjzrgdauzriraze`.
-- **What:** Seeded 2026-05-29 to browser-verify the Applications UI (Group G) against real data on a fresh test account.
-- **Why it's debt:** Fake data in the production DB. If a real JD import (Task 39) runs for this user before cleanup, fake + real mix.
-- **Cost to fix:** trivial — `DELETE FROM operations_center.<table> WHERE org_id='seed-org';` across the 4 tables + delete the placeholder connection row. Also delete the untracked `tests/e2e/applications-view.spec.ts` (intentionally uncommitted per its header — it asserts against this seed data and is superseded by the Group H specs).
-- **Trigger:** **before Task 39** (real import). First thing next session.
-
-### `debug-spray-shape` edge function still deployed (Task 38 deferred)
-
-- **Where:** Supabase project `nuxofsjzrgdauzriraze`, function `debug-spray-shape` (v1); local source at `supabase/functions/debug-spray-shape/`.
-- **What:** Phase 0c read-only diagnostic for inspecting JD application-rate response shapes. Job done (schema locked).
-- **Why it's debt:** Extra deployed surface area. Deletion deferred 2026-05-29 (deleting a live fn on shared prod wants explicit authorization).
-- **Cost to fix:** trivial — dashboard delete or `npx supabase functions delete debug-spray-shape --project-ref nuxofsjzrgdauzriraze`, then remove local folder + commit.
-- **Trigger:** Task 38 / next session cleanup.
-
-### Orphaned component: `area-unit-toggle.tsx`
-
-- **Where:** `components/dashboard/area-unit-toggle.tsx`
-- **What:** Exported `AreaUnitToggle` is imported nowhere (the area-unit preference shipped via Settings instead). Found by the 2026-06-10 repo audit.
-- **Cost to fix:** trivial — delete the file.
-- **Trigger:** next cleanup commit.
-
-### `exhaustive-deps` warnings in reports yield charts
-
-- **Where:** `components/reports/reports-yield-charts.tsx:367`
-- **What:** `useEffect` missing `hiddenCrops` dependency + a complex expression in the dep array (the repo's only 2 lint warnings). Potential stale chart filtering when hidden crops change.
-- **Cost to fix:** small — extract the expression to a variable, add the dep, verify charts re-filter live (watch for effect loops).
-- **Trigger:** next session touching the reports area.
 
 ### `irrigation-analysis.tsx` and `progress/page.tsx` over 500 lines
 
@@ -120,6 +82,22 @@
 - **Trigger:** a deliberate Next 16 migration sprint, not a one-off
 
 ## Resolved
+
+### Seed test data + price rows in shared prod DB — 2026-06-10
+
+All 11 seed rows deleted in one Codex-approved transaction (5 tables × `org_id='seed-org'` + the `dev@precisionfarms.test` connection row). Verified 0 seed rows remain; real data intact (71 fields, 1,686 ops). The dependent untracked spec `tests/e2e/applications-view.spec.ts` deleted with it. Covers both former seed-data items (Group G UI seed + pricing seed rows).
+
+### `debug-spray-shape` edge function — 2026-06-10
+
+Deployed function deleted from `nuxofsjzrgdauzriraze` (verified gone via functions list); local folder removed (commit 610f52b). Cleared two Watchtower P3 flags (cors wildcard + stale debug endpoint).
+
+### Orphaned `area-unit-toggle.tsx` — 2026-06-10
+
+Deleted (never imported; the area-unit preference shipped via Settings).
+
+### `exhaustive-deps` warnings in reports components — 2026-06-10
+
+Bigger than first scoped: the `hiddenCrops.join(",")` dep-array pattern existed in THREE files (`reports-yield-charts`, `reports-trends`, `reports-view`). All fixed by memoizing `hiddenCrops` on a join-key (same contents-based re-run semantics) + real array in deps; `reports-trends` crop-snap moved to functional setState so `selectedCrop` left its effect deps without refetch-on-pick. Zero `exhaustive-deps` warnings remain (3 informational `<img>`→`next/image` notices are the only lint output). Codex-reviewed, no findings.
 
 ### `john-deere-import/index.ts` over 500 lines — resolved by 2026-06-03
 
