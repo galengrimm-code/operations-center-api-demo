@@ -229,11 +229,12 @@ Deno.serve(async (req: Request) => {
           });
 
         if (uploadError) {
-          console.error("[irrigation] Storage upload error:", uploadError);
-          return errorResponse(
-            `Failed to upload shapefile to storage: ${uploadError.message}`,
+          return logAndRespond(
             500,
-            undefined,
+            "request_failed",
+            "IRRIGATION_UPLOAD",
+            uploadError,
+            { storagePath },
             req,
           );
         }
@@ -255,19 +256,14 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Capture the full error response for debugging
+      // Log the full error response server-side; client gets a generic code
       const responseBody = await response.text();
-      console.error(
-        `[irrigation] JD error response: status=${response.status}, body=${responseBody}`,
-      );
-      return jsonResponse(
-        {
-          error: `John Deere API error: ${response.status}`,
-          details: responseBody,
-          url: shapefileUrl,
-          operationId,
-        },
+      return logAndRespond(
         response.status,
+        "request_failed",
+        "IRRIGATION_JD_SHAPEFILE",
+        new Error(`JD shapefile returned ${response.status}`),
+        { responseBody, shapefileUrl, operationId },
         req,
       );
     }

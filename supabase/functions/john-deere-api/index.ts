@@ -28,10 +28,12 @@ Deno.serve(async (req: Request) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        return errorResponse(
-          `John Deere API error: ${response.status}`,
+        return logAndRespond(
           response.status,
-          errorText,
+          "request_failed",
+          "API_JD_ORGS",
+          new Error(`JD organizations returned ${response.status}`),
+          { errorText },
           req,
         );
       }
@@ -67,10 +69,12 @@ Deno.serve(async (req: Request) => {
       const response = await callJohnDeereApi(accessToken, `/organizations/${orgId}/fields`);
       if (!response.ok) {
         const errorText = await response.text();
-        return errorResponse(
-          `John Deere API error: ${response.status}`,
+        return logAndRespond(
           response.status,
-          errorText,
+          "request_failed",
+          "API_JD_FIELDS",
+          new Error(`JD fields returned ${response.status}`),
+          { orgId, errorText },
           req,
         );
       }
@@ -91,7 +95,7 @@ Deno.serve(async (req: Request) => {
         .eq("org_id", orgId);
 
       if (fieldsError) {
-        return errorResponse(fieldsError.message, 500, undefined, req);
+        return logAndRespond(500, "request_failed", "API_DB_FIELDS", fieldsError, { orgId }, req);
       }
 
       return jsonResponse({ fields: storedFields || [] }, 200, req);
@@ -123,7 +127,7 @@ Deno.serve(async (req: Request) => {
       const { data: operations, error: opsError } = await query;
 
       if (opsError) {
-        return errorResponse(opsError.message, 500, undefined, req);
+        return logAndRespond(500, "request_failed", "API_DB_OPS", opsError, { orgId }, req);
       }
 
       return jsonResponse({ operations: operations || [] }, 200, req);

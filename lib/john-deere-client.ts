@@ -18,6 +18,19 @@ async function getAuthHeaders() {
   };
 }
 
+// Edge functions return { error: "request_failed", code: "FN_CODE" } on failure
+// (generic-error hardening) — surface the stable code with a readable fallback
+// instead of showing the bare "request_failed" string in the UI.
+function apiErrorMessage(
+  error: { error?: string; code?: string } | null | undefined,
+  fallback: string,
+): string {
+  if (!error) return fallback;
+  if (error.code) return `${fallback} (${error.code})`;
+  if (error.error && error.error !== "request_failed") return error.error;
+  return fallback;
+}
+
 export async function exchangeCodeForTokens(code: string, redirectUri: string) {
   console.log("[john-deere-client] Exchanging code for tokens...");
   console.log("[john-deere-client] Redirect URI:", redirectUri);
@@ -39,7 +52,7 @@ export async function exchangeCodeForTokens(code: string, redirectUri: string) {
   if (!response.ok) {
     const error = await response.json();
     console.error("[john-deere-client] Error response:", error);
-    throw new Error(error.error || "Failed to exchange code");
+    throw new Error(apiErrorMessage(error, "Failed to exchange code"));
   }
 
   const result = await response.json();
@@ -56,7 +69,7 @@ export async function refreshJohnDeereToken() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to refresh token");
+    throw new Error(apiErrorMessage(error, "Failed to refresh token"));
   }
 
   return response.json();
@@ -71,7 +84,7 @@ export async function disconnectJohnDeere() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to disconnect");
+    throw new Error(apiErrorMessage(error, "Failed to disconnect"));
   }
 
   return response.json();
@@ -85,7 +98,7 @@ export async function fetchOrganizations() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to fetch organizations");
+    throw new Error(apiErrorMessage(error, "Failed to fetch organizations"));
   }
 
   return response.json();
@@ -104,7 +117,7 @@ export async function selectOrganization(orgId: string, orgName: string) {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to select organization");
+    throw new Error(apiErrorMessage(error, "Failed to select organization"));
   }
 
   return response.json();
@@ -118,7 +131,7 @@ export async function fetchFields() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to fetch fields");
+    throw new Error(apiErrorMessage(error, "Failed to fetch fields"));
   }
 
   return response.json();
@@ -136,7 +149,7 @@ export async function importFieldsWithBoundaries() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to import fields");
+    throw new Error(apiErrorMessage(error, "Failed to import fields"));
   }
 
   return response.json();
@@ -154,7 +167,7 @@ export async function importOperations() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to import operations");
+    throw new Error(apiErrorMessage(error, "Failed to import operations"));
   }
 
   return response.json();
@@ -182,7 +195,7 @@ export async function importApplications(fieldId?: string): Promise<ImportApplic
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `Failed to import applications (${response.status})`);
+    throw new Error(apiErrorMessage(error, `Failed to import applications (${response.status})`));
   }
 
   return response.json();
@@ -197,7 +210,7 @@ export async function importFieldOperations(fieldId: string): Promise<{ totalImp
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to import field operations");
+    throw new Error(apiErrorMessage(error, "Failed to import field operations"));
   }
 
   return response.json();
@@ -215,7 +228,7 @@ export async function fetchStoredOperations(fieldId?: string, operationType?: st
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to fetch stored operations");
+    throw new Error(apiErrorMessage(error, "Failed to fetch stored operations"));
   }
 
   return response.json();
@@ -232,7 +245,7 @@ export async function fetchStoredFields() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to fetch stored fields");
+    throw new Error(apiErrorMessage(error, "Failed to fetch stored fields"));
   }
 
   return response.json();
@@ -247,7 +260,7 @@ export async function fetchIrrigationAnalysis(fieldId: string) {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || "Failed to fetch irrigation analysis");
+    throw new Error(apiErrorMessage(error, "Failed to fetch irrigation analysis"));
   }
 
   return response.json();
@@ -287,7 +300,7 @@ export async function pollForShapefileUrl(
       let errorMsg = "Failed to check shapefile status";
       try {
         const error = await response.json();
-        errorMsg = error.error || errorMsg;
+        errorMsg = apiErrorMessage(error, errorMsg);
       } catch {
         /* response not JSON */
       }
