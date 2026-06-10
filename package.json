@@ -87,6 +87,11 @@
     "vaul": "^0.9.9",
     "zod": "^3.23.8"
   },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "9.0.9"
+    }
+  },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.9.1",
