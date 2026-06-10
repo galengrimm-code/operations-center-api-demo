@@ -30,11 +30,7 @@ describe("deriveApplicationName", () => {
 
   it("filters empty string and whitespace-only names", () => {
     const input: JdApplicationRateResult = {
-      applicationProductTotals: [
-        { name: "Infurrow" },
-        { name: "" },
-        { name: "   " },
-      ],
+      applicationProductTotals: [{ name: "Infurrow" }, { name: "" }, { name: "   " }],
     };
     expect(deriveApplicationName(input)).toBe("Infurrow");
   });

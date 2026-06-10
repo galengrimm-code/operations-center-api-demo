@@ -122,14 +122,15 @@ __fixtures__/jd/README.md
 
 ## Test Strategy (reminder; see spec section 7)
 
-| Tier | Framework | Files | Run in `prebuild`? |
-|---|---|---|---|
-| Unit (TS) | Vitest | `lib/__tests__/*.test.ts` + `supabase/functions/john-deere-import/__tests__/*.test.ts` (the *.ts ones — see Task 1 note) | Yes |
-| Edge function action | Deno test | `supabase/functions/john-deere-import/__tests__/import-applications.test.ts` | No (Deno not on Vercel; local only) |
-| E2E | Playwright | `tests/e2e/*.spec.ts` | No (too slow; local + future CI) |
-| RLS / DB | manual + `checkMutationResult` runtime | — | — |
+| Tier                 | Framework                              | Files                                                                                                                     | Run in `prebuild`?                  |
+| -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Unit (TS)            | Vitest                                 | `lib/__tests__/*.test.ts` + `supabase/functions/john-deere-import/__tests__/*.test.ts` (the \*.ts ones — see Task 1 note) | Yes                                 |
+| Edge function action | Deno test                              | `supabase/functions/john-deere-import/__tests__/import-applications.test.ts`                                              | No (Deno not on Vercel; local only) |
+| E2E                  | Playwright                             | `tests/e2e/*.spec.ts`                                                                                                     | No (too slow; local + future CI)    |
+| RLS / DB             | manual + `checkMutationResult` runtime | —                                                                                                                         | —                                   |
 
 **TDD posture:**
+
 - Pure logic in `lib/` and `helpers/` → test first (Vitest unit tests)
 - Edge function action → test alongside (Deno tests)
 - UI → test after (Playwright once UI exists)
@@ -151,6 +152,7 @@ Cross-reference: `CLAUDE.md` SCAN:AUTO block lists these as active flags. Addres
 ### Task 0.1: Restrict CORS in `_shared/cors.ts` (P1 — `cors-open`)
 
 **Files:**
+
 - Modify: `supabase/functions/_shared/cors.ts`
 
 - [ ] **Step 1: Read current CORS module**
@@ -173,7 +175,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 function resolveOrigin(req: Request | undefined): string {
-  if (!req) return "https://operations-center-api-demo.vercel.app";  // safe default for non-request contexts
+  if (!req) return "https://operations-center-api-demo.vercel.app"; // safe default for non-request contexts
   const origin = req.headers.get("Origin") ?? "";
   return ALLOWED_ORIGINS.has(origin) ? origin : "https://operations-center-api-demo.vercel.app";
 }
@@ -181,7 +183,7 @@ function resolveOrigin(req: Request | undefined): string {
 function corsHeaders(req?: Request): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": resolveOrigin(req),
-    "Vary": "Origin",
+    Vary: "Origin",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
   };
@@ -194,7 +196,12 @@ export function jsonResponse(data: unknown, status = 200, req?: Request): Respon
   });
 }
 
-export function errorResponse(error: string, status = 400, details?: string, req?: Request): Response {
+export function errorResponse(
+  error: string,
+  status = 400,
+  details?: string,
+  req?: Request,
+): Response {
   return jsonResponse({ error, ...(details ? { details } : {}) }, status, req);
 }
 
@@ -204,6 +211,7 @@ export function optionsResponse(req?: Request): Response {
 ```
 
 Notes:
+
 - `Vary: Origin` is required when the response depends on the Origin header (cache correctness).
 - Existing callers pass `req` from the function handler; if they don't, defaults to production origin (won't echo evil.com).
 - No `cors-origin-reflection` (v6.7 P1) risk because we never echo an origin we didn't pre-approve.
@@ -260,6 +268,7 @@ git commit -m "security: restrict CORS to allowlist origins on all edge function
 ### Task 0.2: Generic errors across all 4 functions (P2 — `error-response-leakage`)
 
 **Files:**
+
 - Create: `supabase/functions/_shared/generic-error.ts`
 - Modify: catch blocks in all 4 existing edge functions
 
@@ -361,6 +370,7 @@ git commit -m "security: generic error responses across edge functions (P2 error
 ### Task 0.3: Server-side route protection via `middleware.ts` (P3 — `route-protection-gap`)
 
 **Files:**
+
 - Create: `middleware.ts` (project root)
 - Modify: `package.json` (add `@supabase/ssr` dependency)
 
@@ -385,10 +395,7 @@ Expected: package added; lockfile updated.
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = [
-  "/login",
-  "/auth/callback",
-];
+const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
 const PUBLIC_FILE_EXT = /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff2?|ttf|eot)$/;
 
@@ -400,7 +407,7 @@ export async function middleware(request: NextRequest) {
     pathname === "/" ||
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/api") ||  // API routes handle their own auth
+    pathname.startsWith("/api") || // API routes handle their own auth
     PUBLIC_FILE_EXT.test(pathname)
   ) {
     return NextResponse.next();
@@ -426,7 +433,9 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
@@ -486,6 +495,7 @@ git commit -m "security: middleware.ts server-side route protection (P3 route-pr
 ### Task 0.4: Trim OAuth scopes (P3 — `oauth-broad-scopes`)
 
 **Files:**
+
 - Modify: `lib/john-deere-client.ts:288`
 
 - [ ] **Step 1: Locate the scopes string**
@@ -538,6 +548,7 @@ git commit -m "security: trim John Deere OAuth scopes to read-only (P3 oauth-bro
 The Watch Tower SCAN:AUTO block is auto-managed and refreshes on the next scheduled scan. The Resolved table inside the block IS append-friendly — the next scan will see these items as "previously flagged → no longer triggers" and confirm. Per `reference_watchtower_accepted_risks.md`, manual edits to CLAUDE.md are the source of truth.
 
 **Files:**
+
 - Modify: `CLAUDE.md` (Resolved table inside SCAN:AUTO block)
 - Modify: `TECH-DEBT.md`
 
@@ -546,10 +557,10 @@ The Watch Tower SCAN:AUTO block is auto-managed and refreshes on the next schedu
 In `CLAUDE.md`, locate the `### Resolved` table inside the SCAN:AUTO block. Add four rows at the top of the table body:
 
 ```markdown
-| YYYY-MM-DD | cors-open               | Restricted `_shared/cors.ts` to explicit allowlist (`operations-center-api-demo.vercel.app` + localhost). Verified live: `curl -I -X OPTIONS ... -H "Origin: https://evil.com"` no longer echoes the evil origin. Deployed to all 4 functions. |
-| YYYY-MM-DD | error-response-leakage  | Added `_shared/generic-error.ts`. All 4 functions' catch blocks now return `{error: "request_failed", code: "<FN>_<STATUS>"}` only. Server logs the full error/stack server-side. Verified by curling an unauthorized request — no `error.message` in response body. |
-| YYYY-MM-DD | route-protection-gap    | Added `middleware.ts` using `@supabase/ssr`. Unauthenticated requests to `(app)/*` routes get 307 redirect to `/login?redirect=<path>` BEFORE any page HTML loads. Verified: `curl -i /map` returns 307 with no body content. |
-| YYYY-MM-DD | oauth-broad-scopes      | Trimmed scopes from `ag1 ag2 ag3 org1 org2 work1 work2 offline_access` → `ag1 org1 work1 offline_access` (read-only) in `lib/john-deere-client.ts`. Bump back up when write functionality lands. |
+| YYYY-MM-DD | cors-open | Restricted `_shared/cors.ts` to explicit allowlist (`operations-center-api-demo.vercel.app` + localhost). Verified live: `curl -I -X OPTIONS ... -H "Origin: https://evil.com"` no longer echoes the evil origin. Deployed to all 4 functions. |
+| YYYY-MM-DD | error-response-leakage | Added `_shared/generic-error.ts`. All 4 functions' catch blocks now return `{error: "request_failed", code: "<FN>_<STATUS>"}` only. Server logs the full error/stack server-side. Verified by curling an unauthorized request — no `error.message` in response body. |
+| YYYY-MM-DD | route-protection-gap | Added `middleware.ts` using `@supabase/ssr`. Unauthenticated requests to `(app)/*` routes get 307 redirect to `/login?redirect=<path>` BEFORE any page HTML loads. Verified: `curl -i /map` returns 307 with no body content. |
+| YYYY-MM-DD | oauth-broad-scopes | Trimmed scopes from `ag1 ag2 ag3 org1 org2 work1 work2 offline_access` → `ag1 org1 work1 offline_access` (read-only) in `lib/john-deere-client.ts`. Bump back up when write functionality lands. |
 ```
 
 Replace `YYYY-MM-DD` with today's date. Leave the existing Resolved rows below intact.
@@ -560,15 +571,19 @@ In `TECH-DEBT.md`, find the four active items (CORS wildcard, Error response lea
 
 ```markdown
 ### CORS wildcard on all Supabase Edge Functions — YYYY-MM-DD
+
 Resolved as part of spray-application sync build (Task 0.1). `_shared/cors.ts` now uses an explicit allowlist with `Vary: Origin`. Commit: <hash>.
 
 ### Error response leakage in all Edge Functions — YYYY-MM-DD
+
 Resolved as part of spray-application sync build (Task 0.2). `_shared/generic-error.ts` added; all 4 functions' catch blocks retrofitted. Commit: <hash>.
 
 ### No server-side route protection (middleware.ts) — YYYY-MM-DD
+
 Resolved as part of spray-application sync build (Task 0.3). `middleware.ts` added at project root using `@supabase/ssr`. Commit: <hash>.
 
 ### Overly broad John Deere OAuth scopes — YYYY-MM-DD
+
 Resolved as part of spray-application sync build (Task 0.4). Scopes trimmed to `ag1 org1 work1 offline_access` in `lib/john-deere-client.ts`. Commit: <hash>.
 ```
 
@@ -586,6 +601,7 @@ git commit -m "docs: mark 4 security findings resolved (cors-open, error-leakage
 ### Task 1: Install and configure Vitest
 
 **Files:**
+
 - Create: `vitest.config.ts`
 - Modify: `package.json`
 - Create: `lib/__tests__/sanity.test.ts`
@@ -614,7 +630,12 @@ export default defineConfig({
       "lib/**/*.test.tsx",
       "supabase/functions/john-deere-import/__tests__/**/*.test.ts",
     ],
-    exclude: ["node_modules", ".next", "tests/e2e/**", "supabase/functions/john-deere-import/__tests__/import-applications.test.ts"],
+    exclude: [
+      "node_modules",
+      ".next",
+      "tests/e2e/**",
+      "supabase/functions/john-deere-import/__tests__/import-applications.test.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
@@ -679,6 +700,7 @@ git commit -m "test: install Vitest + first sanity test"
 ### Task 2: Install and configure Playwright
 
 **Files:**
+
 - Create: `playwright.config.ts`
 - Create: `tests/e2e/sanity.spec.ts`
 - Create: `.env.test`
@@ -700,7 +722,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: false,  // single user, single session — avoid auth races
+  fullyParallel: false, // single user, single session — avoid auth races
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
@@ -711,9 +733,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "npm run dev",
     url: "http://localhost:3000",
@@ -788,6 +808,7 @@ git commit -m "test: install Playwright + first sanity test"
 ### Task 3: Seed `__fixtures__/jd/` with Phase 0c captured response
 
 **Files:**
+
 - Create: `__fixtures__/jd/application-rate-result-single-tankmix.json`
 - Create: `__fixtures__/jd/application-rate-result-404.json`
 - Create: `__fixtures__/jd/application-operations-list.json`
@@ -983,12 +1004,18 @@ async function main() {
     headers: { Authorization: `Bearer ${userJwt}` },
   });
   const data = await r.json();
-  const file = path.join(out, `debug-spray-shape-snapshot-${new Date().toISOString().slice(0, 10)}.json`);
+  const file = path.join(
+    out,
+    `debug-spray-shape-snapshot-${new Date().toISOString().slice(0, 10)}.json`,
+  );
   await writeFile(file, JSON.stringify(data, null, 2));
   console.log(`Wrote ${file}`);
   console.log("Anonymize IDs before committing.");
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
 ```
 
 - [ ] **Step 6: Commit**
@@ -1003,6 +1030,7 @@ git commit -m "test: seed JD fixture data from Phase 0c capture"
 ### Task 4: Wire Vitest into `prebuild`
 
 **Files:**
+
 - Modify: `package.json`
 
 - [ ] **Step 1: Read current `package.json` scripts**
@@ -1058,6 +1086,7 @@ git commit -m "build: wire Vitest into prebuild (lint + typecheck + test)"
 ### Task 5: Migration — `products` table
 
 **Files:**
+
 - Create: `supabase/migrations/20260528120000_create_products_table.sql`
 
 - [ ] **Step 1: Create the migration file**
@@ -1124,6 +1153,7 @@ git commit -m "db: migration — create operations_center.products table with RL
 ### Task 6: Migration — `field_operation_products` table + trigger
 
 **Files:**
+
 - Create: `supabase/migrations/20260528120100_create_field_operation_products_table.sql`
 
 - [ ] **Step 1: Create the migration file**
@@ -1239,6 +1269,7 @@ git commit -m "db: migration — create field_operation_products + triggers + RL
 ### Task 7: Migration — extend `field_operations` for applications
 
 **Files:**
+
 - Create: `supabase/migrations/20260528120200_extend_field_operations_for_applications.sql`
 
 - [ ] **Step 1: Create the migration file**
@@ -1286,6 +1317,7 @@ git commit -m "db: migration — extend field_operations with measurement_status
 ### Task 8: Migration — `product_category_seeds` lookup table
 
 **Files:**
+
 - Create: `supabase/migrations/20260528120300_create_product_category_seeds_table.sql`
 
 - [ ] **Step 1: Create the migration file**
@@ -1374,6 +1406,7 @@ Use `mcp__supabase__list_tables` with `project_id: "nuxofsjzrgdauzriraze"`, `sch
 - [ ] **Step 3: Apply migration 1 — products table**
 
 Use `mcp__supabase__apply_migration` with:
+
 - `project_id: "nuxofsjzrgdauzriraze"`
 - `name: "create_products_table"`
 - `query`: the SQL content from `supabase/migrations/20260528120000_create_products_table.sql`
@@ -1425,6 +1458,7 @@ This marker commit makes the apply-step traceable in git log alongside the migra
 ### Task 10: TDD — `extract-tankmix` helper (JD response → flat product lines)
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/__tests__/extract-tankmix.test.ts`
 - Create: `supabase/functions/john-deere-import/helpers/extract-tankmix.ts`
 - Create: `supabase/functions/john-deere-import/shared/types.ts`
@@ -1477,7 +1511,7 @@ export interface JdApplicationRateResult {
 
 // Flat output for the merge layer
 export interface ExtractedProductLine {
-  line_index: number;          // global counter across all outer aggregates
+  line_index: number; // global counter across all outer aggregates
   outer_aggregate_index: number; // which applicationProductTotals[i] this came from
   jd_product_id: string;
   name: string;
@@ -1585,14 +1619,9 @@ Expected: "Cannot find module '../helpers/extract-tankmix.ts'".
 ```typescript
 // supabase/functions/john-deere-import/helpers/extract-tankmix.ts
 
-import type {
-  ExtractedProductLine,
-  JdApplicationRateResult,
-} from "../shared/types.ts";
+import type { ExtractedProductLine, JdApplicationRateResult } from "../shared/types.ts";
 
-export function extractTankmix(
-  input: JdApplicationRateResult,
-): ExtractedProductLine[] {
+export function extractTankmix(input: JdApplicationRateResult): ExtractedProductLine[] {
   const out: ExtractedProductLine[] = [];
   const outers = input.applicationProductTotals ?? [];
   let lineIndex = 0;
@@ -1647,6 +1676,7 @@ git commit -m "feat(import): extractTankmix — flat product lines from JD Appli
 ### Task 11: TDD — `derive-application-name` helper
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/__tests__/derive-application-name.test.ts`
 - Create: `supabase/functions/john-deere-import/helpers/derive-application-name.ts`
 
@@ -1673,7 +1703,7 @@ describe("deriveApplicationName", () => {
       applicationProductTotals: [
         { name: "Outlook" },
         { name: "Atrazine" },
-        { name: "Outlook" },  // dup
+        { name: "Outlook" }, // dup
       ],
     };
     expect(deriveApplicationName(input)).toBe("Atrazine; Outlook");
@@ -1681,21 +1711,14 @@ describe("deriveApplicationName", () => {
 
   it("filters '---' placeholder names", () => {
     const input: JdApplicationRateResult = {
-      applicationProductTotals: [
-        { name: "Infurrow" },
-        { name: "---" },
-      ],
+      applicationProductTotals: [{ name: "Infurrow" }, { name: "---" }],
     };
     expect(deriveApplicationName(input)).toBe("Infurrow");
   });
 
   it("filters empty string and whitespace-only names", () => {
     const input: JdApplicationRateResult = {
-      applicationProductTotals: [
-        { name: "Infurrow" },
-        { name: "" },
-        { name: "   " },
-      ],
+      applicationProductTotals: [{ name: "Infurrow" }, { name: "" }, { name: "   " }],
     };
     expect(deriveApplicationName(input)).toBe("Infurrow");
   });
@@ -1742,9 +1765,7 @@ import type { JdApplicationRateResult } from "../shared/types.ts";
 
 const PLACEHOLDER = "---";
 
-export function deriveApplicationName(
-  input: JdApplicationRateResult,
-): string | null {
+export function deriveApplicationName(input: JdApplicationRateResult): string | null {
   const outers = input.applicationProductTotals ?? [];
   const names = outers
     .map((o) => o.name?.trim() ?? "")
@@ -1778,6 +1799,7 @@ git commit -m "feat(import): deriveApplicationName — sorted distinct outer nam
 ### Task 12: TDD — `normalize` helper (name_normalized)
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/__tests__/normalize.test.ts`
 - Create: `supabase/functions/john-deere-import/helpers/normalize.ts`
 
@@ -1856,6 +1878,7 @@ git commit -m "feat(import): normalizeProductName for name_normalized"
 ### Task 13: TDD — `merge-application-products` (the 5-case decision tree)
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/__tests__/merge-application-products.test.ts`
 - Create: `supabase/functions/john-deere-import/helpers/merge-application-products.ts`
 
@@ -1955,12 +1978,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 2: existing line, NOT user-edited, present in JD → UPDATE both live + JD-original", () => {
     const incoming = [mkIncoming({ line_index: 0, rate_value: 5 })]; // JD changed rate from 4 to 5
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: false,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: false,
+      }),
+    ];
     const productIdByJdId = new Map([["pid-A", "00000000-0000-0000-0000-0000000000A0"]]);
 
     const plan = mergeApplicationProducts({
@@ -1991,12 +2016,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 3: existing line, user-edited, present in JD → SKIP (preserve edits)", () => {
     const incoming = [mkIncoming({ line_index: 0, rate_value: 5 })];
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: true,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: true,
+      }),
+    ];
     const productIdByJdId = new Map([["pid-A", "00000000-0000-0000-0000-0000000000A0"]]);
 
     const plan = mergeApplicationProducts({
@@ -2017,12 +2044,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 4: existing line, NOT user-edited, line VANISHED from JD → SOFT-DELETE", () => {
     const incoming: ExtractedProductLine[] = [];
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: false,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: false,
+      }),
+    ];
     const productIdByJdId = new Map();
 
     const plan = mergeApplicationProducts({
@@ -2042,12 +2071,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 5: existing line, user-edited, line VANISHED from JD → LEAVE UNTOUCHED", () => {
     const incoming: ExtractedProductLine[] = [];
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: true,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: true,
+      }),
+    ];
     const productIdByJdId = new Map();
 
     const plan = mergeApplicationProducts({
@@ -2067,14 +2098,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Combined: insert + update + skip + soft-delete in one merge", () => {
     const incoming = [
-      mkIncoming({ line_index: 0, jd_product_id: "pid-A" }),         // matches existing edited → skip
+      mkIncoming({ line_index: 0, jd_product_id: "pid-A" }), // matches existing edited → skip
       mkIncoming({ line_index: 1, jd_product_id: "pid-B", name: "2,4-D" }), // matches existing non-edited → update
-      mkIncoming({ line_index: 2, jd_product_id: "pid-C", name: "AMS" }),   // new → insert
+      mkIncoming({ line_index: 2, jd_product_id: "pid-C", name: "AMS" }), // new → insert
     ];
     const existing = [
       mkExisting({ id: "row-edit", line_index: 0, product_id: "pa", is_user_edited: true }),
       mkExisting({ id: "row-up", line_index: 1, product_id: "pb", is_user_edited: false }),
-      mkExisting({ id: "row-del", line_index: 5, product_id: "pz", is_user_edited: false }),  // vanished
+      mkExisting({ id: "row-del", line_index: 5, product_id: "pz", is_user_edited: false }), // vanished
     ];
     const productIdByJdId = new Map([
       ["pid-A", "pa"],
@@ -2174,7 +2205,7 @@ export interface UpdateRow {
     total_value_jd_original: number | null;
     area_value_jd_original: number | null;
     raw_response: unknown;
-    deleted_at: null;  // un-delete if was soft-deleted then JD brings the line back
+    deleted_at: null; // un-delete if was soft-deleted then JD brings the line back
   };
 }
 
@@ -2197,7 +2228,7 @@ export interface MergePlan {
 export interface MergeInput {
   incoming: ExtractedProductLine[];
   existing: ExistingProductRow[];
-  productIdByJdId: Map<string, string>;  // jd_product_id -> products.id (UUID)
+  productIdByJdId: Map<string, string>; // jd_product_id -> products.id (UUID)
   field_operation_id: string;
   user_id: string;
   org_id: string;
@@ -2275,7 +2306,7 @@ export function mergeApplicationProducts(input: MergeInput): MergePlan {
   }
 
   for (const ex of input.existing) {
-    if (incomingByLineIndex.has(ex.line_index)) continue;  // handled above
+    if (incomingByLineIndex.has(ex.line_index)) continue; // handled above
     if (ex.is_user_edited) {
       // Case 5: vanished from JD but user-edited → leave untouched
       plan.skipped.push({ id: ex.id, reason: "user_edited_vanished_from_jd" });
@@ -2310,6 +2341,7 @@ git commit -m "feat(import): mergeApplicationProducts — 5-case decision tree f
 ### Task 14: TDD — seed-list category matcher (`category-utils`)
 
 **Files:**
+
 - Create: `lib/category-utils.ts`
 - Create: `lib/__tests__/category-utils.test.ts`
 
@@ -2324,11 +2356,11 @@ import { matchCategoryFromSeeds, effectiveCategory } from "../category-utils.ts"
 import type { CategorySeed } from "../category-utils.ts";
 
 const seeds: CategorySeed[] = [
-  { name_pattern: "atrazine",   match_type: "contains", product_category: "chemical" },
-  { name_pattern: "outlook",    match_type: "exact",    product_category: "chemical" },
-  { name_pattern: "uan",        match_type: "exact",    product_category: "fertilizer" },
-  { name_pattern: "urea",       match_type: "contains", product_category: "fertilizer" },
-  { name_pattern: "water",      match_type: "exact",    product_category: "other" },
+  { name_pattern: "atrazine", match_type: "contains", product_category: "chemical" },
+  { name_pattern: "outlook", match_type: "exact", product_category: "chemical" },
+  { name_pattern: "uan", match_type: "exact", product_category: "fertilizer" },
+  { name_pattern: "urea", match_type: "contains", product_category: "fertilizer" },
+  { name_pattern: "water", match_type: "exact", product_category: "other" },
 ];
 
 describe("matchCategoryFromSeeds", () => {
@@ -2354,8 +2386,8 @@ describe("matchCategoryFromSeeds", () => {
   it("prefers exact match over contains when both apply (deterministic order)", () => {
     // 'outlook' exact and (hypothetically) a 'out' contains both — exact wins
     const seedsConflict: CategorySeed[] = [
-      { name_pattern: "out",    match_type: "contains", product_category: "fertilizer" },
-      { name_pattern: "outlook", match_type: "exact",   product_category: "chemical" },
+      { name_pattern: "out", match_type: "contains", product_category: "fertilizer" },
+      { name_pattern: "outlook", match_type: "exact", product_category: "chemical" },
     ];
     expect(matchCategoryFromSeeds("outlook", seedsConflict)).toBe("chemical");
   });
@@ -2371,12 +2403,16 @@ describe("matchCategoryFromSeeds", () => {
 
 describe("effectiveCategory", () => {
   it("returns line-override when set", () => {
-    expect(effectiveCategory({ override: "fertilizer", productCategory: "chemical" })).toBe("fertilizer");
+    expect(effectiveCategory({ override: "fertilizer", productCategory: "chemical" })).toBe(
+      "fertilizer",
+    );
   });
 
   it("falls back to product catalog category when no override", () => {
     expect(effectiveCategory({ override: null, productCategory: "chemical" })).toBe("chemical");
-    expect(effectiveCategory({ override: undefined, productCategory: "chemical" })).toBe("chemical");
+    expect(effectiveCategory({ override: undefined, productCategory: "chemical" })).toBe(
+      "chemical",
+    );
   });
 
   it("returns null when both are absent", () => {
@@ -2399,7 +2435,13 @@ npm test -- category-utils
 export type ProductCategory = "fertilizer" | "chemical" | "seed" | "adjuvant" | "other";
 
 // Free-text field — these 5 are the v1 UI defaults; finer values are valid free text.
-export const KNOWN_CATEGORIES: ProductCategory[] = ["fertilizer", "chemical", "seed", "adjuvant", "other"];
+export const KNOWN_CATEGORIES: ProductCategory[] = [
+  "fertilizer",
+  "chemical",
+  "seed",
+  "adjuvant",
+  "other",
+];
 
 export interface CategorySeed {
   name_pattern: string;
@@ -2459,6 +2501,7 @@ git commit -m "feat(applications): category-utils — seed matcher + effective c
 The existing `supabase/functions/john-deere-import/index.ts` is 689 lines. This task creates the new structure (empty modules + `shared/`) without moving any logic yet. Per-action extraction happens in Tasks 16-19.
 
 **Files:**
+
 - Create directories: `actions/`, `helpers/`, `shared/` inside `supabase/functions/john-deere-import/`
 - Create: `shared/errors.ts`
 - Create: `shared/validation.ts`
@@ -2542,7 +2585,10 @@ export const ImportApplicationsQuery = z.object({
 export type ImportApplicationsQueryT = z.infer<typeof ImportApplicationsQuery>;
 
 export function parseSeasons(input: string): string[] {
-  return input.split(",").map((s) => s.trim()).filter(Boolean);
+  return input
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 ```
 
@@ -2567,6 +2613,7 @@ git commit -m "refactor(import): add shared/errors + shared/validation modules (
 ### Task 16: File split — extract `import-fields` action
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/actions/import-fields.ts`
 - Modify: `supabase/functions/john-deere-import/index.ts` (delegate to new module)
 
@@ -2621,6 +2668,7 @@ git commit -m "refactor(import): extract import-fields action into its own modul
 ### Task 17: File split — extract `import-operations` action
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/actions/import-operations.ts`
 - Create: `supabase/functions/john-deere-import/helpers/fetch-measurement-data.ts`
 - Create: `supabase/functions/john-deere-import/helpers/fetch-map-image.ts`
@@ -2671,6 +2719,7 @@ git commit -m "refactor(import): extract import-operations + fetch-measurement-d
 ### Task 18: File split — extract per-field action + debug actions
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/actions/import-field-operations.ts`
 - Create: `supabase/functions/john-deere-import/actions/debug-field-boundaries.ts`
 - Create: `supabase/functions/john-deere-import/actions/debug-field-operations.ts`
@@ -2688,10 +2737,7 @@ interface PagedResponse<T> {
   links?: Array<{ rel: string; uri: string }>;
 }
 
-export async function* paginate<T>(
-  accessToken: string,
-  initialUrl: string,
-): AsyncGenerator<T> {
+export async function* paginate<T>(accessToken: string, initialUrl: string): AsyncGenerator<T> {
   let url: string | null = initialUrl;
   while (url) {
     const resp = await callJohnDeereUrl(accessToken, url);
@@ -2738,6 +2784,7 @@ git commit -m "refactor(import): extract per-field action + debug actions + pagi
 ### Task 19: File split — reduce `index.ts` to dispatch-only
 
 **Files:**
+
 - Modify: `supabase/functions/john-deere-import/index.ts`
 
 After Tasks 16-18, `index.ts` should contain: imports, the Deno.serve handler, auth + connection check, and a dispatch switch. Target: ~80 lines.
@@ -2777,12 +2824,18 @@ Deno.serve(async (req: Request) => {
     const ctx = { supabase, accessToken, user, orgId, url };
 
     switch (action) {
-      case "import-fields":            return await importFields(ctx);
-      case "import-operations":        return await importOperations(ctx);
-      case "import-field-operations":  return await importFieldOperations(ctx);
-      case "debug-field-boundaries":   return await debugFieldBoundaries(ctx);
-      case "debug-field-operations":   return await debugFieldOperations(ctx);
-      default:                         return errorResponse("Unknown action", 400);
+      case "import-fields":
+        return await importFields(ctx);
+      case "import-operations":
+        return await importOperations(ctx);
+      case "import-field-operations":
+        return await importFieldOperations(ctx);
+      case "debug-field-boundaries":
+        return await debugFieldBoundaries(ctx);
+      case "debug-field-operations":
+        return await debugFieldOperations(ctx);
+      default:
+        return errorResponse("Unknown action", 400);
     }
   } catch (err) {
     return logAndRespond(500, "request_failed", "IMPORT_DISPATCH_500", err);
@@ -2822,6 +2875,7 @@ git commit -m "refactor(import): reduce index.ts to dispatch only (689 -> ~80 li
 ### Task 20: Implement `import-applications` action
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/actions/import-applications.ts`
 - Modify: `supabase/functions/john-deere-import/index.ts` (add to dispatch)
 
@@ -2844,10 +2898,7 @@ import {
   mergeApplicationProducts,
   type ExistingProductRow,
 } from "../helpers/merge-application-products.ts";
-import type {
-  ExtractedProductLine,
-  JdApplicationRateResult,
-} from "../shared/types.ts";
+import type { ExtractedProductLine, JdApplicationRateResult } from "../shared/types.ts";
 import { ImportApplicationsQuery, parseSeasons } from "../shared/validation.ts";
 import { logAndRespond } from "../shared/errors.ts";
 
@@ -2953,7 +3004,9 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
         .eq("jd_operation_id", op.id)
         .maybeSingle();
       if (foErr) {
-        return logAndRespond(500, "request_failed", "IMPORT_APP_500_FO_READ", foErr, { opId: op.id });
+        return logAndRespond(500, "request_failed", "IMPORT_APP_500_FO_READ", foErr, {
+          opId: op.id,
+        });
       }
 
       const baseRow = {
@@ -2984,7 +3037,9 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
           .select("id")
           .single();
         if (insErr || !ins) {
-          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FO_INSERT", insErr, { opId: op.id });
+          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FO_INSERT", insErr, {
+            opId: op.id,
+          });
         }
         fieldOperationId = ins.id;
       } else {
@@ -2994,14 +3049,16 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
           patch.application_name = applicationName;
           patch.application_name_jd_original = applicationName;
         } else {
-          patch.application_name_jd_original = applicationName;  // refresh original even when user-edited
+          patch.application_name_jd_original = applicationName; // refresh original even when user-edited
         }
         const { error: updErr } = await ctx.supabase
           .from("field_operations")
           .update(patch)
           .eq("id", fieldOperationId);
         if (updErr) {
-          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FO_UPDATE", updErr, { opId: op.id });
+          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FO_UPDATE", updErr, {
+            opId: op.id,
+          });
         }
       }
 
@@ -3025,7 +3082,9 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
         .select("id, line_index, product_id, is_user_edited, deleted_at")
         .eq("field_operation_id", fieldOperationId);
       if (exErr) {
-        return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_READ", exErr, { opId: op.id });
+        return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_READ", exErr, {
+          opId: op.id,
+        });
       }
       const existingRows: ExistingProductRow[] = (existing ?? []).map((r) => ({
         id: r.id,
@@ -3050,7 +3109,9 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
           .from("field_operation_products")
           .insert(plan.toInsert);
         if (insErr) {
-          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_INSERT", insErr, { opId: op.id });
+          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_INSERT", insErr, {
+            opId: op.id,
+          });
         }
       }
       for (const upd of plan.toUpdate) {
@@ -3059,7 +3120,9 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
           .update(upd.patch)
           .eq("id", upd.id);
         if (updErr) {
-          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_UPDATE", updErr, { rowId: upd.id });
+          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_UPDATE", updErr, {
+            rowId: upd.id,
+          });
         }
       }
       for (const del of plan.toSoftDelete) {
@@ -3068,7 +3131,9 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
           .update({ deleted_at: new Date().toISOString() })
           .eq("id", del.id);
         if (delErr) {
-          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_SOFTDELETE", delErr, { rowId: del.id });
+          return logAndRespond(500, "request_failed", "IMPORT_APP_500_FOP_SOFTDELETE", delErr, {
+            rowId: del.id,
+          });
         }
       }
 
@@ -3105,8 +3170,7 @@ async function upsertProduct(
 
   if (existing) {
     // Only seed-set categories may be overwritten by re-seed; user edits are sticky.
-    const shouldRefreshCategory =
-      matchedCategory && existing.product_category_source !== "user";
+    const shouldRefreshCategory = matchedCategory && existing.product_category_source !== "user";
     const patch: Record<string, unknown> = {
       last_seen_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -3149,8 +3213,11 @@ async function upsertProduct(
 function matchSeedCategory(nameNormalized: string, seeds: CategorySeedRow[]): string | null {
   const h = nameNormalized.trim().toLowerCase();
   if (h.length === 0) return null;
-  for (const s of seeds) if (s.match_type === "exact" && h === s.name_pattern.toLowerCase()) return s.product_category;
-  for (const s of seeds) if (s.match_type === "contains" && h.includes(s.name_pattern.toLowerCase())) return s.product_category;
+  for (const s of seeds)
+    if (s.match_type === "exact" && h === s.name_pattern.toLowerCase()) return s.product_category;
+  for (const s of seeds)
+    if (s.match_type === "contains" && h.includes(s.name_pattern.toLowerCase()))
+      return s.product_category;
   return null;
 }
 ```
@@ -3187,6 +3254,7 @@ git commit -m "feat(import): add import-applications action with merge-by-line_i
 ### Task 21: Deno test — `import-applications` against fixtures
 
 **Files:**
+
 - Create: `supabase/functions/john-deere-import/__tests__/import-applications.test.ts`
 
 Tests the action with a mocked Supabase client and a mocked `fetch` (returning fixture data). Verifies 200 / 404 / 5xx paths and merge correctness without hitting the live JD API.
@@ -3210,8 +3278,20 @@ async function loadFixture(name: string): Promise<unknown> {
 function makeMockSupabase(state: {
   fields: Array<{ jd_field_id: string; name: string }>;
   fieldOpsByJdId: Map<string, { id: string; application_name_user_edited: boolean }>;
-  productsByJdId: Map<string, { id: string; product_category: string | null; product_category_source: string | null }>;
-  existingFop: Map<string, Array<{ id: string; line_index: number; product_id: string; is_user_edited: boolean; deleted_at: string | null }>>;
+  productsByJdId: Map<
+    string,
+    { id: string; product_category: string | null; product_category_source: string | null }
+  >;
+  existingFop: Map<
+    string,
+    Array<{
+      id: string;
+      line_index: number;
+      product_id: string;
+      is_user_edited: boolean;
+      deleted_at: string | null;
+    }>
+  >;
   seeds: Array<{ name_pattern: string; match_type: string; product_category: string }>;
   inserts: Record<string, unknown[]>;
   updates: Record<string, unknown[]>;
@@ -3225,7 +3305,8 @@ function makeMockSupabase(state: {
           }
           if (name === "fields") {
             return {
-              eq: (_c2: string, _v2: unknown) => Promise.resolve({ data: state.fields, error: null }),
+              eq: (_c2: string, _v2: unknown) =>
+                Promise.resolve({ data: state.fields, error: null }),
             };
           }
           if (name === "field_operations") {
@@ -3241,13 +3322,17 @@ function makeMockSupabase(state: {
             };
           }
           if (name === "field_operation_products") {
-            return Promise.resolve({ data: state.existingFop.get(val as string) ?? [], error: null });
+            return Promise.resolve({
+              data: state.existingFop.get(val as string) ?? [],
+              error: null,
+            });
           }
           if (name === "products") {
             return {
               eq: (_c2: string, _v2: unknown) => ({
                 eq: (_c3: string, jdPid: string) => ({
-                  maybeSingle: () => Promise.resolve({ data: state.productsByJdId.get(jdPid) ?? null, error: null }),
+                  maybeSingle: () =>
+                    Promise.resolve({ data: state.productsByJdId.get(jdPid) ?? null, error: null }),
                 }),
               }),
             };
@@ -3276,95 +3361,123 @@ function makeMockSupabase(state: {
   return { from: table } as any;
 }
 
-Deno.test("import-applications: happy path inserts products + lines from single-tankmix fixture", async () => {
-  const single = await loadFixture("application-rate-result-single-tankmix.json");
+Deno.test(
+  "import-applications: happy path inserts products + lines from single-tankmix fixture",
+  async () => {
+    const single = await loadFixture("application-rate-result-single-tankmix.json");
 
-  // Patch global fetch to return the list + measurement fixtures based on URL.
-  const origFetch = globalThis.fetch;
-  globalThis.fetch = (url: string | URL | Request, _init?: RequestInit) => {
-    const s = url.toString();
-    if (s.includes("fieldOperations?fieldOperationType=APPLICATION")) {
-      return Promise.resolve(new Response(JSON.stringify({
-        values: [{ id: "op-1", fieldOperationType: "application", cropSeason: "2025", startDate: "2025-06-03T22:01:57.473Z" }],
-        links: [],
-      }), { status: 200, headers: { "Content-Type": "application/json" } }));
-    }
-    if (s.includes("/measurementTypes/ApplicationRateResult")) {
-      return Promise.resolve(new Response(JSON.stringify(single), { status: 200, headers: { "Content-Type": "application/json" } }));
-    }
-    return Promise.resolve(new Response("not found", { status: 404 }));
-  };
-
-  const supabase = makeMockSupabase({
-    fields: [{ jd_field_id: "field-1", name: "Test Field" }],
-    fieldOpsByJdId: new Map(),
-    productsByJdId: new Map(),
-    existingFop: new Map(),
-    seeds: [],
-    inserts: {},
-    updates: {},
-  });
-
-  const url = new URL("https://example.com/?action=import-applications&seasons=2025,2026");
-  const ctx = {
-    supabase,
-    accessToken: "test-token",
-    user: { id: "00000000-0000-0000-0000-00000000U0U0" } as never,
-    orgId: "600550",
-    url,
-  };
-
-  const resp = await importApplications(ctx);
-  assertEquals(resp.status, 200);
-  const body = await resp.json();
-  assertExists(body.operations_processed);
-  assertEquals(body.operations_processed, 1);
-  assertEquals(body.product_lines_written, 2);
-  assertEquals(body.measurements_not_found, 0);
-
-  globalThis.fetch = origFetch;
-});
-
-Deno.test("import-applications: 404 on measurement -> measurement_status='not_found', no product lines", async () => {
-  const origFetch = globalThis.fetch;
-  globalThis.fetch = (url: string | URL | Request) => {
-    const s = url.toString();
-    if (s.includes("fieldOperations?fieldOperationType=APPLICATION")) {
-      return Promise.resolve(new Response(JSON.stringify({
-        values: [{ id: "op-404", fieldOperationType: "application", cropSeason: "2026" }],
-        links: [],
-      }), { status: 200 }));
-    }
-    if (s.includes("/measurementTypes/ApplicationRateResult")) {
+    // Patch global fetch to return the list + measurement fixtures based on URL.
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (url: string | URL | Request, _init?: RequestInit) => {
+      const s = url.toString();
+      if (s.includes("fieldOperations?fieldOperationType=APPLICATION")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              values: [
+                {
+                  id: "op-1",
+                  fieldOperationType: "application",
+                  cropSeason: "2025",
+                  startDate: "2025-06-03T22:01:57.473Z",
+                },
+              ],
+              links: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      if (s.includes("/measurementTypes/ApplicationRateResult")) {
+        return Promise.resolve(
+          new Response(JSON.stringify(single), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
       return Promise.resolve(new Response("not found", { status: 404 }));
-    }
-    return Promise.resolve(new Response("", { status: 200 }));
-  };
+    };
 
-  const supabase = makeMockSupabase({
-    fields: [{ jd_field_id: "field-1", name: "Test Field" }],
-    fieldOpsByJdId: new Map(),
-    productsByJdId: new Map(),
-    existingFop: new Map(),
-    seeds: [],
-    inserts: {},
-    updates: {},
-  });
+    const supabase = makeMockSupabase({
+      fields: [{ jd_field_id: "field-1", name: "Test Field" }],
+      fieldOpsByJdId: new Map(),
+      productsByJdId: new Map(),
+      existingFop: new Map(),
+      seeds: [],
+      inserts: {},
+      updates: {},
+    });
 
-  const url = new URL("https://example.com/?action=import-applications&seasons=2025,2026");
-  const resp = await importApplications({
-    supabase,
-    accessToken: "t",
-    user: { id: "u" } as never,
-    orgId: "o",
-    url,
-  });
-  const body = await resp.json();
-  assertEquals(body.measurements_not_found, 1);
-  assertEquals(body.product_lines_written, 0);
+    const url = new URL("https://example.com/?action=import-applications&seasons=2025,2026");
+    const ctx = {
+      supabase,
+      accessToken: "test-token",
+      user: { id: "00000000-0000-0000-0000-00000000U0U0" } as never,
+      orgId: "600550",
+      url,
+    };
 
-  globalThis.fetch = origFetch;
-});
+    const resp = await importApplications(ctx);
+    assertEquals(resp.status, 200);
+    const body = await resp.json();
+    assertExists(body.operations_processed);
+    assertEquals(body.operations_processed, 1);
+    assertEquals(body.product_lines_written, 2);
+    assertEquals(body.measurements_not_found, 0);
+
+    globalThis.fetch = origFetch;
+  },
+);
+
+Deno.test(
+  "import-applications: 404 on measurement -> measurement_status='not_found', no product lines",
+  async () => {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (url: string | URL | Request) => {
+      const s = url.toString();
+      if (s.includes("fieldOperations?fieldOperationType=APPLICATION")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              values: [{ id: "op-404", fieldOperationType: "application", cropSeason: "2026" }],
+              links: [],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      if (s.includes("/measurementTypes/ApplicationRateResult")) {
+        return Promise.resolve(new Response("not found", { status: 404 }));
+      }
+      return Promise.resolve(new Response("", { status: 200 }));
+    };
+
+    const supabase = makeMockSupabase({
+      fields: [{ jd_field_id: "field-1", name: "Test Field" }],
+      fieldOpsByJdId: new Map(),
+      productsByJdId: new Map(),
+      existingFop: new Map(),
+      seeds: [],
+      inserts: {},
+      updates: {},
+    });
+
+    const url = new URL("https://example.com/?action=import-applications&seasons=2025,2026");
+    const resp = await importApplications({
+      supabase,
+      accessToken: "t",
+      user: { id: "u" } as never,
+      orgId: "o",
+      url,
+    });
+    const body = await resp.json();
+    assertEquals(body.measurements_not_found, 1);
+    assertEquals(body.product_lines_written, 0);
+
+    globalThis.fetch = origFetch;
+  },
+);
 ```
 
 - [ ] **Step 2: Add Deno test script to `package.json`**
@@ -3393,6 +3506,7 @@ git commit -m "test(import): Deno tests for import-applications (happy + 404 pat
 ### Task 22: Auto-chain `import-applications` from `import-fields`
 
 **Files:**
+
 - Modify: `supabase/functions/john-deere-import/actions/import-fields.ts`
 
 The existing `import-fields` action already auto-chains to `import-operations` after importing fields. Extend the chain to also call `import-applications` so the user gets a one-click "give me everything."
@@ -3433,6 +3547,7 @@ git commit -m "feat(import): chain import-applications into import-fields auto-f
 ### Task 23: Frontend types (`types/applications.ts`)
 
 **Files:**
+
 - Create: `types/applications.ts`
 
 - [ ] **Step 1: Create file with the v1 type set**
@@ -3440,12 +3555,7 @@ git commit -m "feat(import): chain import-applications into import-fields auto-f
 ```typescript
 // types/applications.ts
 
-export type ProductCategory =
-  | "fertilizer"
-  | "chemical"
-  | "seed"
-  | "adjuvant"
-  | "other";
+export type ProductCategory = "fertilizer" | "chemical" | "seed" | "adjuvant" | "other";
 
 export interface Product {
   id: string;
@@ -3457,7 +3567,7 @@ export interface Product {
   brand: string | null;
   is_carrier_default: boolean;
   product_kind: "constituent" | "tank_mix_recipe" | null;
-  product_category: ProductCategory | string | null;  // free text but typed for known set
+  product_category: ProductCategory | string | null; // free text but typed for known set
   product_category_source: "seed" | "user" | null;
   default_unit: string | null;
   first_seen_at: string;
@@ -3546,6 +3656,7 @@ git commit -m "types: applications + product lines for spray-sync UI"
 ### Task 24: Frontend helper `checkMutationResult` + `unit-display`
 
 **Files:**
+
 - Create: `lib/check-mutation-result.ts`
 - Create: `lib/unit-display.ts`
 - Create: `lib/__tests__/unit-display.test.ts`
@@ -3558,7 +3669,10 @@ git commit -m "types: applications + product lines for spray-sync UI"
 // lib/check-mutation-result.ts
 
 export class MutationError extends Error {
-  constructor(message: string, public operation: string) {
+  constructor(
+    message: string,
+    public operation: string,
+  ) {
     super(message);
     this.name = "MutationError";
   }
@@ -3707,6 +3821,7 @@ git commit -m "feat(lib): checkMutationResult + unit-display helpers"
 ### Task 25: Frontend `applications-client.ts` — read paths
 
 **Files:**
+
 - Create: `lib/applications-client.ts`
 
 - [ ] **Step 1: Create file**
@@ -3729,10 +3844,13 @@ export interface ApplicationsListFilter {
   category?: string;
 }
 
-export async function fetchApplications(filter: ApplicationsListFilter = {}): Promise<ApplicationWithLines[]> {
+export async function fetchApplications(
+  filter: ApplicationsListFilter = {},
+): Promise<ApplicationWithLines[]> {
   let q = supabase
     .from("field_operations")
-    .select(`
+    .select(
+      `
       id, user_id, org_id, jd_field_id, jd_operation_id, operation_type,
       crop_season, start_date, end_date,
       application_name, application_name_jd_original, application_name_user_edited,
@@ -3748,7 +3866,8 @@ export async function fetchApplications(filter: ApplicationsListFilter = {}): Pr
         product:products(*)
       ),
       field:fields(name)
-    `)
+    `,
+    )
     .eq("operation_type", "application")
     .is("product_lines.deleted_at", null)
     .order("start_date", { ascending: false });
@@ -3760,48 +3879,58 @@ export async function fetchApplications(filter: ApplicationsListFilter = {}): Pr
   if (error) throw error;
 
   // Reshape: lift field name + apply filters that span join boundaries client-side.
-  return (data ?? []).map((row: any) => ({
-    ...row,
-    field_name: row.field?.name ?? "Unknown",
-    product_lines: row.product_lines ?? [],
-  })).filter((row: ApplicationWithLines) => {
-    if (filter.productId && !row.product_lines.some((l) => l.product_id === filter.productId)) return false;
-    if (filter.category) {
-      const has = row.product_lines.some((l) => {
-        const effective = l.product_category_override ?? l.product?.product_category;
-        return effective === filter.category;
-      });
-      if (!has) return false;
-    }
-    return true;
-  });
+  return (data ?? [])
+    .map((row: any) => ({
+      ...row,
+      field_name: row.field?.name ?? "Unknown",
+      product_lines: row.product_lines ?? [],
+    }))
+    .filter((row: ApplicationWithLines) => {
+      if (filter.productId && !row.product_lines.some((l) => l.product_id === filter.productId))
+        return false;
+      if (filter.category) {
+        const has = row.product_lines.some((l) => {
+          const effective = l.product_category_override ?? l.product?.product_category;
+          return effective === filter.category;
+        });
+        if (!has) return false;
+      }
+      return true;
+    });
 }
 
-export async function fetchProductsRollup(season?: string): Promise<Array<{
-  product: Product;
-  total_value_sum: number;
-  total_unit: string | null;
-  field_count: number;
-  operation_count: number;
-}>> {
-  // Use a single query with aggregation; Supabase RPC would be cleaner but we keep it client-side for v1.
-  const { data, error } = await supabase
-    .from("field_operation_products")
-    .select(`
-      total_value, total_unit, product_id, field_operation_id,
-      field_operation:field_operations!inner(crop_season, jd_field_id),
-      product:products(*)
-    `)
-    .is("deleted_at", null);
-  if (error) throw error;
-
-  const byProduct = new Map<string, {
+export async function fetchProductsRollup(season?: string): Promise<
+  Array<{
     product: Product;
     total_value_sum: number;
     total_unit: string | null;
-    fields: Set<string>;
-    operations: Set<string>;
-  }>();
+    field_count: number;
+    operation_count: number;
+  }>
+> {
+  // Use a single query with aggregation; Supabase RPC would be cleaner but we keep it client-side for v1.
+  const { data, error } = await supabase
+    .from("field_operation_products")
+    .select(
+      `
+      total_value, total_unit, product_id, field_operation_id,
+      field_operation:field_operations!inner(crop_season, jd_field_id),
+      product:products(*)
+    `,
+    )
+    .is("deleted_at", null);
+  if (error) throw error;
+
+  const byProduct = new Map<
+    string,
+    {
+      product: Product;
+      total_value_sum: number;
+      total_unit: string | null;
+      fields: Set<string>;
+      operations: Set<string>;
+    }
+  >();
   for (const row of (data ?? []) as any[]) {
     if (season && row.field_operation?.crop_season !== season) continue;
     const pid = row.product_id as string;
@@ -3847,6 +3976,7 @@ git commit -m "feat(applications): client read paths (list + rollup)"
 ### Task 26: Frontend `applications-client.ts` — edit + revert mutations
 
 **Files:**
+
 - Modify: `lib/applications-client.ts`
 
 Append the edit-mutation contract from spec section 6.6.
@@ -3902,10 +4032,7 @@ export async function revertProductLine(lineId: string): Promise<FieldOperationP
   return checkMutationResult(data, "revert product line", 1) as FieldOperationProductLine;
 }
 
-export async function editProductCategory(
-  productId: string,
-  category: string,
-): Promise<Product> {
+export async function editProductCategory(productId: string, category: string): Promise<Product> {
   const { data, error } = await supabase
     .from("products")
     .update({
@@ -3979,6 +4106,7 @@ git commit -m "feat(applications): edit + revert mutations with checkMutationRes
 ### Task 27: UI — `/applications` page skeleton
 
 **Files:**
+
 - Create: `app/(app)/applications/page.tsx`
 - Create: `app/(app)/applications/loading.tsx`
 - Modify: `components/layout/nav-links.tsx` (add nav item)
@@ -4004,20 +4132,30 @@ export default function ApplicationsPage() {
     let cancelled = false;
     setLoading(true);
     fetchApplications(filter)
-      .then((data) => { if (!cancelled) setRows(data); })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((data) => {
+        if (!cancelled) setRows(data);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [filter]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl p-6">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Applications</h1>
-        <p className="text-sm text-slate-600 mt-1">Spray applications imported from John Deere Operations Center.</p>
+        <p className="mt-1 text-sm text-slate-600">
+          Spray applications imported from John Deere Operations Center.
+        </p>
       </header>
       <ApplicationFilters value={filter} onChange={setFilter} />
-      {error && <div className="mt-4 p-3 rounded bg-red-50 text-red-700 text-sm">{error}</div>}
+      {error && <div className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {loading ? (
         <div className="mt-6 text-slate-500">Loading...</div>
       ) : (
@@ -4065,6 +4203,7 @@ git commit -m "feat(applications): /applications page skeleton + nav entry"
 ### Task 28: UI — `applications-list` + `application-row` (collapsed)
 
 **Files:**
+
 - Create: `components/applications/applications-list.tsx`
 - Create: `components/applications/application-row.tsx`
 - Create: `components/applications/category-badge.tsx`
@@ -4094,7 +4233,9 @@ const COLORS: Record<string, string> = {
 export function CategoryBadge({ category }: { category: string | null }) {
   const key = category ?? "other";
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${COLORS[key] ?? COLORS.other}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${COLORS[key] ?? COLORS.other}`}
+    >
       <span>{ICONS[key] ?? ICONS.other}</span>
       <span className="capitalize">{category ?? "Uncategorized"}</span>
     </span>
@@ -4128,33 +4269,43 @@ export function ApplicationFilters({
   const [seasons] = useState<string[]>(["2026", "2025", "2024"]);
 
   useEffect(() => {
-    supabase.from("fields").select("jd_field_id, name").order("name").then(({ data }) => {
-      setFields(data ?? []);
-    });
+    supabase
+      .from("fields")
+      .select("jd_field_id, name")
+      .order("name")
+      .then(({ data }) => {
+        setFields(data ?? []);
+      });
   }, []);
 
   return (
-    <div className="flex flex-wrap gap-3 items-center">
+    <div className="flex flex-wrap items-center gap-3">
       <select
-        className="border border-slate-200 rounded px-2 py-1 text-sm"
+        className="rounded border border-slate-200 px-2 py-1 text-sm"
         value={value.fieldId ?? ""}
         onChange={(e) => onChange({ ...value, fieldId: e.target.value || undefined })}
       >
         <option value="">All fields</option>
         {fields.map((f) => (
-          <option key={f.jd_field_id} value={f.jd_field_id}>{f.name}</option>
+          <option key={f.jd_field_id} value={f.jd_field_id}>
+            {f.name}
+          </option>
         ))}
       </select>
       <select
-        className="border border-slate-200 rounded px-2 py-1 text-sm"
+        className="rounded border border-slate-200 px-2 py-1 text-sm"
         value={value.season ?? ""}
         onChange={(e) => onChange({ ...value, season: e.target.value || undefined })}
       >
         <option value="">All seasons</option>
-        {seasons.map((s) => <option key={s} value={s}>{s}</option>)}
+        {seasons.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
       </select>
       <select
-        className="border border-slate-200 rounded px-2 py-1 text-sm"
+        className="rounded border border-slate-200 px-2 py-1 text-sm"
         value={value.category ?? ""}
         onChange={(e) => onChange({ ...value, category: e.target.value || undefined })}
       >
@@ -4191,18 +4342,22 @@ export function ApplicationRow({
   const dateLabel = row.start_date ? new Date(row.start_date).toLocaleDateString() : "—";
 
   return (
-    <div className="border border-slate-200 rounded bg-white">
+    <div className="rounded border border-slate-200 bg-white">
       <button
         type="button"
-        className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-slate-50"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
         onClick={() => setOpen(!open)}
       >
-        <span className="text-sm text-slate-600 w-24">{dateLabel}</span>
-        <span className="font-medium text-slate-900 flex-1">{row.application_name ?? "(unnamed)"}</span>
+        <span className="w-24 text-sm text-slate-600">{dateLabel}</span>
+        <span className="flex-1 font-medium text-slate-900">
+          {row.application_name ?? "(unnamed)"}
+        </span>
         <span className="text-sm text-slate-500">{row.field_name}</span>
         <span className="text-sm text-slate-500">{lineCount} items</span>
         {row.measurement_status === "not_found" && (
-          <span className="text-xs px-2 py-0.5 rounded bg-yellow-50 text-yellow-700">JD data pending</span>
+          <span className="rounded bg-yellow-50 px-2 py-0.5 text-xs text-yellow-700">
+            JD data pending
+          </span>
         )}
         <span className="text-slate-400">{open ? "▾" : "▸"}</span>
       </button>
@@ -4229,7 +4384,7 @@ export function ApplicationsList({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="mt-6 p-8 text-center text-slate-500 border border-dashed border-slate-200 rounded">
+      <div className="mt-6 rounded border border-dashed border-slate-200 p-8 text-center text-slate-500">
         No applications to show. Import from John Deere via Settings.
       </div>
     );
@@ -4260,6 +4415,7 @@ git commit -m "feat(applications): list + collapsed row + filters + category bad
 ### Task 29: UI — `application-expanded` + `product-line-row` (read-only first)
 
 **Files:**
+
 - Create: `components/applications/application-expanded.tsx`
 - Create: `components/applications/product-line-row.tsx`
 - Create: `components/applications/inconsistency-badge.tsx`
@@ -4280,11 +4436,11 @@ export function InconsistencyBadge({
 }) {
   if (rate == null || area == null || total == null) return null;
   const expected = rate * area;
-  const eps = Math.max(0.5, expected * 0.05);  // 5% tolerance or 0.5 absolute
+  const eps = Math.max(0.5, expected * 0.05); // 5% tolerance or 0.5 absolute
   if (Math.abs(total - expected) <= eps) return null;
   return (
     <span
-      className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700"
+      className="rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700"
       title={`Rate × area = ${expected.toFixed(2)}, but total is ${total}. Save still works.`}
     >
       ⚠ inconsistent
@@ -4312,26 +4468,44 @@ interface Props {
 export function ProductLineRow({ line, onEdit, onRevert }: Props) {
   const effectiveCategory = line.product_category_override ?? line.product.product_category;
   return (
-    <div className="grid grid-cols-12 gap-2 items-center py-2 px-3 text-sm border-b border-slate-100 last:border-b-0">
+    <div className="grid grid-cols-12 items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
       <div className="col-span-3 font-medium text-slate-900">{line.product.name}</div>
       <div className="col-span-2">
         <CategoryBadge category={effectiveCategory} />
       </div>
-      <div className="col-span-2 text-slate-700">{displayRate(line.rate_value, line.rate_unit)}</div>
-      <div className="col-span-2 text-slate-700">{displayTotal(line.total_value, line.total_unit)}</div>
-      <div className="col-span-1 text-slate-700">{line.area_value} {displayUnit(line.area_unit)}</div>
+      <div className="col-span-2 text-slate-700">
+        {displayRate(line.rate_value, line.rate_unit)}
+      </div>
+      <div className="col-span-2 text-slate-700">
+        {displayTotal(line.total_value, line.total_unit)}
+      </div>
+      <div className="col-span-1 text-slate-700">
+        {line.area_value} {displayUnit(line.area_unit)}
+      </div>
       <div className="col-span-2 flex items-center justify-end gap-2">
-        <InconsistencyBadge rate={line.rate_value} area={line.area_value} total={line.total_value} />
+        <InconsistencyBadge
+          rate={line.rate_value}
+          area={line.area_value}
+          total={line.total_value}
+        />
         {line.is_user_edited && (
-          <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700">edited</span>
+          <span className="rounded bg-purple-50 px-2 py-0.5 text-xs text-purple-700">edited</span>
         )}
         {onEdit && (
-          <button type="button" onClick={onEdit} className="text-xs px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-50">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded border border-slate-200 px-2 py-0.5 text-xs hover:bg-slate-50"
+          >
             Edit
           </button>
         )}
         {line.is_user_edited && onRevert && (
-          <button type="button" onClick={onRevert} className="text-xs px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-50">
+          <button
+            type="button"
+            onClick={onRevert}
+            className="rounded border border-slate-200 px-2 py-0.5 text-xs hover:bg-slate-50"
+          >
             Revert
           </button>
         )}
@@ -4371,8 +4545,8 @@ export function ApplicationExpanded({
   }
 
   return (
-    <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/50">
-      <div className="grid grid-cols-12 gap-2 py-2 px-3 text-xs text-slate-500 uppercase">
+    <div className="border-t border-slate-100 bg-slate-50/50 px-4 pb-4">
+      <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs uppercase text-slate-500">
         <div className="col-span-3">Product</div>
         <div className="col-span-2">Category</div>
         <div className="col-span-2">Rate</div>
@@ -4384,7 +4558,7 @@ export function ApplicationExpanded({
         const lines = grouped.get(cat);
         if (!lines || lines.length === 0) return null;
         return (
-          <div key={cat ?? "uncategorized"} className="bg-white rounded mt-1">
+          <div key={cat ?? "uncategorized"} className="mt-1 rounded bg-white">
             {lines.map((line) => (
               <ProductLineRow key={line.id} line={line as any} />
             ))}
@@ -4392,7 +4566,7 @@ export function ApplicationExpanded({
         );
       })}
       <div className="mt-3">
-        <label className="text-xs text-slate-600 flex items-center gap-2">
+        <label className="flex items-center gap-2 text-xs text-slate-600">
           <input
             type="checkbox"
             checked={showCarriers}
@@ -4422,6 +4596,7 @@ git commit -m "feat(applications): expanded view grouped by category + read-only
 ### Task 30: UI — product line edit dialog + revert flow
 
 **Files:**
+
 - Create: `components/applications/product-line-edit-dialog.tsx`
 - Modify: `components/applications/application-expanded.tsx` (wire edit + revert handlers)
 
@@ -4469,17 +4644,23 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Edit {line.product.name}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <h3 className="mb-4 text-lg font-semibold text-slate-900">Edit {line.product.name}</h3>
         <div className="space-y-3">
           <Row label={`Rate (${displayUnit(line.rate_unit)})`} value={rate} setValue={setRate} />
-          <Row label={`Total (${displayUnit(line.total_unit)})`} value={total} setValue={setTotal} />
+          <Row
+            label={`Total (${displayUnit(line.total_unit)})`}
+            value={total}
+            setValue={setTotal}
+          />
           <Row label={`Area (${displayUnit(line.area_unit)})`} value={area} setValue={setArea} />
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Category override (optional)</label>
+            <label className="mb-1 block text-xs text-slate-600">
+              Category override (optional)
+            </label>
             <select
-              className="w-full border border-slate-200 rounded px-2 py-1.5"
+              className="w-full rounded border border-slate-200 px-2 py-1.5"
               value={override}
               onChange={(e) => setOverride(e.target.value)}
             >
@@ -4492,12 +4673,22 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
             </select>
           </div>
         </div>
-        {error && <div className="mt-3 p-2 rounded bg-red-50 text-red-700 text-sm">{error}</div>}
+        {error && <div className="mt-3 rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50" disabled={saving}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-slate-200 px-3 py-1.5 hover:bg-slate-50"
+            disabled={saving}
+          >
             Cancel
           </button>
-          <button type="button" onClick={save} className="px-3 py-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50" disabled={saving}>
+          <button
+            type="button"
+            onClick={save}
+            className="rounded bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+            disabled={saving}
+          >
             {saving ? "Saving..." : "Save"}
           </button>
         </div>
@@ -4506,14 +4697,22 @@ export function ProductLineEditDialog({ line, onClose, onSaved }: Props) {
   );
 }
 
-function Row({ label, value, setValue }: { label: string; value: string | number; setValue: (v: string) => void }) {
+function Row({
+  label,
+  value,
+  setValue,
+}: {
+  label: string;
+  value: string | number;
+  setValue: (v: string) => void;
+}) {
   return (
     <div>
-      <label className="block text-xs text-slate-600 mb-1">{label}</label>
+      <label className="mb-1 block text-xs text-slate-600">{label}</label>
       <input
         type="number"
         step="any"
-        className="w-full border border-slate-200 rounded px-2 py-1.5"
+        className="w-full rounded border border-slate-200 px-2 py-1.5"
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
@@ -4543,21 +4742,26 @@ const [editingLineId, setEditingLineId] = useState<string | null>(null);
     try {
       await revertProductLine(line.id);
       onChanged();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   }}
-/>
+/>;
 
 // at end of component:
-{editingLineId && (() => {
-  const line = visibleLines.find((l) => l.id === editingLineId);
-  return line ? (
-    <ProductLineEditDialog
-      line={line as any}
-      onClose={() => setEditingLineId(null)}
-      onSaved={onChanged}
-    />
-  ) : null;
-})()}
+{
+  editingLineId &&
+    (() => {
+      const line = visibleLines.find((l) => l.id === editingLineId);
+      return line ? (
+        <ProductLineEditDialog
+          line={line as any}
+          onClose={() => setEditingLineId(null)}
+          onSaved={onChanged}
+        />
+      ) : null;
+    })();
+}
 ```
 
 - [ ] **Step 3: Test in browser**
@@ -4576,6 +4780,7 @@ git commit -m "feat(applications): edit dialog + revert wired to client"
 ### Task 31: UI — `/products` rollup page
 
 **Files:**
+
 - Create: `app/(app)/products/page.tsx`
 - Create: `app/(app)/products/loading.tsx`
 - Create: `components/applications/products-rollup-table.tsx`
@@ -4605,14 +4810,16 @@ export default function ProductsPage() {
   useEffect(load, [season]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl p-6">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Products</h1>
-        <p className="text-sm text-slate-600 mt-1">Quantities applied across all fields, grouped by product.</p>
+        <p className="mt-1 text-sm text-slate-600">
+          Quantities applied across all fields, grouped by product.
+        </p>
       </header>
-      <div className="flex gap-3 items-center mb-4">
+      <div className="mb-4 flex items-center gap-3">
         <select
-          className="border border-slate-200 rounded px-2 py-1 text-sm"
+          className="rounded border border-slate-200 px-2 py-1 text-sm"
           value={season}
           onChange={(e) => setSeason(e.target.value)}
         >
@@ -4622,7 +4829,7 @@ export default function ProductsPage() {
           <option value="2024">2024</option>
         </select>
       </div>
-      {error && <div className="p-3 rounded bg-red-50 text-red-700 text-sm">{error}</div>}
+      {error && <div className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {loading ? (
         <div className="text-slate-500">Loading...</div>
       ) : (
@@ -4664,26 +4871,30 @@ export function ProductsRollupTable({
   onEditCategory: (productId: string, category: string) => Promise<void>;
 }) {
   if (rows.length === 0) {
-    return <div className="p-8 text-center text-slate-500 border border-dashed border-slate-200 rounded">No products yet.</div>;
+    return (
+      <div className="rounded border border-dashed border-slate-200 p-8 text-center text-slate-500">
+        No products yet.
+      </div>
+    );
   }
   return (
     <table className="w-full text-sm">
-      <thead className="text-xs text-slate-500 uppercase border-b border-slate-200">
+      <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
         <tr>
-          <th className="text-left py-2 px-3">Product</th>
-          <th className="text-left py-2 px-3">Category</th>
-          <th className="text-right py-2 px-3">Total Applied</th>
-          <th className="text-right py-2 px-3">Fields</th>
-          <th className="text-right py-2 px-3">Operations</th>
+          <th className="px-3 py-2 text-left">Product</th>
+          <th className="px-3 py-2 text-left">Category</th>
+          <th className="px-3 py-2 text-right">Total Applied</th>
+          <th className="px-3 py-2 text-right">Fields</th>
+          <th className="px-3 py-2 text-right">Operations</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r) => (
           <tr key={r.product.id} className="border-b border-slate-100">
-            <td className="py-2 px-3 font-medium text-slate-900">{r.product.name}</td>
-            <td className="py-2 px-3">
+            <td className="px-3 py-2 font-medium text-slate-900">{r.product.name}</td>
+            <td className="px-3 py-2">
               <select
-                className="border border-slate-200 rounded px-2 py-0.5 text-xs"
+                className="rounded border border-slate-200 px-2 py-0.5 text-xs"
                 value={r.product.product_category ?? ""}
                 onChange={(e) => onEditCategory(r.product.id, e.target.value)}
               >
@@ -4695,11 +4906,11 @@ export function ProductsRollupTable({
                 <option value="other">Other</option>
               </select>
             </td>
-            <td className="py-2 px-3 text-right">
+            <td className="px-3 py-2 text-right">
               {r.total_value_sum.toFixed(2)} {displayUnit(r.total_unit)}
             </td>
-            <td className="py-2 px-3 text-right">{r.field_count}</td>
-            <td className="py-2 px-3 text-right">{r.operation_count}</td>
+            <td className="px-3 py-2 text-right">{r.field_count}</td>
+            <td className="px-3 py-2 text-right">{r.operation_count}</td>
           </tr>
         ))}
       </tbody>
@@ -4732,6 +4943,7 @@ git commit -m "feat(products): /products rollup page with editable categories"
 ### Task 32: UI — `/fields/[fieldId]` Applications tab
 
 **Files:**
+
 - Create: `components/fields/field-applications-tab.tsx`
 - Modify: existing field detail page to add the tab
 
@@ -4762,14 +4974,20 @@ export default function FieldApplicationsPage() {
 
   function load() {
     setLoading(true);
-    fetchApplications({ fieldId }).then(setRows).finally(() => setLoading(false));
+    fetchApplications({ fieldId })
+      .then(setRows)
+      .finally(() => setLoading(false));
   }
   useEffect(load, [fieldId]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl p-6">
       <h1 className="text-2xl font-semibold text-slate-900">Field applications</h1>
-      {loading ? <div className="mt-4 text-slate-500">Loading...</div> : <ApplicationsList rows={rows} onChanged={load} />}
+      {loading ? (
+        <div className="mt-4 text-slate-500">Loading...</div>
+      ) : (
+        <ApplicationsList rows={rows} onChanged={load} />
+      )}
     </div>
   );
 }
@@ -4795,6 +5013,7 @@ git commit -m "feat(fields): per-field applications view"
 ### Task 33: Playwright global auth setup
 
 **Files:**
+
 - Create: `tests/e2e/global-setup.ts`
 - Modify: `playwright.config.ts` (reference globalSetup)
 
@@ -4865,6 +5084,7 @@ git commit -m "test(e2e): Playwright global auth setup + storageState"
 ### Task 34: E2E spec — import + view applications
 
 **Files:**
+
 - Create: `tests/e2e/import-and-view.spec.ts`
 
 This spec asserts that after triggering the import, the `/applications` page lists at least one application with at least one product line. Galen's account is assumed to have real JD data with at least one APPLICATION op.
@@ -4934,6 +5154,7 @@ git commit -m "test(e2e): import + view applications smoke"
 ### Task 35: E2E spec — edit + revert flow
 
 **Files:**
+
 - Create: `tests/e2e/edit-and-revert.spec.ts`
 
 - [ ] **Step 1: Create the spec**
@@ -4972,7 +5193,7 @@ test.describe("Edit + revert product line", () => {
     await revertBtn.click();
 
     // Edited badge should disappear after revert
-    await page.waitForTimeout(1500);  // allow refetch
+    await page.waitForTimeout(1500); // allow refetch
     const editedAfter = await page.locator("text=/edited/i").count();
     expect(editedAfter).toBeLessThan(1);
   });
@@ -4997,6 +5218,7 @@ git commit -m "test(e2e): edit + revert product line flow"
 ### Task 36: E2E spec — re-import preserves user edits
 
 **Files:**
+
 - Create: `tests/e2e/reimport-preserves-edits.spec.ts`
 
 This is the load-bearing test for the merge-by-line_index logic.
@@ -5015,7 +5237,7 @@ test.describe("Re-import preserves user edits", () => {
     await page.locator('button:text("Edit")').first().click();
     const rateInput = page.locator('input[type="number"]').first();
     const original = await rateInput.inputValue();
-    const edited = (Number(original) + 7).toString();  // arbitrary delta
+    const edited = (Number(original) + 7).toString(); // arbitrary delta
     await rateInput.fill(edited);
     await page.locator('button:text("Save")').click();
     await page.waitForTimeout(1500);
@@ -5068,6 +5290,7 @@ git commit -m "test(e2e): re-import preserves user-edited product lines"
 After running real imports, the test fixture coverage can be hardened with cases the Phase 0c capture didn't include (multi-tankmix operations, ops with `cropName` present, mixed seasons).
 
 **Files:**
+
 - Modify or create: `__fixtures__/jd/application-rate-result-multi-tankmix.json`
 - Modify: tests that reference the new fixture
 
@@ -5111,6 +5334,7 @@ git commit -m "test: add multi-tankmix fixture + extract-tankmix coverage"
 ### Task 38: Delete the temporary `debug-spray-shape` function
 
 **Files:**
+
 - Delete (filesystem): `supabase/functions/debug-spray-shape/`
 - Use: `mcp__supabase__list_edge_functions` to confirm deletion intent
 
@@ -5123,6 +5347,7 @@ Use `mcp__supabase__list_edge_functions` with `project_id: "nuxofsjzrgdauzriraze
 - [ ] **Step 2: Note — Supabase MCP does not expose a delete-function tool**
 
 There is no `mcp__supabase__delete_edge_function`. Options:
+
 - Use Supabase CLI: `npx supabase functions delete debug-spray-shape --project-ref nuxofsjzrgdauzriraze`
 - Delete via the Supabase dashboard UI (manual)
 
@@ -5229,6 +5454,7 @@ The `/code-review` skill in this project reviews the current diff for correctnes
 ```
 
 Review the findings. For each:
+
 - P1 / correctness bugs: fix in this task with a new commit
 - P2 / cleanups: triage — fix obvious wins, defer the rest to TECH-DEBT
 - P3 / nits: defer
@@ -5249,6 +5475,7 @@ In `CHANGELOG.md` `[Unreleased]` block, add:
 
 ```markdown
 ### Added
+
 - Spray-application sync from John Deere Operations Center with per-product tank-mix data
 - Product classification (5-bucket: fertilizer / chemical / seed / adjuvant / other) seeded from common ag products
 - Editable JD-imported values with revert-to-JD-original path
@@ -5269,6 +5496,7 @@ In `PROJECT-LOG.md`, add a new top entry:
 **Tech debt addressed:** john-deere-import split from 689 lines to <100 (dispatch-only).
 
 **Tech debt opened:**
+
 - (list anything new found during the build)
 ```
 
@@ -5293,15 +5521,16 @@ Performed after writing the complete plan, checked against the spec at `docs/sup
 
 Group 0 was added after the initial plan, in response to Galen's request to fold Watch Tower v6.7 security findings into this build where they touch surfaces we're already modifying.
 
-| v6.4/v6.7 flag | Severity | Resolution |
-|---|---|---|
-| `cors-open` | P1 | Task 0.1 — `_shared/cors.ts` allowlist |
-| `error-response-leakage` | P2 | Task 0.2 — `_shared/generic-error.ts` retrofitted to 4 functions |
-| `route-protection-gap` | P3 | Task 0.3 — `middleware.ts` via `@supabase/ssr` |
-| `oauth-broad-scopes` | P3 | Task 0.4 — trim to read-only |
-| `file-over-500` (john-deere-import) | P4 | Tasks 15-19 — file split |
+| v6.4/v6.7 flag                      | Severity | Resolution                                                       |
+| ----------------------------------- | -------- | ---------------------------------------------------------------- |
+| `cors-open`                         | P1       | Task 0.1 — `_shared/cors.ts` allowlist                           |
+| `error-response-leakage`            | P2       | Task 0.2 — `_shared/generic-error.ts` retrofitted to 4 functions |
+| `route-protection-gap`              | P3       | Task 0.3 — `middleware.ts` via `@supabase/ssr`                   |
+| `oauth-broad-scopes`                | P3       | Task 0.4 — trim to read-only                                     |
+| `file-over-500` (john-deere-import) | P4       | Tasks 15-19 — file split                                         |
 
 Flags NOT addressed in this build (deliberately, per the v6.7 audit triage):
+
 - `no-input-validation` on the 4 existing functions (new endpoints get Zod; legacy retrofit is follow-on)
 - `no-rate-limiting` (needs Upstash/Redis infrastructure)
 - `npm-cve-residual` (Next 13 → 16 migration sprint)
@@ -5310,47 +5539,47 @@ Flags NOT addressed in this build (deliberately, per the v6.7 audit triage):
 
 ### Spec coverage check
 
-| Spec section | Covered by task(s) |
-|---|---|
-| 2 (Scope — APPLICATION ops, 3 seasons) | Task 20 (import-applications) + Task 22 (auto-chain) |
-| 2 (Product classification) | Tasks 8 (seed table) + 14 (matcher) + 20 (upsertProduct) + 28 (UI) + 31 (category edit) |
-| 2 (Editable JD values + revert) | Tasks 6 (schema) + 26 (mutations) + 30 (UI) |
-| 2 (Seed migration) | Task 8 |
-| 2 (`/applications` + `/products` UI) | Tasks 27, 28, 29, 30, 31 |
-| 2 (Per-field tab) | Task 32 |
-| 2 (`checkMutationResult`) | Task 24 |
-| 2 (Zod + generic errors + restricted CORS — new endpoints) | Task 15 (errors + validation) + Task 20 (uses them) |
-| 2 (`john-deere-import` file split) | Tasks 15-19 |
-| 2 (Automated testing) | Tasks 1, 2, 10-14, 21, 33-36 |
-| 3 (Hard constraints — schema in `operations_center`, RLS day-one, verify_jwt: false) | All migrations (Tasks 5-8), edge function deploys use existing patterns |
-| 4.1 (`products` table) | Task 5 |
-| 4.1 (`field_operation_products` table, `*_jd_original`, soft-delete) | Task 6 |
-| 4.1 (`field_operations` extensions) | Task 7 |
-| 4.2 (Trigger as backup guard) | Task 6 |
-| 4.3 (RLS) | Tasks 5, 6 (policies in same migrations) |
-| 4.4 (GRANTs) | Tasks 5, 6, 8 |
-| 4.5 (Migration files) | Tasks 5-8, applied in Task 9 |
-| 4.6 (Seed list) | Task 8 |
-| 5.2 (Import algorithm) | Task 20 (matches the spec algorithm step-by-step) |
-| 5.3 (Imperial via `Accept-UOM-System: ENGLISH`) | Task 20 (header in measurement fetch) |
-| 5.4 (Merge by `line_index` + soft-delete) | Task 13 (TDD logic) + Task 20 (executes the plan) |
-| 5.5 (Zod) | Task 15 |
-| 5.6 (Errors) | Task 15 |
-| 6.1 (Routes) | Tasks 27, 31, 32 |
-| 6.2 (HP-aligned layout) | Task 29 (grouped by category, expand affordance) |
-| 6.3 (Components) | Tasks 27-30 |
-| 6.4 (Frontend conventions, `checkMutationResult`) | Task 24 |
-| 6.5 (No charts) | by omission — not added |
-| 6.6 (Edit mutation contract) | Task 26 |
-| 7.1 (Test tier matrix) | Tasks 1, 2, 10-14, 21, 33-36 |
-| 7.2 (Real fixtures) | Task 3 |
-| 7.3 (TDD posture) | Tasks 10-14 follow test-first |
-| 7.4 (CI integration) | Task 4 |
-| 7.5 (Manual verification) | Task 39 |
-| 8 (Tech debt addressed) | Task 19 (file split resolves the >500-line guardrail violation on `john-deere-import`) |
-| 9 (Locked decisions) | Inherited by execution — no separate tasks |
-| 10 (Forward-looking — cost layer, FB integration) | Documented in BACKBURNER, no tasks |
-| 11 (Phased execution order) | Plan tasks follow the 14-phase order |
+| Spec section                                                                         | Covered by task(s)                                                                      |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| 2 (Scope — APPLICATION ops, 3 seasons)                                               | Task 20 (import-applications) + Task 22 (auto-chain)                                    |
+| 2 (Product classification)                                                           | Tasks 8 (seed table) + 14 (matcher) + 20 (upsertProduct) + 28 (UI) + 31 (category edit) |
+| 2 (Editable JD values + revert)                                                      | Tasks 6 (schema) + 26 (mutations) + 30 (UI)                                             |
+| 2 (Seed migration)                                                                   | Task 8                                                                                  |
+| 2 (`/applications` + `/products` UI)                                                 | Tasks 27, 28, 29, 30, 31                                                                |
+| 2 (Per-field tab)                                                                    | Task 32                                                                                 |
+| 2 (`checkMutationResult`)                                                            | Task 24                                                                                 |
+| 2 (Zod + generic errors + restricted CORS — new endpoints)                           | Task 15 (errors + validation) + Task 20 (uses them)                                     |
+| 2 (`john-deere-import` file split)                                                   | Tasks 15-19                                                                             |
+| 2 (Automated testing)                                                                | Tasks 1, 2, 10-14, 21, 33-36                                                            |
+| 3 (Hard constraints — schema in `operations_center`, RLS day-one, verify_jwt: false) | All migrations (Tasks 5-8), edge function deploys use existing patterns                 |
+| 4.1 (`products` table)                                                               | Task 5                                                                                  |
+| 4.1 (`field_operation_products` table, `*_jd_original`, soft-delete)                 | Task 6                                                                                  |
+| 4.1 (`field_operations` extensions)                                                  | Task 7                                                                                  |
+| 4.2 (Trigger as backup guard)                                                        | Task 6                                                                                  |
+| 4.3 (RLS)                                                                            | Tasks 5, 6 (policies in same migrations)                                                |
+| 4.4 (GRANTs)                                                                         | Tasks 5, 6, 8                                                                           |
+| 4.5 (Migration files)                                                                | Tasks 5-8, applied in Task 9                                                            |
+| 4.6 (Seed list)                                                                      | Task 8                                                                                  |
+| 5.2 (Import algorithm)                                                               | Task 20 (matches the spec algorithm step-by-step)                                       |
+| 5.3 (Imperial via `Accept-UOM-System: ENGLISH`)                                      | Task 20 (header in measurement fetch)                                                   |
+| 5.4 (Merge by `line_index` + soft-delete)                                            | Task 13 (TDD logic) + Task 20 (executes the plan)                                       |
+| 5.5 (Zod)                                                                            | Task 15                                                                                 |
+| 5.6 (Errors)                                                                         | Task 15                                                                                 |
+| 6.1 (Routes)                                                                         | Tasks 27, 31, 32                                                                        |
+| 6.2 (HP-aligned layout)                                                              | Task 29 (grouped by category, expand affordance)                                        |
+| 6.3 (Components)                                                                     | Tasks 27-30                                                                             |
+| 6.4 (Frontend conventions, `checkMutationResult`)                                    | Task 24                                                                                 |
+| 6.5 (No charts)                                                                      | by omission — not added                                                                 |
+| 6.6 (Edit mutation contract)                                                         | Task 26                                                                                 |
+| 7.1 (Test tier matrix)                                                               | Tasks 1, 2, 10-14, 21, 33-36                                                            |
+| 7.2 (Real fixtures)                                                                  | Task 3                                                                                  |
+| 7.3 (TDD posture)                                                                    | Tasks 10-14 follow test-first                                                           |
+| 7.4 (CI integration)                                                                 | Task 4                                                                                  |
+| 7.5 (Manual verification)                                                            | Task 39                                                                                 |
+| 8 (Tech debt addressed)                                                              | Task 19 (file split resolves the >500-line guardrail violation on `john-deere-import`)  |
+| 9 (Locked decisions)                                                                 | Inherited by execution — no separate tasks                                              |
+| 10 (Forward-looking — cost layer, FB integration)                                    | Documented in BACKBURNER, no tasks                                                      |
+| 11 (Phased execution order)                                                          | Plan tasks follow the 14-phase order                                                    |
 
 **No gaps found.** Every In-Scope spec requirement maps to at least one task.
 
@@ -5361,6 +5590,7 @@ No "TBD", "TODO", "implement later", or "add appropriate X" instances found in t
 ### Type consistency
 
 Cross-reference verification:
+
 - `ExtractedProductLine` defined in Task 10, used in Tasks 13, 20 — consistent fields
 - `MergePlan` defined in Task 13, used in Task 20 — consistent
 - `ProductCategory` defined in Task 23, used in Tasks 30, 31 — consistent
@@ -5387,12 +5617,3 @@ Two execution options:
 **2. Inline Execution** — execute tasks in this session using executing-plans, batch execution with checkpoints. Higher context usage but you see every keystroke.
 
 Which approach?
-
-
-
-
-
-
-
-
-

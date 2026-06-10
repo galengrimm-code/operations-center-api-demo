@@ -79,13 +79,7 @@ Deno.serve(async (req: Request) => {
       case "import-field-operations": {
         const fieldId = url.searchParams.get("fieldId");
         if (!fieldId) return errorResponse("Missing fieldId parameter", 400, undefined, req);
-        const result = await importFieldOperations(
-          supabase,
-          accessToken,
-          user.id,
-          orgId,
-          fieldId,
-        );
+        const result = await importFieldOperations(supabase, accessToken, user.id, orgId, fieldId);
         return jsonResponse(result, 200, req);
       }
 

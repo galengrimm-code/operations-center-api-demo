@@ -3,11 +3,7 @@ import { JdOperation } from "./import-operations.ts";
 
 // --- Diagnostic: show what JD returns for a field's operations ---
 
-export async function debugFieldOperations(
-  accessToken: string,
-  orgId: string,
-  fieldId: string,
-) {
+export async function debugFieldOperations(accessToken: string, orgId: string, fieldId: string) {
   const results: Record<string, unknown> = {};
   for (const opType of ["HARVEST", "SEEDING"]) {
     try {

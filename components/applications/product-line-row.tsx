@@ -29,17 +29,19 @@ export function ProductLineRow({ line, onEdit, onRevert }: Props) {
         <div className="font-mono-data text-slate-200">
           {displayTotal(line.total_value, line.total_unit)}
         </div>
-        {line.cost && (
-          line.cost.cost_per_acre != null ? (
+        {line.cost &&
+          (line.cost.cost_per_acre != null ? (
             <div className="font-mono-data text-xs text-emerald-400/80">
-              ${line.cost.cost_per_acre.toFixed(2)}/ac · ${line.cost.price_per_unit!.toFixed(2)}/{line.cost.price_unit === "ozm" ? "oz" : displayUnit(line.cost.price_unit)}
+              ${line.cost.cost_per_acre.toFixed(2)}/ac · ${line.cost.price_per_unit!.toFixed(2)}/
+              {line.cost.price_unit === "ozm" ? "oz" : displayUnit(line.cost.price_unit)}
             </div>
           ) : line.cost.needs_density ? (
-            <a href="/products" className="text-xs text-amber-400 hover:underline">set density</a>
+            <a href="/products" className="text-xs text-amber-400 hover:underline">
+              set density
+            </a>
           ) : (
             <div className="text-xs text-slate-600">—</div>
-          )
-        )}
+          ))}
       </div>
       <div className="font-mono-data col-span-1 text-slate-200">
         {line.area_value} {displayUnit(line.area_unit)}

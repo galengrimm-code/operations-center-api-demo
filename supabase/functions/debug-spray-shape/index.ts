@@ -75,8 +75,7 @@ function isResponse(result: AuthResult | Response): result is Response {
 
 // --- Inlined: John Deere helpers ---
 const JOHN_DEERE_API_BASE = "https://api.deere.com/platform";
-const JOHN_DEERE_TOKEN_URL =
-  "https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token";
+const JOHN_DEERE_TOKEN_URL = "https://signin.johndeere.com/oauth2/aus78tnlaysMraFhC1t7/v1/token";
 const JOHN_DEERE_CLIENT_ID = Deno.env.get("JOHN_DEERE_CLIENT_ID") || "";
 const JOHN_DEERE_CLIENT_SECRET = Deno.env.get("JOHN_DEERE_CLIENT_SECRET") || "";
 
@@ -115,10 +114,7 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> 
   return response.json();
 }
 
-async function getValidToken(
-  supabase: SupabaseClient,
-  connection: Connection,
-): Promise<string> {
+async function getValidToken(supabase: SupabaseClient, connection: Connection): Promise<string> {
   const expiresAt = new Date(connection.token_expires_at);
   const now = new Date();
   const bufferMs = 5 * 60 * 1000;

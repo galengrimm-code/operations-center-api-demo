@@ -5,7 +5,9 @@ import { test, expect } from "@playwright/test";
 //   AMS      $400/ton   -> 1360 lb / 80 ac  = $3.40/ac
 //   Liberty 280 SL (unit "oz", unrecognized) -> unpriced "—"
 //   Application total: $38.40/ac
-test("pricing flows to per-line and application $/ac on the applications view", async ({ page }) => {
+test("pricing flows to per-line and application $/ac on the applications view", async ({
+  page,
+}) => {
   await page.goto("/applications");
   await page.waitForLoadState("networkidle");
 
@@ -13,7 +15,10 @@ test("pricing flows to per-line and application $/ac on the applications view", 
   await expect(page.getByText("$38.40/ac")).toBeVisible();
 
   // Expand the application to reveal per-line cost
-  await page.getByText(/Burndown/i).first().click();
+  await page
+    .getByText(/Burndown/i)
+    .first()
+    .click();
 
   // UAN line: $35.00/ac · $3.50/gal
   await expect(page.getByText("$35.00/ac").first()).toBeVisible();

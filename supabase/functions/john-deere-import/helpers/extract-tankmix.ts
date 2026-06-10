@@ -1,13 +1,8 @@
 // supabase/functions/john-deere-import/helpers/extract-tankmix.ts
 
-import type {
-  ExtractedProductLine,
-  JdApplicationRateResult,
-} from "../shared/types.ts";
+import type { ExtractedProductLine, JdApplicationRateResult } from "../shared/types.ts";
 
-export function extractTankmix(
-  input: JdApplicationRateResult,
-): ExtractedProductLine[] {
+export function extractTankmix(input: JdApplicationRateResult): ExtractedProductLine[] {
   const out: ExtractedProductLine[] = [];
   const outers = input.applicationProductTotals ?? [];
   let lineIndex = 0;

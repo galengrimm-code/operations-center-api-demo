@@ -80,12 +80,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 2: existing line, NOT user-edited, present in JD → UPDATE both live + JD-original", () => {
     const incoming = [mkIncoming({ line_index: 0, rate_value: 5 })]; // JD changed rate from 4 to 5
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: false,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: false,
+      }),
+    ];
     const productIdByJdId = new Map([["pid-A", "00000000-0000-0000-0000-0000000000A0"]]);
 
     const plan = mergeApplicationProducts({
@@ -116,12 +118,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 3: existing line, user-edited, present in JD → SKIP (preserve edits)", () => {
     const incoming = [mkIncoming({ line_index: 0, rate_value: 5 })];
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: true,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: true,
+      }),
+    ];
     const productIdByJdId = new Map([["pid-A", "00000000-0000-0000-0000-0000000000A0"]]);
 
     const plan = mergeApplicationProducts({
@@ -142,12 +146,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 4: existing line, NOT user-edited, line VANISHED from JD → SOFT-DELETE", () => {
     const incoming: ExtractedProductLine[] = [];
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: false,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: false,
+      }),
+    ];
     const productIdByJdId = new Map();
 
     const plan = mergeApplicationProducts({
@@ -167,12 +173,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Case 5: existing line, user-edited, line VANISHED from JD → LEAVE UNTOUCHED", () => {
     const incoming: ExtractedProductLine[] = [];
-    const existing = [mkExisting({
-      id: "row-X",
-      line_index: 0,
-      product_id: "00000000-0000-0000-0000-0000000000A0",
-      is_user_edited: true,
-    })];
+    const existing = [
+      mkExisting({
+        id: "row-X",
+        line_index: 0,
+        product_id: "00000000-0000-0000-0000-0000000000A0",
+        is_user_edited: true,
+      }),
+    ];
     const productIdByJdId = new Map();
 
     const plan = mergeApplicationProducts({
@@ -192,14 +200,14 @@ describe("mergeApplicationProducts — 5-case decision tree", () => {
 
   it("Combined: insert + update + skip + soft-delete in one merge", () => {
     const incoming = [
-      mkIncoming({ line_index: 0, jd_product_id: "pid-A" }),         // matches existing edited → skip
+      mkIncoming({ line_index: 0, jd_product_id: "pid-A" }), // matches existing edited → skip
       mkIncoming({ line_index: 1, jd_product_id: "pid-B", name: "2,4-D" }), // matches existing non-edited → update
-      mkIncoming({ line_index: 2, jd_product_id: "pid-C", name: "AMS" }),   // new → insert
+      mkIncoming({ line_index: 2, jd_product_id: "pid-C", name: "AMS" }), // new → insert
     ];
     const existing = [
       mkExisting({ id: "row-edit", line_index: 0, product_id: "pa", is_user_edited: true }),
       mkExisting({ id: "row-up", line_index: 1, product_id: "pb", is_user_edited: false }),
-      mkExisting({ id: "row-del", line_index: 5, product_id: "pz", is_user_edited: false }),  // vanished
+      mkExisting({ id: "row-del", line_index: 5, product_id: "pz", is_user_edited: false }), // vanished
     ];
     const productIdByJdId = new Map([
       ["pid-A", "pa"],

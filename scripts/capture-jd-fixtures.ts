@@ -21,9 +21,15 @@ async function main() {
     headers: { Authorization: `Bearer ${userJwt}` },
   });
   const data = await r.json();
-  const file = path.join(out, `debug-spray-shape-snapshot-${new Date().toISOString().slice(0, 10)}.json`);
+  const file = path.join(
+    out,
+    `debug-spray-shape-snapshot-${new Date().toISOString().slice(0, 10)}.json`,
+  );
   await writeFile(file, JSON.stringify(data, null, 2));
   console.log(`Wrote ${file}`);
   console.log("Anonymize IDs before committing.");
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

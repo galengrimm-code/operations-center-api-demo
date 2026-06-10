@@ -81,9 +81,10 @@ export function fieldCostPerAcre(
   basis: FieldBasis,
   fieldAcres: number,
 ): number | null {
-  const priced = lines.filter(
-    (l) => l.totalCost != null && l.appliedAcres > 0,
-  ) as Array<{ totalCost: number; appliedAcres: number }>;
+  const priced = lines.filter((l) => l.totalCost != null && l.appliedAcres > 0) as Array<{
+    totalCost: number;
+    appliedAcres: number;
+  }>;
   if (priced.length === 0) return null;
   if (basis === "actual") {
     return priced.reduce((sum, l) => sum + l.totalCost / l.appliedAcres, 0);

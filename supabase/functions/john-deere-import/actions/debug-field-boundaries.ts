@@ -4,11 +4,7 @@ import { JdBoundary } from "../../_shared/boundaries.ts";
 // --- Diagnostic: show ALL boundaries (active + irrigated + others) for a field ---
 // so we can see what JD has for fields with bogus irrigated splits.
 
-export async function debugFieldBoundaries(
-  accessToken: string,
-  orgId: string,
-  fieldId: string,
-) {
+export async function debugFieldBoundaries(accessToken: string, orgId: string, fieldId: string) {
   const response = await callJohnDeereApi(
     accessToken,
     `/organizations/${orgId}/fields/${fieldId}/boundaries?recordFilter=all`,

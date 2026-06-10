@@ -17,6 +17,7 @@ we can compute `$/ac` for every application line and roll it up per field. This 
 that lets Farm Data Hub replace Harvest Profit's day-to-day use.
 
 **User-stated goals:**
+
 - Set input prices under **Products**, scoped **by year**.
 - See **`$/ac`** per product on each application (like HP's `$X.XX/ac • $Y.YY/unit`).
 - Pull up a field (e.g. "East of Falls City", "Myers East") and see **per-acre input cost**.
@@ -69,10 +70,10 @@ UNIQUE (user_id, org_id, product_id, year)
 
 A small pure module (`lib/unit-convert.ts`), unit-tested (TDD), with two families:
 
-| Family | Units | Base | Fixed factors |
-|---|---|---|---|
-| Weight | `ozm`, `lb`, `ton` | lb | 1 lb = 16 ozm; 1 ton = 2000 lb |
-| Volume | `floz`, `pt`, `qt`, `gal` | gal | 1 gal = 128 floz = 8 pt = 4 qt |
+| Family | Units                     | Base | Fixed factors                  |
+| ------ | ------------------------- | ---- | ------------------------------ |
+| Weight | `ozm`, `lb`, `ton`        | lb   | 1 lb = 16 ozm; 1 ton = 2000 lb |
+| Volume | `floz`, `pt`, `qt`, `gal` | gal  | 1 gal = 128 floz = 8 pt = 4 qt |
 
 **Cross-family (weight ↔ volume)** uses the product's `density_lbs_per_gal`:
 `lb = gal × density` (and inverse). Convert volume→gal (fixed), gal→lb via density, lb→target

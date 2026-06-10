@@ -6,10 +6,7 @@ interface PagedResponse<T> {
   links?: Array<{ rel: string; uri: string }>;
 }
 
-export async function* paginate<T>(
-  accessToken: string,
-  initialUrl: string,
-): AsyncGenerator<T> {
+export async function* paginate<T>(accessToken: string, initialUrl: string): AsyncGenerator<T> {
   let url: string | null = initialUrl;
   while (url) {
     const resp = await callJohnDeereUrl(accessToken, url);

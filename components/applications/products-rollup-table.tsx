@@ -63,9 +63,7 @@ function PriceCell({
   onSetPrice: (productId: string, value: number, unit: string) => void;
 }) {
   const existing = priceByProduct.get(row.product.id);
-  const [inputVal, setInputVal] = useState<string>(
-    existing ? String(existing.price_per_unit) : "",
-  );
+  const [inputVal, setInputVal] = useState<string>(existing ? String(existing.price_per_unit) : "");
   const [unit, setUnit] = useState<PriceUnit>(
     existing ? (existing.price_unit as PriceUnit) : defaultPriceUnit(row.product),
   );

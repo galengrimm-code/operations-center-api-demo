@@ -10,10 +10,7 @@ import {
   mergeApplicationProducts,
   type ExistingProductRow,
 } from "../helpers/merge-application-products.ts";
-import type {
-  ExtractedProductLine,
-  JdApplicationRateResult,
-} from "../shared/types.ts";
+import type { ExtractedProductLine, JdApplicationRateResult } from "../shared/types.ts";
 import { ImportApplicationsQuery, parseSeasons } from "../shared/validation.ts";
 import { logAndRespond } from "../../_shared/generic-error.ts";
 
@@ -64,14 +61,7 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
     .from("product_category_seeds")
     .select("name_pattern, match_type, product_category");
   if (seedsErr) {
-    return logAndRespond(
-      500,
-      "request_failed",
-      "IMPORT_APP_500_SEEDS",
-      seedsErr,
-      {},
-      ctx.req,
-    );
+    return logAndRespond(500, "request_failed", "IMPORT_APP_500_SEEDS", seedsErr, {}, ctx.req);
   }
   const seedList: CategorySeedRow[] = seeds ?? [];
 
@@ -84,21 +74,10 @@ export async function importApplications(ctx: Ctx): Promise<Response> {
   if (parse.data.fieldId) fieldsQuery.eq("jd_field_id", parse.data.fieldId);
   const { data: fields, error: fieldsErr } = await fieldsQuery;
   if (fieldsErr) {
-    return logAndRespond(
-      500,
-      "request_failed",
-      "IMPORT_APP_500_FIELDS",
-      fieldsErr,
-      {},
-      ctx.req,
-    );
+    return logAndRespond(500, "request_failed", "IMPORT_APP_500_FIELDS", fieldsErr, {}, ctx.req);
   }
   if (!fields || fields.length === 0) {
-    return jsonResponse(
-      { totalImported: 0, message: "No stored fields to scan." },
-      200,
-      ctx.req,
-    );
+    return jsonResponse({ totalImported: 0, message: "No stored fields to scan." }, 200, ctx.req);
   }
 
   let totalOps = 0;
@@ -350,8 +329,7 @@ async function upsertProduct(
   if (readErr) throw readErr;
 
   if (existing) {
-    const shouldRefreshCategory =
-      matchedCategory && existing.product_category_source !== "user";
+    const shouldRefreshCategory = matchedCategory && existing.product_category_source !== "user";
     const patch: Record<string, unknown> = {
       last_seen_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

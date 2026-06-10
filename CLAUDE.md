@@ -29,19 +29,20 @@ The app is deployed to **Vercel**.
 
 ## Tech Stack
 
-| Layer | Tech |
-|---|---|
-| Frontend | Next.js 13.5 (App Router), React 18, TypeScript 5.2, Tailwind 3.3, shadcn/Radix UI, Mapbox GL, Recharts |
-| Backend | Supabase Edge Functions (Deno runtime) — John Deere OAuth + API proxy + data import; Next.js server middleware for route auth |
-| Data | Supabase Postgres (`operations_center` schema), Supabase Storage (shapefiles bucket) |
-| Auth | Supabase Auth (email/password) via `@supabase/ssr` cookie sessions; John Deere OAuth 2.0 (tokens stored server-side in `john_deere_connections`) |
-| Hosting | Vercel (frontend) + Supabase (edge functions, DB, storage) |
-| Testing | Vitest (unit, `lib/__tests__` + edge `__tests__`), Playwright (e2e, `tests/e2e/`), Deno test for one edge function; ~10 spec/test files |
-| Integrations | John Deere Operations Center API (`api.deere.com`, `signin.johndeere.com`), Mapbox GL JS |
+| Layer        | Tech                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Frontend     | Next.js 13.5 (App Router), React 18, TypeScript 5.2, Tailwind 3.3, shadcn/Radix UI, Mapbox GL, Recharts                                          |
+| Backend      | Supabase Edge Functions (Deno runtime) — John Deere OAuth + API proxy + data import; Next.js server middleware for route auth                    |
+| Data         | Supabase Postgres (`operations_center` schema), Supabase Storage (shapefiles bucket)                                                             |
+| Auth         | Supabase Auth (email/password) via `@supabase/ssr` cookie sessions; John Deere OAuth 2.0 (tokens stored server-side in `john_deere_connections`) |
+| Hosting      | Vercel (frontend) + Supabase (edge functions, DB, storage)                                                                                       |
+| Testing      | Vitest (unit, `lib/__tests__` + edge `__tests__`), Playwright (e2e, `tests/e2e/`), Deno test for one edge function; ~10 spec/test files          |
+| Integrations | John Deere Operations Center API (`api.deere.com`, `signin.johndeere.com`), Mapbox GL JS                                                         |
 
 ## Architecture
 
 ### Folder Structure
+
 ```
 app/                  # Next.js App Router pages
   (app)/              # authenticated routes (map, fields, operations, applications, products, reports, settings, progress)
@@ -60,6 +61,7 @@ middleware.ts         # server-side auth gate for (app)/* routes
 ```
 
 ### Key Files
+
 - `middleware.ts` — Supabase SSR auth gate; redirects unauthenticated `(app)/*` requests to `/login`.
 - `supabase/functions/_shared/auth.ts` — service-role client (bypasses RLS) + `getAuthenticatedUser` JWT gate; every function scopes queries by `user.id`.
 - `supabase/functions/_shared/cors.ts` — explicit origin allowlist for the 4 production functions.
@@ -68,9 +70,11 @@ middleware.ts         # server-side auth gate for (app)/* routes
 - `lib/john-deere-client.ts` / `lib/supabase.ts` — browser-side clients (anon key + OAuth client ID, both public-safe).
 
 ### Data Flow
+
 User signs in via Supabase Auth (cookie session). Middleware validates the session before serving `(app)/*` pages. The browser calls Supabase Edge Functions with the user JWT; each function authenticates the JWT, loads the user's `john_deere_connections` row via the service-role client (scoped by `user.id`), refreshes the JD access token if near expiry, then calls the John Deere API. Imported field/operation/application data is written to the `operations_center` Postgres schema and rendered on a Mapbox map and Recharts dashboards.
 
 ### External API Calls
+
 - `POST https://signin.johndeere.com/oauth2/.../v1/token` — OAuth code exchange + refresh (server-side edge functions, on connect/refresh).
 - `GET https://api.deere.com/platform/*` — organizations, fields, fieldOperations, measurement, shapefile downloads (server-side, on import/browse).
 - `GET <JD pre-signed S3 redirect>` — shapefile zip download following 307 redirect, then uploaded to Supabase Storage (irrigation function).
@@ -87,15 +91,15 @@ User signs in via Supabase Auth (cookie session). Middleware validates the sessi
 
 ### Active Flags
 
-| Severity | Category | Confidence | Description |
-|----------|----------|------------|-------------|
-| P2 | dependency-vulnerability | 0.99 | `npm audit` reports 7 vulnerabilities (4 high, 3 moderate), all in `exceljs` (>=3.5.0). Fix requires `npm audit fix --force` (breaking major bump). |
-| P3 | error-response-leakage | 0.85 | Edge-function action handlers forward raw upstream/DB error text to the client: `john-deere-api` returns `fieldsError.message`/`opsError.message` and JD upstream `errorText` as `details`; `john-deere-irrigation` returns `uploadError.message` and JD `responseBody` as `details`. Catch blocks were hardened (generic-error) but per-action paths still leak. |
-| P3 | cors-misconfig | 0.90 | `supabase/functions/debug-spray-shape/index.ts` inlines `Access-Control-Allow-Origin: *`, bypassing the shared `_shared/cors.ts` allowlist that the 4 production functions use. No credentials header set and auth is Bearer-token, so impact is limited, but it diverges from the resolved cors-open hardening. |
-| P3 | stale-debug-endpoint | 0.85 | `debug-spray-shape` is a self-described "TEMPORARY DIAGNOSTIC" function (2026-05-28) still present in source; deployed with `verify_jwt: false` (handles auth internally). Unnecessary attack surface — remove once schema work is done. |
-| P3 | formatting-inconsistency | 1.0 | `prettier --check .` reports code style issues in 47 files. Run `npm run format`. |
-| P4 | csp-unsafe-inline | 0.80 | CSP `script-src` allows `'unsafe-inline' 'unsafe-eval'` (Mapbox/Next requirement). Verified live. Weakens XSS defense-in-depth; acceptable given React escaping but worth tightening with nonces later. |
-| P4 | repo-sync-skipped-dirty | 0.99 | Local repo had 1 uncommitted change at scan time; audited working-tree code, not remote HEAD. |
+| Severity | Category                 | Confidence | Description                                                                                                                                                                                                                                                                                                                                                       |
+| -------- | ------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P2       | dependency-vulnerability | 0.99       | `npm audit` reports 7 vulnerabilities (4 high, 3 moderate), all in `exceljs` (>=3.5.0). Fix requires `npm audit fix --force` (breaking major bump).                                                                                                                                                                                                               |
+| P3       | error-response-leakage   | 0.85       | Edge-function action handlers forward raw upstream/DB error text to the client: `john-deere-api` returns `fieldsError.message`/`opsError.message` and JD upstream `errorText` as `details`; `john-deere-irrigation` returns `uploadError.message` and JD `responseBody` as `details`. Catch blocks were hardened (generic-error) but per-action paths still leak. |
+| P3       | cors-misconfig           | 0.90       | `supabase/functions/debug-spray-shape/index.ts` inlines `Access-Control-Allow-Origin: *`, bypassing the shared `_shared/cors.ts` allowlist that the 4 production functions use. No credentials header set and auth is Bearer-token, so impact is limited, but it diverges from the resolved cors-open hardening.                                                  |
+| P3       | stale-debug-endpoint     | 0.85       | `debug-spray-shape` is a self-described "TEMPORARY DIAGNOSTIC" function (2026-05-28) still present in source; deployed with `verify_jwt: false` (handles auth internally). Unnecessary attack surface — remove once schema work is done.                                                                                                                          |
+| P3       | formatting-inconsistency | 1.0        | `prettier --check .` reports code style issues in 47 files. Run `npm run format`.                                                                                                                                                                                                                                                                                 |
+| P4       | csp-unsafe-inline        | 0.80       | CSP `script-src` allows `'unsafe-inline' 'unsafe-eval'` (Mapbox/Next requirement). Verified live. Weakens XSS defense-in-depth; acceptable given React escaping but worth tightening with nonces later.                                                                                                                                                           |
+| P4       | repo-sync-skipped-dirty  | 0.99       | Local repo had 1 uncommitted change at scan time; audited working-tree code, not remote HEAD.                                                                                                                                                                                                                                                                     |
 
 ### Watch List (confidence < 0.8)
 
@@ -107,11 +111,11 @@ _None_
 
 ### Resolved
 
-| Date       | Category                 | Note                                                                                                                                                                                                                                                                                                                        |
-| ---------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-05-28 | cors-open               | Restricted `_shared/cors.ts` to explicit allowlist (`operations-center-api-demo.vercel.app` + localhost). Verified live: `curl -I -X OPTIONS ... -H "Origin: https://evil.com"` no longer echoes the evil origin. Deployed to all 4 functions. Commit aa76cd5 + 7942c9d (DRY refactor). |
-| 2026-05-28 | error-response-leakage  | Added `_shared/generic-error.ts`. All 4 functions' catch blocks now return `{error: "request_failed", code: "<FN>_<STATUS>"}` only. Server logs the full error/stack server-side. Commit 9442f2a. (Note: per-action error paths still leak — re-flagged 2026-06-05.) |
-| 2026-05-28 | route-protection-gap    | Added `middleware.ts` using `@supabase/ssr`. Unauthenticated requests to `(app)/*` routes get 307 redirect to `/login?redirect=<path>` BEFORE any page HTML loads. Verified: `curl -i /map` returns 307. Commit e1e149c + ae0df7e (login safety comment). |
+| Date       | Category               | Note                                                                                                                                                                                                                                                                                    |
+| ---------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-05-28 | cors-open              | Restricted `_shared/cors.ts` to explicit allowlist (`operations-center-api-demo.vercel.app` + localhost). Verified live: `curl -I -X OPTIONS ... -H "Origin: https://evil.com"` no longer echoes the evil origin. Deployed to all 4 functions. Commit aa76cd5 + 7942c9d (DRY refactor). |
+| 2026-05-28 | error-response-leakage | Added `_shared/generic-error.ts`. All 4 functions' catch blocks now return `{error: "request_failed", code: "<FN>_<STATUS>"}` only. Server logs the full error/stack server-side. Commit 9442f2a. (Note: per-action error paths still leak — re-flagged 2026-06-05.)                    |
+| 2026-05-28 | route-protection-gap   | Added `middleware.ts` using `@supabase/ssr`. Unauthenticated requests to `(app)/*` routes get 307 redirect to `/login?redirect=<path>` BEFORE any page HTML loads. Verified: `curl -i /map` returns 307. Commit e1e149c + ae0df7e (login safety comment).                               |
 
 ## Guardrails
 
@@ -138,6 +142,7 @@ _None_
 ## Deployed Surface
 
 Production URL: https://operations-center-api-demo.vercel.app (HTTP 200). Verified headers (live, 2026-06-05):
+
 - **Content-Security-Policy:** present (default-src 'self'; allows `'unsafe-inline'`/`'unsafe-eval'` in script-src for Mapbox/Next — see csp-unsafe-inline flag)
 - **Strict-Transport-Security:** `max-age=63072000; includeSubDomains; preload`
 - **X-Frame-Options:** DENY | **X-Content-Type-Options:** nosniff

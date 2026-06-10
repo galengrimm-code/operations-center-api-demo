@@ -60,7 +60,10 @@ describe("lineTotalCost", () => {
     };
     // 14642 lb / 2000 * 730 = $5344.33 (no content adjustment)
     expect(lineTotalCost(14642, "lb", at100)).toBeCloseTo(5344.33, 1);
-    expect(lineTotalCost(14642, "lb", { ...at100, nutrient_content_pct: null })).toBeCloseTo(5344.33, 1);
+    expect(lineTotalCost(14642, "lb", { ...at100, nutrient_content_pct: null })).toBeCloseTo(
+      5344.33,
+      1,
+    );
   });
 });
 
@@ -74,7 +77,12 @@ describe("appliedInPriceUnit", () => {
     expect(appliedInPriceUnit(1152, "lb", ton)).toBeCloseTo(0.576, 3);
   });
   it("applies content (NH3: 14642 lb N -> 8.928 ton product at 82%)", () => {
-    const nh3: PriceRef = { price_per_unit: 730, price_unit: "ton", density_lbs_per_gal: null, nutrient_content_pct: 82 };
+    const nh3: PriceRef = {
+      price_per_unit: 730,
+      price_unit: "ton",
+      density_lbs_per_gal: null,
+      nutrient_content_pct: 82,
+    };
     expect(appliedInPriceUnit(14642, "lb", nh3)).toBeCloseTo(8.928, 2);
   });
   it("null when no price / not convertible", () => {

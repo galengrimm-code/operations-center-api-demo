@@ -41,8 +41,7 @@ describe("convertAmount — cross family via density", () => {
     expect(convertAmount(11.05, "lb", "gal", 11.05)).toBeCloseTo(1, 6));
   it("floz -> ton via density", () =>
     expect(convertAmount(128, "floz", "ton", 2000)).toBeCloseTo(1, 6)); // 128 floz=1 gal; 1 gal*2000 lb/gal=2000 lb=1 ton
-  it("returns null when density missing", () =>
-    expect(convertAmount(1, "gal", "lb")).toBeNull());
+  it("returns null when density missing", () => expect(convertAmount(1, "gal", "lb")).toBeNull());
   it("returns null when density is zero/negative", () => {
     expect(convertAmount(1, "gal", "lb", 0)).toBeNull();
     expect(convertAmount(1, "gal", "lb", -2)).toBeNull();

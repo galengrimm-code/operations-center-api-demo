@@ -22,9 +22,7 @@ export function FieldCostSummary({
 
   const { total, byCategory, footnotes } = useMemo(() => {
     // Flatten all non-deleted lines across all rows
-    const allRawLines = rows.flatMap((row) =>
-      row.product_lines.filter((l) => !l.deleted_at),
-    );
+    const allRawLines = rows.flatMap((row) => row.product_lines.filter((l) => !l.deleted_at));
 
     const allLines: CostLine[] = allRawLines.map((l) => ({
       totalCost: l.cost?.total_cost ?? null,
@@ -90,7 +88,7 @@ export function FieldCostSummary({
     basis === "spread" ? "spread across all field acres" : "per acre actually covered";
 
   return (
-    <div className="glass rounded-xl p-4 mb-4">
+    <div className="glass mb-4 rounded-xl p-4">
       {/* Header row: label + toggle */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -111,7 +109,7 @@ export function FieldCostSummary({
                 className={[
                   "rounded-md px-3 py-1 text-xs font-medium transition-colors",
                   active
-                    ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                    ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
                     : "border border-transparent text-slate-400 hover:text-slate-300",
                 ].join(" ")}
               >

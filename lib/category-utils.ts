@@ -3,7 +3,13 @@
 export type ProductCategory = "fertilizer" | "chemical" | "seed" | "adjuvant" | "other";
 
 // Free-text field — these 5 are the v1 UI defaults; finer values are valid free text.
-export const KNOWN_CATEGORIES: ProductCategory[] = ["fertilizer", "chemical", "seed", "adjuvant", "other"];
+export const KNOWN_CATEGORIES: ProductCategory[] = [
+  "fertilizer",
+  "chemical",
+  "seed",
+  "adjuvant",
+  "other",
+];
 
 export interface CategorySeed {
   name_pattern: string;

@@ -19,8 +19,7 @@ export async function importFieldOperations(
 
   for (const opType of operationTypes) {
     try {
-      const initialUrl =
-        `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`;
+      const initialUrl = `${JOHN_DEERE_API_BASE}/organizations/${orgId}/fields/${fieldId}/fieldOperations?fieldOperationType=${opType}`;
 
       for await (const op of paginate<JdOperation>(accessToken, initialUrl)) {
         const opTypeStr = op.fieldOperationType || opType.toLowerCase();

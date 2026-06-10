@@ -47,6 +47,7 @@ Known units (the only valid `price_unit` / line-unit tokens): weight `ozm`, `lb`
 ## Task 1: `product_prices` table + RLS
 
 **Files:**
+
 - Create: `supabase/migrations/20260602120000_create_product_prices_table.sql`
 
 - [ ] **Step 1: Write the migration**
@@ -98,6 +99,7 @@ git commit -m "feat(db): product_prices table (year-keyed) + RLS"
 ## Task 2: `density_lbs_per_gal` on products
 
 **Files:**
+
 - Create: `supabase/migrations/20260602120100_add_density_to_products.sql`
 
 - [ ] **Step 1: Write the migration**
@@ -123,6 +125,7 @@ git commit -m "feat(db): products.density_lbs_per_gal for weight<->volume conver
 ## Task 3: `lib/unit-convert.ts` (pure converter, TDD)
 
 **Files:**
+
 - Create: `lib/unit-convert.ts`
 - Test: `lib/__tests__/unit-convert.test.ts`
 
@@ -172,8 +175,7 @@ describe("convertAmount — cross family via density", () => {
     expect(convertAmount(11.05, "lb", "gal", 11.05)).toBeCloseTo(1, 6));
   it("floz -> ton via density", () =>
     expect(convertAmount(128, "floz", "ton", 2000)).toBeCloseTo(1, 6)); // 128 floz=1 gal; 1 gal*2000 lb/gal=2000 lb=1 ton
-  it("returns null when density missing", () =>
-    expect(convertAmount(1, "gal", "lb")).toBeNull());
+  it("returns null when density missing", () => expect(convertAmount(1, "gal", "lb")).toBeNull());
   it("returns null when density is zero/negative", () => {
     expect(convertAmount(1, "gal", "lb", 0)).toBeNull();
     expect(convertAmount(1, "gal", "lb", -2)).toBeNull();
@@ -271,6 +273,7 @@ git commit -m "feat(cost): unit converter (weight/volume + cross-family via dens
 ## Task 4: `lib/cost-calc.ts` (pure cost math, TDD)
 
 **Files:**
+
 - Create: `lib/cost-calc.ts`
 - Test: `lib/__tests__/cost-calc.test.ts`
 
@@ -408,7 +411,12 @@ export function lineTotalCost(
   price: PriceRef | null,
 ): number | null {
   if (price == null || totalValue == null || totalUnit == null) return null;
-  const amountInPriceUnit = convertAmount(totalValue, totalUnit, price.price_unit, price.density_lbs_per_gal);
+  const amountInPriceUnit = convertAmount(
+    totalValue,
+    totalUnit,
+    price.price_unit,
+    price.density_lbs_per_gal,
+  );
   if (amountInPriceUnit == null) return null;
   return amountInPriceUnit * price.price_per_unit;
 }
@@ -441,9 +449,10 @@ export function fieldCostPerAcre(
   basis: FieldBasis,
   fieldAcres: number,
 ): number | null {
-  const priced = lines.filter(
-    (l) => l.totalCost != null && l.appliedAcres > 0,
-  ) as Array<{ totalCost: number; appliedAcres: number }>;
+  const priced = lines.filter((l) => l.totalCost != null && l.appliedAcres > 0) as Array<{
+    totalCost: number;
+    appliedAcres: number;
+  }>;
   if (priced.length === 0) return null;
   if (basis === "actual") {
     return priced.reduce((sum, l) => sum + l.totalCost / l.appliedAcres, 0);
@@ -473,6 +482,7 @@ git commit -m "feat(cost): line + field cost math (actual/spread basis)"
 ## Task 5: Types + price CRUD in the client
 
 **Files:**
+
 - Modify: `types/applications.ts`
 - Modify: `lib/applications-client.ts`
 
@@ -512,7 +522,9 @@ Extend the product-line shape in `ApplicationWithLines.product_lines[]` to optio
 ```ts
 export async function fetchProductPrices(year: number, orgId: string): Promise<ProductPrice[]> {
   const { data, error } = await (supabase.from("product_prices") as any)
-    .select("*").eq("year", year).eq("org_id", orgId);
+    .select("*")
+    .eq("year", year)
+    .eq("org_id", orgId);
   if (error) throw error;
   return (data ?? []) as ProductPrice[];
 }
@@ -520,7 +532,9 @@ export async function fetchProductPrices(year: number, orgId: string): Promise<P
 // Years that actually have application data (drives the year selector — no hardcoded list).
 export async function fetchSeasonYears(orgId: string): Promise<number[]> {
   const { data, error } = await (supabase.from("field_operations") as any)
-    .select("crop_season").eq("org_id", orgId).eq("operation_type", "application");
+    .select("crop_season")
+    .eq("org_id", orgId)
+    .eq("operation_type", "application");
   if (error) throw error;
   const years = new Set<number>();
   for (const r of (data ?? []) as any[]) {
@@ -531,16 +545,21 @@ export async function fetchSeasonYears(orgId: string): Promise<number[]> {
 
 // average price_per_unit per product across all years (for "All seasons", read-only).
 // Only averages rows that share the product's modal price_unit to avoid mixing units.
-export async function fetchProductPriceAverages(orgId: string): Promise<Map<string, { avg: number; unit: string }>> {
+export async function fetchProductPriceAverages(
+  orgId: string,
+): Promise<Map<string, { avg: number; unit: string }>> {
   const { data, error } = await (supabase.from("product_prices") as any)
-    .select("product_id, price_per_unit, price_unit").eq("org_id", orgId);
+    .select("product_id, price_per_unit, price_unit")
+    .eq("org_id", orgId);
   if (error) throw error;
   const byProduct = new Map<string, { sums: Map<string, { total: number; n: number }> }>();
   for (const r of (data ?? []) as any[]) {
     const e = byProduct.get(r.product_id) ?? { sums: new Map() };
     const s = e.sums.get(r.price_unit) ?? { total: 0, n: 0 };
-    s.total += Number(r.price_per_unit); s.n += 1;
-    e.sums.set(r.price_unit, s); byProduct.set(r.product_id, e);
+    s.total += Number(r.price_per_unit);
+    s.n += 1;
+    e.sums.set(r.price_unit, s);
+    byProduct.set(r.product_id, e);
   }
   const out = new Map<string, { avg: number; unit: string }>();
   for (const [pid, e] of byProduct) {
@@ -553,15 +572,23 @@ export async function fetchProductPriceAverages(orgId: string): Promise<Map<stri
 }
 
 export async function upsertProductPrice(input: {
-  productId: string; orgId: string; year: number; pricePerUnit: number; priceUnit: string;
+  productId: string;
+  orgId: string;
+  year: number;
+  pricePerUnit: number;
+  priceUnit: string;
 }): Promise<void> {
   const { data: u } = await supabase.auth.getUser();
   const userId = u.user?.id;
   if (!userId) throw new Error("not authenticated");
   const { error } = await (supabase.from("product_prices") as any).upsert(
     {
-      user_id: userId, org_id: input.orgId, product_id: input.productId,
-      year: input.year, price_per_unit: input.pricePerUnit, price_unit: input.priceUnit,
+      user_id: userId,
+      org_id: input.orgId,
+      product_id: input.productId,
+      year: input.year,
+      price_per_unit: input.pricePerUnit,
+      price_unit: input.priceUnit,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id,org_id,product_id,year" },
@@ -577,17 +604,27 @@ export async function setProductDensity(productId: string, density: number | nul
 }
 
 // Bulk-copy a year's prices into another year (HP "Inputs Copy"). Does not overwrite existing.
-export async function copyPricesFromYear(fromYear: number, toYear: number, orgId: string): Promise<number> {
+export async function copyPricesFromYear(
+  fromYear: number,
+  toYear: number,
+  orgId: string,
+): Promise<number> {
   const { data: u } = await supabase.auth.getUser();
   const userId = u.user?.id;
   if (!userId) throw new Error("not authenticated");
   // org-scoped on BOTH sides — never copy another org's price onto this org's product.
   const src = await fetchProductPrices(fromYear, orgId);
   const existing = new Set((await fetchProductPrices(toYear, orgId)).map((p) => p.product_id));
-  const rows = src.filter((p) => !existing.has(p.product_id)).map((p) => ({
-    user_id: userId, org_id: orgId, product_id: p.product_id, year: toYear,
-    price_per_unit: p.price_per_unit, price_unit: p.price_unit,
-  }));
+  const rows = src
+    .filter((p) => !existing.has(p.product_id))
+    .map((p) => ({
+      user_id: userId,
+      org_id: orgId,
+      product_id: p.product_id,
+      year: toYear,
+      price_per_unit: p.price_per_unit,
+      price_unit: p.price_unit,
+    }));
   if (rows.length === 0) return 0;
   const { error } = await (supabase.from("product_prices") as any).insert(rows);
   if (error) throw error;
@@ -612,6 +649,7 @@ git commit -m "feat(pricing): product_prices CRUD + averages + copy-year + densi
 ## Task 6: Attach per-line cost in `fetchApplications`
 
 **Files:**
+
 - Modify: `lib/applications-client.ts` (the `fetchApplications` reshape block)
 
 - [ ] **Step 1: Load prices for the years present, then attach `cost` to each line.**
@@ -621,7 +659,9 @@ After the existing field-name resolution in `fetchApplications`, before the fina
 ```ts
 // Prices for every (product, year) touched by the result set.
 const years = Array.from(
-  new Set((data ?? []).map((r: any) => Number(r.crop_season)).filter((y: number) => Number.isFinite(y))),
+  new Set(
+    (data ?? []).map((r: any) => Number(r.crop_season)).filter((y: number) => Number.isFinite(y)),
+  ),
 );
 let priceRows: any[] = [];
 if (years.length > 0) {
@@ -691,6 +731,7 @@ git commit -m "feat(pricing): attach derived per-line cost to fetchApplications"
 ## Task 7: Products page — year selector, price entry, all-seasons average
 
 **Files:**
+
 - Modify: `app/(app)/products/page.tsx`
 - Modify: `components/applications/products-rollup-table.tsx`
 
@@ -716,6 +757,7 @@ season list, so you can't copy from a year with no data).
 In `products-rollup-table.tsx`, accept new props: `priceByProduct: Map<string,{price_per_unit:number;price_unit:string}>`, `densityByProduct: Map<string,number|null>` (from the product rows), `allSeasons: boolean`, `avgByProduct?: Map<string,{avg:number;unit:string}>`, and handlers `onSetPrice(productId, value, unit)`, `onSetDensity(productId, value)`.
 
 Add columns after Category:
+
 - **Price**: when `allSeasons` → read-only text `avg.toFixed(2)` (or "—"); else editable number input + a unit `<select>` (`ozm/lb/ton/floz/pt/qt/gal`, default = product's observed unit or existing price unit). On blur/change → `onSetPrice`.
 - **Density**: editable number (`lbs/gal`); show a subtle "set density" hint styling when null. On blur → `onSetDensity`.
 
@@ -737,6 +779,7 @@ git commit -m "feat(pricing): set price/unit/density per year on Products + all-
 ## Task 8: Application line cost display
 
 **Files:**
+
 - Modify: `components/applications/product-line-row.tsx`
 - Modify: `components/applications/application-expanded.tsx`
 - Modify: `components/applications/application-row.tsx` (collapsed header total)
@@ -744,6 +787,7 @@ git commit -m "feat(pricing): set price/unit/density per year on Products + all-
 - [ ] **Step 1: Product line row — show `$/ac • $/unit`.**
 
 In `product-line-row.tsx`, read `line.cost`. Render in the cost area:
+
 - if `cost.cost_per_acre != null`: `` `$${cost.cost_per_acre.toFixed(2)}/ac • $${cost.price_per_unit!.toFixed(2)}/${displayUnit(cost.price_unit)}` ``
 - else if `cost.needs_density`: amber "set density" text linking to /products
 - else: muted **`—`** (no price set — unknown, NOT `$0.00`; #6). `$0.00` is reserved for a real $0 price.
@@ -753,10 +797,13 @@ In `product-line-row.tsx`, read `line.cost`. Render in the cost area:
 In `application-expanded.tsx` (and the collapsed `application-row.tsx` total slot), compute `sum of line.cost.cost_per_acre` (treating null as 0) and render `$X.XX/ac`. Add a tiny helper in `lib/cost-calc.ts`:
 
 ```ts
-export function applicationCostPerAcre(lines: Array<{ cost?: { cost_per_acre: number | null } }>): number {
+export function applicationCostPerAcre(
+  lines: Array<{ cost?: { cost_per_acre: number | null } }>,
+): number {
   return lines.reduce((s, l) => s + (l.cost?.cost_per_acre ?? 0), 0);
 }
 ```
+
 (Add a test for `applicationCostPerAcre` in `cost-calc.test.ts`: two lines 9.73 + 2.0 → 11.73; null line ignored.)
 
 - [ ] **Step 3: Typecheck + commit**
@@ -773,6 +820,7 @@ git commit -m "feat(pricing): per-line \$/ac • \$/unit + application \$/ac tot
 ## Task 9: Field per-acre cost summary + Actual/Spread toggle
 
 **Files:**
+
 - Create: `components/applications/field-cost-summary.tsx`
 - Modify: `app/(app)/fields/[fieldId]/applications/page.tsx`
 
@@ -811,6 +859,7 @@ Expected: typecheck clean, all Vitest tests PASS (existing 47 + new unit-convert
 ## Task 11: E2E verification (Playwright) + manual data check
 
 **Files:**
+
 - Create: `tests/e2e/pricing.spec.ts`
 
 - [ ] **Step 1: Write a seed-data E2E** (test user has the seed product/op). Steps: go to `/products`, pick a year, set a price + unit on the seed product, reload, assert it persisted; switch to "All seasons", assert the price cell is read-only; go to `/applications`, expand the seed application, assert a `$/ac` value renders on the line and a total on the header. Use the auth.setup storageState.
@@ -835,6 +884,7 @@ git commit -m "test(e2e): pricing entry + application cost display"
 - **Resolved (data-checked):** `total_unit` is bare (`lb`/`floz`/`gal`); `rate_unit` is a JD token (`lb1ac-1`). Cost derives from `total_value`/`total_unit` — no token parsing, JD-authoritative total. Verified on real rows (Lime 696,134 lb / 139.23 ac, etc.).
 
 ### Codex review (gpt-5.4, 2026-06-02) — findings folded in
+
 - **#1 spec/verify cited rate_value** → fixed spec Cost-computation section + T11 verification to use `total_value`/`total_unit`.
 - **#2 `area_value` assumed acres** (real bug — `ha` would be ~2.47× wrong) → added `acresFrom(value,unit)` in T4; T6 attaches normalized `applied_acres`; T9 normalizes field acres. Data today is 100% `ac`, but the guard prevents a silent future error.
 - **#3 cross-org price→product** → `fetchProductPrices`/averages/`copyPricesFromYear` all org-scoped (T5).

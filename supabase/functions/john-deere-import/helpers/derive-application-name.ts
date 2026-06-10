@@ -2,9 +2,7 @@ import type { JdApplicationRateResult } from "../shared/types.ts";
 
 const PLACEHOLDER = "---";
 
-export function deriveApplicationName(
-  input: JdApplicationRateResult,
-): string | null {
+export function deriveApplicationName(input: JdApplicationRateResult): string | null {
   const outers = input.applicationProductTotals ?? [];
   const names = outers
     .map((o) => o.name?.trim() ?? "")

@@ -3,11 +3,11 @@ import { matchCategoryFromSeeds, effectiveCategory } from "../category-utils";
 import type { CategorySeed } from "../category-utils";
 
 const seeds: CategorySeed[] = [
-  { name_pattern: "atrazine",   match_type: "contains", product_category: "chemical" },
-  { name_pattern: "outlook",    match_type: "exact",    product_category: "chemical" },
-  { name_pattern: "uan",        match_type: "exact",    product_category: "fertilizer" },
-  { name_pattern: "urea",       match_type: "contains", product_category: "fertilizer" },
-  { name_pattern: "water",      match_type: "exact",    product_category: "other" },
+  { name_pattern: "atrazine", match_type: "contains", product_category: "chemical" },
+  { name_pattern: "outlook", match_type: "exact", product_category: "chemical" },
+  { name_pattern: "uan", match_type: "exact", product_category: "fertilizer" },
+  { name_pattern: "urea", match_type: "contains", product_category: "fertilizer" },
+  { name_pattern: "water", match_type: "exact", product_category: "other" },
 ];
 
 describe("matchCategoryFromSeeds", () => {
@@ -33,8 +33,8 @@ describe("matchCategoryFromSeeds", () => {
   it("prefers exact match over contains when both apply (deterministic order)", () => {
     // 'outlook' exact and (hypothetically) a 'out' contains both — exact wins
     const seedsConflict: CategorySeed[] = [
-      { name_pattern: "out",    match_type: "contains", product_category: "fertilizer" },
-      { name_pattern: "outlook", match_type: "exact",   product_category: "chemical" },
+      { name_pattern: "out", match_type: "contains", product_category: "fertilizer" },
+      { name_pattern: "outlook", match_type: "exact", product_category: "chemical" },
     ];
     expect(matchCategoryFromSeeds("outlook", seedsConflict)).toBe("chemical");
   });
@@ -50,12 +50,16 @@ describe("matchCategoryFromSeeds", () => {
 
 describe("effectiveCategory", () => {
   it("returns line-override when set", () => {
-    expect(effectiveCategory({ override: "fertilizer", productCategory: "chemical" })).toBe("fertilizer");
+    expect(effectiveCategory({ override: "fertilizer", productCategory: "chemical" })).toBe(
+      "fertilizer",
+    );
   });
 
   it("falls back to product catalog category when no override", () => {
     expect(effectiveCategory({ override: null, productCategory: "chemical" })).toBe("chemical");
-    expect(effectiveCategory({ override: undefined, productCategory: "chemical" })).toBe("chemical");
+    expect(effectiveCategory({ override: undefined, productCategory: "chemical" })).toBe(
+      "chemical",
+    );
   });
 
   it("returns null when both are absent", () => {

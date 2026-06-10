@@ -48,12 +48,7 @@ interface RowCells {
   ops: number;
 }
 
-function buildRow(
-  r: ExportRow,
-  prices: PriceMap,
-  allSeasons: boolean,
-  avgs?: AvgMap,
-): RowCells {
+function buildRow(r: ExportRow, prices: PriceMap, allSeasons: boolean, avgs?: AvgMap): RowCells {
   const category = r.product.product_category ?? "other";
   const priceEntry = prices.get(r.product.id);
   const avgEntry = avgs?.get(r.product.id);
@@ -77,7 +72,8 @@ function buildRow(
   return {
     category,
     name: r.product.name,
-    categoryLabel: category === "other" && !r.product.product_category ? "Uncategorized" : cap(category),
+    categoryLabel:
+      category === "other" && !r.product.product_category ? "Uncategorized" : cap(category),
     price: pricePerUnit != null ? `$${pricePerUnit.toFixed(2)}/${unitLabel(priceUnit)}` : "—",
     applied: appliedStr,
     totalCost: totalCost != null ? `$${totalCost.toFixed(2)}` : "—",
@@ -149,7 +145,15 @@ export async function exportProductsPdf(
   autoTable(doc, {
     startY: 22,
     head: [["Product", "Category", "Price", "Total Applied", "Total Cost", "Fields", "Ops"]],
-    body: cells.map((d) => [d.name, d.categoryLabel, d.price, d.applied, d.totalCost, d.fields, d.ops]),
+    body: cells.map((d) => [
+      d.name,
+      d.categoryLabel,
+      d.price,
+      d.applied,
+      d.totalCost,
+      d.fields,
+      d.ops,
+    ]),
     headStyles: { fillColor: [30, 41, 59], textColor: [241, 245, 249] },
     didParseCell: (data) => {
       if (data.section === "body") {

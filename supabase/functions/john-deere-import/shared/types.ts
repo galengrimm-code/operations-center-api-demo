@@ -41,7 +41,7 @@ export interface JdApplicationRateResult {
 
 // Flat output for the merge layer
 export interface ExtractedProductLine {
-  line_index: number;          // global counter across all outer aggregates
+  line_index: number; // global counter across all outer aggregates
   outer_aggregate_index: number; // which applicationProductTotals[i] this came from
   jd_product_id: string;
   name: string;

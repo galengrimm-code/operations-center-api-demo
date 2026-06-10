@@ -15,5 +15,8 @@ export const ImportApplicationsQuery = z.object({
 export type ImportApplicationsQueryT = z.infer<typeof ImportApplicationsQuery>;
 
 export function parseSeasons(input: string): string[] {
-  return input.split(",").map((s) => s.trim()).filter(Boolean);
+  return input
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }

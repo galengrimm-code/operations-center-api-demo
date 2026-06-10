@@ -1,11 +1,6 @@
 // types/applications.ts
 
-export type ProductCategory =
-  | "fertilizer"
-  | "chemical"
-  | "seed"
-  | "adjuvant"
-  | "other";
+export type ProductCategory = "fertilizer" | "chemical" | "seed" | "adjuvant" | "other";
 
 export interface Product {
   id: string;
@@ -17,7 +12,7 @@ export interface Product {
   brand: string | null;
   is_carrier_default: boolean;
   product_kind: "constituent" | "tank_mix_recipe" | null;
-  product_category: ProductCategory | string | null;  // free text but typed for known set
+  product_category: ProductCategory | string | null; // free text but typed for known set
   product_category_source: "seed" | "user" | null;
   default_unit: string | null;
   density_lbs_per_gal: number | null;
@@ -81,7 +76,9 @@ export interface ApplicationOperation {
 export interface ApplicationWithLines extends ApplicationOperation {
   field_name: string;
   farm_name: string | null;
-  product_lines: Array<FieldOperationProductLine & { product: Product; cost?: LineCost; applied_acres?: number | null }>;
+  product_lines: Array<
+    FieldOperationProductLine & { product: Product; cost?: LineCost; applied_acres?: number | null }
+  >;
 }
 
 export interface ProductPrice {

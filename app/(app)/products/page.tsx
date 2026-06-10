@@ -43,9 +43,9 @@ export default function ProductsPage() {
   const [priceByProduct, setPriceByProduct] = useState<
     Map<string, { price_per_unit: number; price_unit: string }>
   >(new Map());
-  const [avgByProduct, setAvgByProduct] = useState<
-    Map<string, { avg: number; unit: string }>
-  >(new Map());
+  const [avgByProduct, setAvgByProduct] = useState<Map<string, { avg: number; unit: string }>>(
+    new Map(),
+  );
 
   const [copyingPrices, setCopyingPrices] = useState(false);
 
@@ -224,7 +224,9 @@ export default function ProductsPage() {
           <div className="flex flex-shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={() => exportProductsExcel(visibleRows, priceByProduct, allSeasons, avgByProduct)}
+              onClick={() =>
+                exportProductsExcel(visibleRows, priceByProduct, allSeasons, avgByProduct)
+              }
               disabled={visibleRows.length === 0}
               className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
             >
@@ -233,7 +235,9 @@ export default function ProductsPage() {
             </button>
             <button
               type="button"
-              onClick={() => exportProductsPdf(visibleRows, priceByProduct, allSeasons, avgByProduct)}
+              onClick={() =>
+                exportProductsPdf(visibleRows, priceByProduct, allSeasons, avgByProduct)
+              }
               disabled={visibleRows.length === 0}
               className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
             >
@@ -285,7 +289,6 @@ export default function ProductsPage() {
             <option value="adjuvant">Adjuvant</option>
             <option value="other">Other</option>
           </select>
-
         </div>
 
         {/* Bulk tools panel — collapsed by default; deliberate open avoids accidental bulk writes.

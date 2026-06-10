@@ -10,11 +10,13 @@
 ## 1. Goal
 
 Import John Deere Operations Center **APPLICATION** (spray) field operations into the OPS Center app with full per-product (tank-mix-ingredient) data, so the user can answer:
+
 - "How many gallons of atrazine did I apply across all fields this season?"
 - "What was applied to field X this year?" and across years
 - (future) "What did chemical inputs cost per acre on field X?"
 
 The build sets up the data layer for two declared strategic ambitions:
+
 - **Displace Harvest Profit** (existing $1,600/yr SaaS Galen pays) by eventually adding a product-cost layer
 - **Feed OPS Center data into Farm-Budget** (sibling app in same Supabase project) for cross-app analytics
 
@@ -25,6 +27,7 @@ Both ambitions are out of scope for THIS build but inform the schema shape.
 ## 2. Scope
 
 ### In scope
+
 - Pull APPLICATION fieldOperations for crop seasons 2024, 2025, 2026 (three-season history)
 - Capture per-product tank-mix breakdown with rates, totals, areas, carrier flag
 - New `products` catalog auto-populated by JD's stable product UUIDs (no manual matching required)
@@ -39,6 +42,7 @@ Both ambitions are out of scope for THIS build but inform the schema shape.
 - **Introduce automated testing** — Vitest (unit, TDD on pure logic), Playwright (E2E for edit/revert flow), Deno test (edge function actions). `prebuild` runs lint + typecheck + Vitest. Project previously had no tests; this build establishes the baseline.
 
 ### Out of scope (explicit)
+
 - **Map UI changes** — existing `/map` continues to work, no spray overlay
 - **Cost / pricing data layer** — no cost columns, no price-entry UI, no $/acre rollups (Harvest Profit covers this for now)
 - **Tillage operations** — same plumbing pattern, deferred to backburner
@@ -97,6 +101,7 @@ CREATE INDEX products_category_idx ON operations_center.products (user_id, org_i
 ```
 
 Notes:
+
 - `user_id` is on `products` (not just org-scoped) — matches the existing auth model. If multi-user org tenancy ever lands, migrate then, not now.
 - `name_normalized` is maintained by the import path (computed at insert/update). Generated column is an option but kept as plain text for simplicity + index control.
 - `product_kind` (structural) is nullable — populated heuristically (outer ApplicationProductTotal → `tank_mix_recipe`, inner ProductTotal → `constituent`). Not user-facing.
@@ -151,6 +156,7 @@ CREATE INDEX fop_user_org_product_idx ON operations_center.field_operation_produ
 ```
 
 Notes:
+
 - `user_id` + `org_id` denormalized for RLS query speed (per Codex section 5) — avoids forced JOIN to `field_operations` on every read of the `/products` rollup.
 - Consistency enforced via insert trigger (below) that copies `user_id` + `org_id` from `field_operations` on insert. Cheaper than a check constraint with subquery.
 - `line_index` = position in the JD `applicationProductTotals[...].productTotals[]` array. Avoids the duplicate-product-in-same-operation collision Codex flagged.
@@ -178,6 +184,7 @@ ALTER TABLE operations_center.field_operations
 ```
 
 Notes:
+
 - Pre-existing HARVEST/SEEDING rows default to 'unknown' for `measurement_status` — no backfill needed.
 - `application_name` is the operation-level descriptive label seen in Harvest Profit's UI (Galen's reference screenshot 2026-05-28) — separate from `crop_name` (which is the crop being grown) and `variety_name` (which is the seeded variety). For APPLICATION operations only; HARVEST and SEEDING rows leave it null.
 - The auto-populate logic: if a JD response has one outer `ApplicationProductTotal`, use its `name` (e.g., "Infurrow"). If multiple outer entries with different names, concatenate (e.g., "Atrazine + 2,4-D") OR use the first — TBD during implementation based on observed data variety. If JD provides no name (or only `"---"`), leave null and let user fill in.
@@ -302,6 +309,7 @@ INSERT INTO operations_center.product_category_seeds (name_pattern, match_type, 
 ```
 
 Notes:
+
 - Pattern matching is `name_normalized LIKE '%' || name_pattern || '%'` for `match_type = 'contains'`, exact equality for `match_type = 'exact'`.
 - Categories use the 5-bucket HP-aligned vocabulary; the finer-grained type (herbicide vs fungicide vs micronutrient) is preserved in the `notes` column for transparency and future sub-categorization filtering.
 - The list is intentionally short — covers Galen's most likely products in northeast Kansas corn/soy. Easy to extend later.
@@ -345,6 +353,7 @@ The temporary `debug-spray-shape` function is DELETED at the end of execution.
 Triggered by `?action=import-applications` (and bundled into `import-fields` like operations already are).
 
 Algorithm:
+
 1. Read stored fields from `operations_center.fields` for (user, org)
 2. For each field, call `GET /organizations/{org}/fields/{field}/fieldOperations?fieldOperationType=APPLICATION` (paginated via `links[].rel === "nextPage"`)
 3. Filter to `cropSeason ∈ {2024, 2025, 2026}` client-side (JD doesn't expose a server-side filter)
@@ -393,8 +402,8 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 export const ImportApplicationsQuery = z.object({
   action: z.literal("import-applications"),
-  fieldId: z.string().uuid().optional(),  // if present, scope to one field
-  seasons: z.string().optional(),          // CSV "2024,2025,2026"; default = "2024,2025,2026"
+  fieldId: z.string().uuid().optional(), // if present, scope to one field
+  seasons: z.string().optional(), // CSV "2024,2025,2026"; default = "2024,2025,2026"
 });
 ```
 
@@ -419,11 +428,13 @@ Parse with `safeParse` and return generic error on failure. Never echo Zod issue
 Reference: Harvest Profit screenshot 2026-05-28. Mirroring their proven UX for the operation list + expanded-tank-mix view, adapted to our 5-category vocabulary and our schema.
 
 **Collapsed operation row (1 line per application):**
+
 ```
 [date]  [application_name]  [Application icon]  [cost/ac placeholder]  [N items]  [Edit]
 ```
 
 **Expanded operation row** (when user clicks Edit):
+
 - Editable date picker
 - Editable `application_name` (free text)
 - "Application" type label
@@ -431,6 +442,7 @@ Reference: Harvest Profit screenshot 2026-05-28. Mirroring their proven UX for t
 - Item count
 
 **Products section within expanded row** (grouped by `product_category`):
+
 ```
 💧 Fertilizer
   ──────────────────────────────────────────────────────────────────
@@ -454,10 +466,12 @@ Reference: Harvest Profit screenshot 2026-05-28. Mirroring their proven UX for t
 - Water/carrier rows hidden by default; "Show carriers" toggle reveals (per spec 9.2)
 
 **"Imported Machine Rate" toggle (matches HP's "Custom / Machine" toggle):**
+
 - When `is_user_edited = false`: shows "Imported Machine Rate" — read-only
 - When `is_user_edited = true`: shows "Custom" — editable, with revert affordance
 
 **NOT in v1 UI (deferred):**
+
 - Cost / Rate columns (cost layer is out of scope)
 - "Add Fertilizer / Chemical / Seed" buttons to manually add a line item (HP affordance for products JD didn't report)
 - "Tank Mix?" toggle with carrier + carrier-rate metadata (derivable from line items today)
@@ -500,36 +514,43 @@ No charts in v1. Tables only. Charts (e.g., "atrazine usage trend year-over-year
 Edits do NOT go through new edge functions — they use the Supabase browser client directly. RLS enforces authorization. `checkMutationResult` catches silent failures.
 
 **Editing a product line (rate / total / area / category override):**
+
 ```typescript
 // lib/applications-client.ts
-async function editProductLine(lineId: string, edits: {
-  rate_value?: number | null;
-  total_value?: number | null;
-  area_value?: number | null;
-  product_category_override?: string | null;
-}) {
-  const validated = ProductLineEditSchema.parse(edits);  // Zod
+async function editProductLine(
+  lineId: string,
+  edits: {
+    rate_value?: number | null;
+    total_value?: number | null;
+    area_value?: number | null;
+    product_category_override?: string | null;
+  },
+) {
+  const validated = ProductLineEditSchema.parse(edits); // Zod
   const { data, error } = await supabase
-    .from('field_operation_products')
+    .from("field_operation_products")
     .update({
       ...validated,
       is_user_edited: true,
       edited_at: new Date().toISOString(),
     })
-    .eq('id', lineId)
+    .eq("id", lineId)
     .select()
     .single();
   if (error) throw error;
-  return checkMutationResult(data, 'edit product line', 1);
+  return checkMutationResult(data, "edit product line", 1);
 }
 
 async function revertProductLine(lineId: string) {
   // Reset to JD originals via a single update
   const { data: row, error: readErr } = await supabase
-    .from('field_operation_products').select('*').eq('id', lineId).single();
+    .from("field_operation_products")
+    .select("*")
+    .eq("id", lineId)
+    .single();
   if (readErr) throw readErr;
   const { data, error } = await supabase
-    .from('field_operation_products')
+    .from("field_operation_products")
     .update({
       rate_value: row.rate_value_jd_original,
       total_value: row.total_value_jd_original,
@@ -538,47 +559,49 @@ async function revertProductLine(lineId: string) {
       is_user_edited: false,
       edited_at: null,
     })
-    .eq('id', lineId)
+    .eq("id", lineId)
     .select()
     .single();
   if (error) throw error;
-  return checkMutationResult(data, 'revert product line', 1);
+  return checkMutationResult(data, "revert product line", 1);
 }
 ```
 
 **Editing a product's catalog category (affects all lines of that product):**
+
 ```typescript
 async function editProductCategory(productId: string, category: ProductCategory) {
   const { data, error } = await supabase
-    .from('products')
+    .from("products")
     .update({
       product_category: category,
-      product_category_source: 'user',
+      product_category_source: "user",
       updated_at: new Date().toISOString(),
     })
-    .eq('id', productId)
+    .eq("id", productId)
     .select()
     .single();
   if (error) throw error;
-  return checkMutationResult(data, 'edit product category', 1);
+  return checkMutationResult(data, "edit product category", 1);
 }
 ```
 
 **Editing the operation-level `application_name`:**
+
 ```typescript
 async function editApplicationName(operationId: string, name: string) {
   const { data, error } = await supabase
-    .from('field_operations')
+    .from("field_operations")
     .update({
       application_name: name,
       application_name_user_edited: true,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', operationId)
+    .eq("id", operationId)
     .select()
     .single();
   if (error) throw error;
-  return checkMutationResult(data, 'edit application name', 1);
+  return checkMutationResult(data, "edit application name", 1);
 }
 ```
 
@@ -594,12 +617,12 @@ async function editApplicationName(operationId: string, name: string) {
 
 ### 7.1 Tier matrix
 
-| Tier | Framework | Scope | Files |
-|---|---|---|---|
-| Unit (TS) | **Vitest** | Pure logic: JD response extraction, products catalog matching, seed-list lookup, merge-by-line_index decision tree, application_name derivation | `lib/__tests__/*.test.ts` |
-| Edge function | **Deno test** | `import-applications` action: 200 happy path, 404 graceful skip, 5xx error, idempotent re-import preserving user edits | `supabase/functions/john-deere-import/__tests__/*.test.ts` |
-| E2E (UI) | **Playwright** | Sign in → import-applications → view `/applications` → edit rate on a line → confirm `is_user_edited` + JD-original preserved → revert → re-run import → confirm edit was preserved across imports | `tests/e2e/*.spec.ts` |
-| DB / RLS | **Manual + `checkMutationResult`** | Multi-account read attempts verify RLS at runtime. `checkMutationResult` catches silent failures on every mutation. | (no test files; runtime + manual) |
+| Tier          | Framework                          | Scope                                                                                                                                                                                              | Files                                                      |
+| ------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Unit (TS)     | **Vitest**                         | Pure logic: JD response extraction, products catalog matching, seed-list lookup, merge-by-line_index decision tree, application_name derivation                                                    | `lib/__tests__/*.test.ts`                                  |
+| Edge function | **Deno test**                      | `import-applications` action: 200 happy path, 404 graceful skip, 5xx error, idempotent re-import preserving user edits                                                                             | `supabase/functions/john-deere-import/__tests__/*.test.ts` |
+| E2E (UI)      | **Playwright**                     | Sign in → import-applications → view `/applications` → edit rate on a line → confirm `is_user_edited` + JD-original preserved → revert → re-run import → confirm edit was preserved across imports | `tests/e2e/*.spec.ts`                                      |
+| DB / RLS      | **Manual + `checkMutationResult`** | Multi-account read attempts verify RLS at runtime. `checkMutationResult` catches silent failures on every mutation.                                                                                | (no test files; runtime + manual)                          |
 
 ### 7.2 Test data — real fixtures, not synthetic
 
@@ -637,6 +660,7 @@ Fixture capture script committed at `scripts/capture-jd-fixtures.ts` (Deno) so f
 ### 7.5 Manual verification (still required, supplements automated tests)
 
 After automated tests pass, Galen runs:
+
 1. Trigger `import-applications` from UI → expect products + tank mix rows
 2. Open `/applications` → expect rows with tank-mix expand, products grouped by category
 3. Open `/products` → expect "X gallons of EnzUpP across N fields" rollup
@@ -659,10 +683,12 @@ After automated tests pass, Galen runs:
 ## 8. Tech-debt addressed by this build
 
 From `TECH-DEBT.md`:
+
 - `john-deere-import/index.ts > 500 lines` — RESOLVED via split
 - New endpoints ship with Zod, generic errors, restricted CORS — does not widen the existing gaps on the new surface (the existing gaps on the 4 existing functions remain debt to be cleaned up separately)
 
 Tech debt NOT addressed (continues as-is):
+
 - Existing 4 edge functions' CORS wildcard, error leakage, missing input validation, missing rate limiting — separate cleanup
 - `irrigation-analysis.tsx`, `progress/page.tsx`, etc. >500 lines — separate cleanup
 - Next 13.5.x residual CVEs — deferred to deliberate Next 16 migration
@@ -674,18 +700,22 @@ Tech debt NOT addressed (continues as-is):
 These were judgment calls made during design rather than questions bounced back. Documented so future me / future Galen can push back if the rationale doesn't hold up.
 
 ### 9.1 `line_index` is FLAT across all outer aggregates for one operation
+
 **Decision:** Single counter 0..N across the entire flattened `applicationProductTotals[i].productTotals[j]` array for an operation. NOT per-outer-aggregate.
 **Rationale:** The unique constraint `(field_operation_id, line_index)` is simpler with flat numbering. The outer-aggregate grouping signal is preserved in `field_operations.raw_response` for anyone who needs it. Analytics queries don't care about outer grouping; they care about products.
 
 ### 9.2 `/products` rollup hides carrier rows by default
+
 **Decision:** UI default-filters `is_carrier = true` rows out of the `/products` view. A "show carriers" toggle reveals water/UAN.
 **Rationale:** Galen's primary use case is "how much atrazine did I apply" — water and surfactants are noise in that view. The data is preserved (so compliance use cases can show them), just hidden by default.
 
 ### 9.3 `import-fields` auto-chains to `import-applications`
+
 **Decision:** The existing import-fields → import-operations chain extends to import-applications. One-click "give me everything" from the UI.
 **Rationale:** The existing UX is a single import button. Forcing two clicks for spray data is friction without benefit. JD API cost is bounded (one-time per user-triggered action).
 
 ### 9.4 Re-fetch 404'd operations on every import-applications run
+
 **Decision:** Operations in `field_operations` with `measurement_status = 'not_found'` are re-fetched on every import-applications call, in case JD has since processed them.
 **Rationale:** Phase 0c showed 2/3 sampled ops returned 404, plausibly because JD's pipeline hadn't processed recent ops yet. Re-fetching opportunistically captures the data when JD catches up. Cost is bounded because import is user-triggered, not scheduled.
 
