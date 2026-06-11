@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, Grid3X3, BarChart3, FileBarChart, TrendingUp, Droplets, Package } from "lucide-react";
+import {
+  Map,
+  Grid3X3,
+  BarChart3,
+  FileBarChart,
+  TrendingUp,
+  Droplets,
+  Package,
+  Mountain,
+} from "lucide-react";
 
 const links = [
   { href: "/map", label: "Map", icon: Map },
@@ -12,6 +21,7 @@ const links = [
   { href: "/reports", label: "Reports", icon: FileBarChart },
   { href: "/applications", label: "Applications", icon: Droplets },
   { href: "/products", label: "Products", icon: Package },
+  { href: "/elevation", label: "Elevation", icon: Mountain },
 ];
 
 export function NavLinks() {
