@@ -7,6 +7,7 @@ import { useFields } from "@/hooks/use-fields";
 import { supabase } from "@/lib/supabase";
 import { fetchStoredOperations, pollForShapefileUrl } from "@/lib/john-deere-client";
 import { filterHiddenOperations } from "@/lib/crop-filter";
+import { loadElevationModel, saveElevationModel } from "@/lib/elevation-store";
 import { processShapefile } from "@/lib/shapefile-analysis";
 import {
   applyOffsets,
@@ -79,14 +80,18 @@ export function ElevationView() {
   const [intervalFt, setIntervalFt] = useState(DEFAULT_INTERVAL_FT);
   const [contours, setContours] = useState<ContourResult | null>(null);
   const [passStats, setPassStats] = useState<PassStat[]>([]);
+  const [savedBuiltAt, setSavedBuiltAt] = useState<string | null>(null);
   const gridRef = useRef<ElevationGrid | null>(null);
   const projRef = useRef<LocalProjection | null>(null);
+  // Mirrors intervalFt for effects that shouldn't re-run on interval change.
+  const intervalRef = useRef(DEFAULT_INTERVAL_FT);
   // Invalidates in-flight builds when inputs change so a slow build for
   // field A can't commit its results after the user switched to field B.
   const buildTokenRef = useRef(0);
 
   const selectedField = fields.find((f) => f.jd_field_id === selectedFieldId) || null;
   const hiddenCrops = johnDeereConnection?.hidden_crop_names;
+  const orgId = johnDeereConnection?.selected_org_id;
 
   // If the farm filter changes and the selected field is no longer visible,
   // invalidate any in-flight build and clear the selection.
@@ -104,6 +109,7 @@ export function ElevationView() {
       setCheckedOpIds(new Set());
       setContours(null);
       setPassStats([]);
+      setSavedBuiltAt(null);
       gridRef.current = null;
       return;
     }
@@ -112,7 +118,33 @@ export function ElevationView() {
     setOpsLoading(true);
     setContours(null);
     setPassStats([]);
+    setSavedBuiltAt(null);
     gridRef.current = null;
+
+    // Restore the saved model (if any) so the map appears without a rebuild.
+    // restoreToken: a Build click (or another field change) advances the
+    // token, after which a late-arriving restore must be discarded.
+    const restoreToken = buildTokenRef.current;
+    let restoredPassSelection = false;
+    if (orgId) {
+      (async () => {
+        try {
+          const saved = await loadElevationModel(orgId, selectedFieldId);
+          if (cancelled || !saved || buildTokenRef.current !== restoreToken) return;
+          gridRef.current = saved.grid;
+          projRef.current = saved.proj;
+          setPassStats(saved.passStats);
+          setSavedBuiltAt(saved.builtAt);
+          setContours(gridToContours(saved.grid, saved.proj, intervalRef.current));
+          // Reflect the pass set the saved surface was actually built from.
+          restoredPassSelection = true;
+          setCheckedOpIds(new Set(saved.passOpIds));
+        } catch {
+          // No saved model is a normal state — build produces one.
+        }
+      })();
+    }
+
     (async () => {
       try {
         const data = await fetchStoredOperations(selectedFieldId);
@@ -125,13 +157,16 @@ export function ElevationView() {
         setOps(usable);
 
         // Default-select recent full-field passes; tiny stubs stay unchecked.
-        const currentYear = new Date().getFullYear();
-        const defaults = usable.filter(
-          (op) =>
-            Number(op.crop_season) >= currentYear - DEFAULT_SEASON_LOOKBACK &&
-            (op.area_value ?? 0) >= MIN_DEFAULT_AREA_AC,
-        );
-        setCheckedOpIds(new Set(defaults.map((op) => op.jd_operation_id)));
+        // A restored model's own pass set wins over the defaults.
+        if (!restoredPassSelection) {
+          const currentYear = new Date().getFullYear();
+          const defaults = usable.filter(
+            (op) =>
+              Number(op.crop_season) >= currentYear - DEFAULT_SEASON_LOOKBACK &&
+              (op.area_value ?? 0) >= MIN_DEFAULT_AREA_AC,
+          );
+          setCheckedOpIds(new Set(defaults.map((op) => op.jd_operation_id)));
+        }
       } catch {
         if (!cancelled) setOps([]);
       } finally {
@@ -141,7 +176,7 @@ export function ElevationView() {
     return () => {
       cancelled = true;
     };
-  }, [selectedFieldId, hiddenCrops]);
+  }, [selectedFieldId, hiddenCrops, orgId]);
 
   const toggleOp = (opId: string) => {
     setCheckedOpIds((prev) => {
@@ -240,17 +275,37 @@ export function ElevationView() {
       if (buildTokenRef.current !== buildToken) return;
       gridRef.current = grid;
 
-      setPassStats(
-        usablePasses.map((p, i) => ({
-          label: opLabel(p.op),
-          pointCount: p.points.points.length,
-          missingElevationCount: p.points.missingElevationCount,
-          outlierCount: p.points.outlierCount,
-          offsetFt: offsets[i].offsetFt,
-          lowConfidence: offsets[i].lowConfidence,
-        })),
-      );
+      const stats = usablePasses.map((p, i) => ({
+        label: opLabel(p.op),
+        pointCount: p.points.points.length,
+        missingElevationCount: p.points.missingElevationCount,
+        outlierCount: p.points.outlierCount,
+        offsetFt: offsets[i].offsetFt,
+        lowConfidence: offsets[i].lowConfidence,
+      }));
+      setPassStats(stats);
       setContours(gridToContours(grid, proj, intervalFt));
+
+      // Persist so the next visit renders without a rebuild. Failure is
+      // non-fatal — the map is already on screen.
+      if (orgId) {
+        try {
+          await saveElevationModel({
+            orgId,
+            jdFieldId: selectedField.jd_field_id,
+            passOpIds: usablePasses.map((p) => p.op.jd_operation_id),
+            passStats: stats,
+            grid,
+            proj,
+            pointCount: merged.length,
+          });
+          if (buildTokenRef.current === buildToken) {
+            setSavedBuiltAt(new Date().toISOString());
+          }
+        } catch (err) {
+          console.error("[elevation] Failed to save model:", err);
+        }
+      }
     } catch (err) {
       if (buildTokenRef.current === buildToken) {
         setBuildError(err instanceof Error ? err.message : "Elevation build failed");
@@ -258,10 +313,11 @@ export function ElevationView() {
     } finally {
       setIsBuilding(false);
     }
-  }, [selectedField, checkedOpIds, ops, intervalFt]);
+  }, [selectedField, checkedOpIds, ops, intervalFt, orgId]);
 
   const handleIntervalChange = (nextInterval: number) => {
     setIntervalFt(nextInterval);
+    intervalRef.current = nextInterval;
     if (gridRef.current && projRef.current) {
       setContours(gridToContours(gridRef.current, projRef.current, nextInterval));
     }
@@ -350,8 +406,18 @@ export function ElevationView() {
             ) : (
               <Play className="h-4 w-4" />
             )}
-            {isBuilding ? "Building..." : "Build elevation map"}
+            {isBuilding
+              ? "Building..."
+              : contours
+                ? "Rebuild elevation map"
+                : "Build elevation map"}
           </button>
+
+          {savedBuiltAt && !isBuilding && (
+            <p className="text-xs text-slate-500">
+              Saved model · built {new Date(savedBuiltAt).toLocaleString()}
+            </p>
+          )}
         </div>
 
         {selectedFieldId && (

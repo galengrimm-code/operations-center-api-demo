@@ -28,6 +28,8 @@ export interface PassExtraction {
   featureCount: number;
   missingElevationCount: number;
   outlierCount: number;
+  /** Records collapsed into shared-timestamp points (planter sections). */
+  collapsedCount: number;
 }
 
 export interface PassOffset {
@@ -104,6 +106,13 @@ export function extractElevationPoints(
   const rawPoints: ElevationPoint[] = [];
   let missingElevationCount = 0;
 
+  // Seeding shapefiles emit one polygon per row section per second, all
+  // sharing the receiver's single GPS fix and elevation. Collapse records
+  // with the same timestamp to one point (averaged centroid) so a single
+  // elevation reading isn't smeared across the toolbar width.
+  const byTime = new Map<string, { sx: number; sy: number; sz: number; n: number }>();
+  let collapsedCount = 0;
+
   for (const feature of fc.features) {
     const geom = feature.geometry;
     if (!geom) continue;
@@ -118,7 +127,8 @@ export function extractElevationPoints(
     }
     if (!ring || ring.length === 0) continue;
 
-    const z = readElevation(feature.properties as Record<string, unknown> | null);
+    const props = feature.properties as Record<string, unknown> | null;
+    const z = readElevation(props);
     if (z === null || z <= 0) {
       missingElevationCount++;
       continue;
@@ -126,8 +136,27 @@ export function extractElevationPoints(
 
     const [lon, lat] = ringCentroid(ring);
     const [x, y] = proj.toLocal(lon, lat);
-    rawPoints.push({ x, y, z });
+
+    const timeRaw = props?.IsoTime ?? props?.Time ?? props?.TIME;
+    if (typeof timeRaw === "string" && timeRaw.length > 0) {
+      const entry = byTime.get(timeRaw);
+      if (entry) {
+        entry.sx += x;
+        entry.sy += y;
+        entry.sz += z;
+        entry.n++;
+        collapsedCount++;
+      } else {
+        byTime.set(timeRaw, { sx: x, sy: y, sz: z, n: 1 });
+      }
+    } else {
+      rawPoints.push({ x, y, z });
+    }
   }
+
+  byTime.forEach(({ sx, sy, sz, n }) => {
+    rawPoints.push({ x: sx / n, y: sy / n, z: sz / n });
+  });
 
   // Robust outlier filter: real terrain relief survives (MAD covers it),
   // GPS glitches (0 ft, 5-digit spikes) do not.
@@ -148,6 +177,7 @@ export function extractElevationPoints(
     featureCount: fc.features.length,
     missingElevationCount,
     outlierCount,
+    collapsedCount,
   };
 }
 

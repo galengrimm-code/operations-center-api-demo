@@ -94,6 +94,49 @@ describe("extractElevationPoints", () => {
     expect(result.points[0].x).toBeCloseTo(expectedX, 3);
   });
 
+  it("collapses same-timestamp section records into one averaged point", () => {
+    const proj = createLocalProjection(LON0, LAT0);
+    const d = 0.0001;
+    const fc: FeatureCollection = {
+      type: "FeatureCollection",
+      features: [
+        // Three planter sections sharing one GPS fix at t1, spread laterally
+        { lon: LON0 - d, lat: LAT0, elevation: 1010, time: "t1" },
+        { lon: LON0, lat: LAT0, elevation: 1010, time: "t1" },
+        { lon: LON0 + d, lat: LAT0, elevation: 1010, time: "t1" },
+        // Two sections at t2
+        { lon: LON0, lat: LAT0 + d, elevation: 1011, time: "t2" },
+        { lon: LON0 + d, lat: LAT0 + d, elevation: 1011, time: "t2" },
+        // One record without a timestamp passes through untouched
+        { lon: LON0, lat: LAT0 + 2 * d, elevation: 1012, time: null },
+      ].map(({ lon, lat, elevation, time }) => ({
+        type: "Feature" as const,
+        properties: time ? { Elevation: elevation, Time: time } : { Elevation: elevation },
+        geometry: {
+          type: "Polygon" as const,
+          coordinates: [
+            [
+              [lon - 0.00002, lat - 0.00002],
+              [lon + 0.00002, lat - 0.00002],
+              [lon + 0.00002, lat + 0.00002],
+              [lon - 0.00002, lat + 0.00002],
+              [lon - 0.00002, lat - 0.00002],
+            ],
+          ],
+        },
+      })),
+    };
+
+    const result = extractElevationPoints(fc, proj);
+    expect(result.points).toHaveLength(3); // t1 group + t2 group + untimed
+    expect(result.collapsedCount).toBe(3); // 2 extra at t1 + 1 extra at t2
+
+    // t1 group centroid averages to the middle position
+    const [centerX] = proj.toLocal(LON0, LAT0);
+    const t1Point = result.points.find((p) => Math.abs(p.z - 1010) < 0.001)!;
+    expect(t1Point.x).toBeCloseTo(centerX, 3);
+  });
+
   it("filters GPS-glitch outliers but keeps real relief", () => {
     const proj = createLocalProjection(LON0, LAT0);
     const cells = [];

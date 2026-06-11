@@ -1,15 +1,10 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
+import type { ElevationPassStat } from "@/lib/elevation-store";
 
-export interface PassStat {
-  label: string;
-  pointCount: number;
-  missingElevationCount: number;
-  outlierCount: number;
-  offsetFt: number;
-  lowConfidence: boolean;
-}
+// Persisted in elevation_models.pass_stats — shape lives in the store module.
+export type PassStat = ElevationPassStat;
 
 interface ElevationStatsProps {
   passStats: PassStat[];
