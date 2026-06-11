@@ -1,14 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Mountain, Play } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useFields } from "@/hooks/use-fields";
 import { supabase } from "@/lib/supabase";
-import {
-  fetchStoredFields,
-  fetchStoredOperations,
-  pollForShapefileUrl,
-} from "@/lib/john-deere-client";
+import { fetchStoredOperations, pollForShapefileUrl } from "@/lib/john-deere-client";
 import { filterHiddenOperations } from "@/lib/crop-filter";
 import { processShapefile } from "@/lib/shapefile-analysis";
 import {
@@ -23,7 +20,7 @@ import {
   type ElevationGrid,
   type LocalProjection,
 } from "@/lib/elevation-merge";
-import type { StoredField, StoredFieldOperation } from "@/types/john-deere";
+import type { StoredFieldOperation } from "@/types/john-deere";
 import { ElevationMap } from "./elevation-map";
 import { ElevationStats, type PassStat } from "./elevation-stats";
 
@@ -62,9 +59,14 @@ function boundaryCentroid(boundary: GeoJSON.MultiPolygon): [number, number] {
 export function ElevationView() {
   const { johnDeereConnection } = useAuth();
 
-  const [fields, setFields] = useState<StoredField[]>([]);
-  const [fieldsLoading, setFieldsLoading] = useState(true);
+  // useFields applies the global farm filter (top-bar dropdown) app-wide.
+  const { fields: farmFields, loading: fieldsLoading } = useFields();
   const [selectedFieldId, setSelectedFieldId] = useState("");
+
+  const fields = useMemo(
+    () => farmFields.filter((f) => f.boundary_geojson).sort((a, b) => a.name.localeCompare(b.name)),
+    [farmFields],
+  );
 
   const [ops, setOps] = useState<StoredFieldOperation[]>([]);
   const [opsLoading, setOpsLoading] = useState(false);
@@ -86,31 +88,23 @@ export function ElevationView() {
   const selectedField = fields.find((f) => f.jd_field_id === selectedFieldId) || null;
   const hiddenCrops = johnDeereConnection?.hidden_crop_names;
 
+  // If the farm filter changes and the selected field is no longer visible,
+  // invalidate any in-flight build and clear the selection.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchStoredFields();
-        if (cancelled) return;
-        const sorted = ((data.fields || []) as StoredField[])
-          .filter((f) => f.boundary_geojson)
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setFields(sorted);
-      } catch {
-        if (!cancelled) setFields([]);
-      } finally {
-        if (!cancelled) setFieldsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (selectedFieldId && !fields.some((f) => f.jd_field_id === selectedFieldId)) {
+      buildTokenRef.current++;
+      setSelectedFieldId("");
+    }
+  }, [fields, selectedFieldId]);
 
   useEffect(() => {
     if (!selectedFieldId) {
+      buildTokenRef.current++;
       setOps([]);
       setCheckedOpIds(new Set());
+      setContours(null);
+      setPassStats([]);
+      gridRef.current = null;
       return;
     }
     let cancelled = false;
