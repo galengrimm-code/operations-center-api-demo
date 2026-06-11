@@ -186,8 +186,13 @@ export function ElevationView() {
         const opId = op.jd_operation_id;
         try {
           setProgress(opId, { status: "polling", attempt: 0 });
-          const storagePath = await pollForShapefileUrl(opId, (attempt) =>
-            setProgress(opId, { status: "polling", attempt }),
+          // OneHertz: same elevation information as EachSensor at ~1/5 the
+          // size (row units share one GPS fix) — keeps big planter passes
+          // under the storage upload limit.
+          const storagePath = await pollForShapefileUrl(
+            opId,
+            (attempt) => setProgress(opId, { status: "polling", attempt }),
+            "OneHertz",
           );
 
           setProgress(opId, { status: "downloading", attempt: 0 });

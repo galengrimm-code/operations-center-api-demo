@@ -170,17 +170,26 @@ Deno.serve(async (req: Request) => {
         return errorResponse("Missing operationId parameter", 400, undefined, req);
       }
 
+      // OneHertz is ~5x smaller than EachSensor (one reading/second instead of
+      // one polygon per row unit) — modern planter EachSensor zips can exceed
+      // storage upload limits. Elevation requests use OneHertz; irrigation
+      // keeps the EachSensor default for per-section rate analysis.
+      const resolution =
+        url.searchParams.get("resolution") === "OneHertz" ? "OneHertz" : "EachSensor";
+      const fileName =
+        resolution === "OneHertz" ? `${operationId}-onehertz.zip` : `${operationId}.zip`;
+
       // Check if we already have this shapefile in storage
-      const storagePath = `${user.id}/${operationId}.zip`;
+      const storagePath = `${user.id}/${fileName}`;
       const { data: existing } = await supabase.storage
         .from("shapefiles")
-        .list(user.id, { search: `${operationId}.zip` });
+        .list(user.id, { search: fileName });
 
       if (existing && existing.length > 0) {
         return jsonResponse({ status: "ready", storagePath }, 200, req);
       }
 
-      const shapefileUrl = `${JOHN_DEERE_API_BASE}/fieldOps/${operationId}?shapeType=Polygon&resolution=EachSensor`;
+      const shapefileUrl = `${JOHN_DEERE_API_BASE}/fieldOps/${operationId}?shapeType=Polygon&resolution=${resolution}`;
       console.log(`[irrigation] Requesting shapefile from: ${shapefileUrl}`);
 
       const response = await fetch(shapefileUrl, {

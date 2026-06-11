@@ -269,6 +269,7 @@ export async function fetchIrrigationAnalysis(fieldId: string) {
 export async function pollForShapefileUrl(
   operationId: string,
   onProgress?: (attempt: number, status: string) => void,
+  resolution?: "EachSensor" | "OneHertz",
 ): Promise<string> {
   const headers = await getAuthHeaders();
   // Budget: up to ~20 minutes total. JD usually finishes in 1-3 min, but
@@ -287,7 +288,9 @@ export async function pollForShapefileUrl(
     onProgress?.(attempt, "polling");
 
     const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/john-deere-irrigation?action=shapefile-status&operationId=${encodeURIComponent(operationId)}`,
+      `${SUPABASE_URL}/functions/v1/john-deere-irrigation?action=shapefile-status&operationId=${encodeURIComponent(operationId)}${
+        resolution ? `&resolution=${resolution}` : ""
+      }`,
       { headers },
     );
 
