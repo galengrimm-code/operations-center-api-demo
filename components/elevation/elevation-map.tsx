@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import type { FeatureCollection } from "geojson";
+import type { DetectedTerrace } from "@/lib/terrace-detect";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 const BANDS_SOURCE = "elevation-bands-source";
@@ -12,14 +13,17 @@ const LINES_LAYER = "elevation-lines";
 const LABELS_LAYER = "elevation-labels";
 const BOUNDARY_SOURCE = "elevation-boundary-source";
 const BOUNDARY_LAYER = "elevation-boundary-line";
+const TERRACE_SOURCE = "terrace-lines-source";
+const TERRACE_LAYER = "terrace-lines";
 
 interface ElevationMapProps {
   boundary: GeoJSON.MultiPolygon | null;
   bands: FeatureCollection;
   lines: FeatureCollection;
+  terraces?: DetectedTerrace[] | null;
 }
 
-export function ElevationMap({ boundary, bands, lines }: ElevationMapProps) {
+export function ElevationMap({ boundary, bands, lines, terraces }: ElevationMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -56,10 +60,10 @@ export function ElevationMap({ boundary, bands, lines }: ElevationMapProps) {
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    [LABELS_LAYER, LINES_LAYER, BANDS_LAYER, BOUNDARY_LAYER].forEach((id) => {
+    [TERRACE_LAYER, LABELS_LAYER, LINES_LAYER, BANDS_LAYER, BOUNDARY_LAYER].forEach((id) => {
       if (map.getLayer(id)) map.removeLayer(id);
     });
-    [LINES_SOURCE, BANDS_SOURCE, BOUNDARY_SOURCE].forEach((id) => {
+    [TERRACE_SOURCE, LINES_SOURCE, BANDS_SOURCE, BOUNDARY_SOURCE].forEach((id) => {
       if (map.getSource(id)) map.removeSource(id);
     });
 
@@ -103,6 +107,30 @@ export function ElevationMap({ boundary, bands, lines }: ElevationMapProps) {
       },
     });
 
+    if (terraces && terraces.length > 0) {
+      map.addSource(TERRACE_SOURCE, {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: terraces.map((t, index) => ({
+            type: "Feature" as const,
+            properties: { index, lengthM: t.lengthM },
+            geometry: { type: "LineString" as const, coordinates: t.coordinates },
+          })),
+        },
+      });
+      map.addLayer({
+        id: TERRACE_LAYER,
+        type: "line",
+        source: TERRACE_SOURCE,
+        paint: {
+          "line-color": "#d946ef",
+          "line-width": 3,
+          "line-opacity": 0.95,
+        },
+      });
+    }
+
     if (boundary) {
       map.addSource(BOUNDARY_SOURCE, {
         type: "geojson",
@@ -135,7 +163,7 @@ export function ElevationMap({ boundary, bands, lines }: ElevationMapProps) {
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { padding: 40, maxZoom: 16 });
     }
-  }, [bands, lines, boundary, mapReady]);
+  }, [bands, lines, boundary, terraces, mapReady]);
 
   if (!MAPBOX_TOKEN) {
     return (

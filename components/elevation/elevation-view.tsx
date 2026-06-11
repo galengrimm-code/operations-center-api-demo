@@ -9,6 +9,7 @@ import { fetchStoredOperations, pollForShapefileUrl } from "@/lib/john-deere-cli
 import { filterHiddenOperations } from "@/lib/crop-filter";
 import { loadElevationModel, saveElevationModel } from "@/lib/elevation-store";
 import { processShapefile } from "@/lib/shapefile-analysis";
+import { detectTerraces, type DetectedTerrace } from "@/lib/terrace-detect";
 import {
   applyOffsets,
   buildGrid,
@@ -81,6 +82,7 @@ export function ElevationView() {
   const [contours, setContours] = useState<ContourResult | null>(null);
   const [passStats, setPassStats] = useState<PassStat[]>([]);
   const [savedBuiltAt, setSavedBuiltAt] = useState<string | null>(null);
+  const [terraces, setTerraces] = useState<DetectedTerrace[] | null>(null);
   const gridRef = useRef<ElevationGrid | null>(null);
   const projRef = useRef<LocalProjection | null>(null);
   // Mirrors intervalFt for effects that shouldn't re-run on interval change.
@@ -110,6 +112,7 @@ export function ElevationView() {
       setContours(null);
       setPassStats([]);
       setSavedBuiltAt(null);
+      setTerraces(null);
       gridRef.current = null;
       return;
     }
@@ -119,6 +122,7 @@ export function ElevationView() {
     setContours(null);
     setPassStats([]);
     setSavedBuiltAt(null);
+    setTerraces(null);
     gridRef.current = null;
 
     // Restore the saved model (if any) so the map appears without a rebuild.
@@ -200,6 +204,7 @@ export function ElevationView() {
     setContours(null);
     setPassStats([]);
     setPassProgress({});
+    setTerraces(null);
     gridRef.current = null;
 
     const [lon0, lat0] = boundaryCentroid(selectedField.boundary_geojson);
@@ -323,6 +328,11 @@ export function ElevationView() {
     }
   };
 
+  const handleDetectTerraces = () => {
+    if (!gridRef.current || !projRef.current) return;
+    setTerraces(detectTerraces(gridRef.current, projRef.current));
+  };
+
   const statusLabel = (p: PassProgress): string => {
     switch (p.status) {
       case "polling":
@@ -413,12 +423,32 @@ export function ElevationView() {
                 : "Build elevation map"}
           </button>
 
+          {contours && !isBuilding && (
+            <button
+              onClick={handleDetectTerraces}
+              className="flex items-center gap-2 rounded-lg border border-fuchsia-300 bg-fuchsia-50 px-4 py-2 text-sm font-medium text-fuchsia-700 transition-colors hover:bg-fuchsia-100"
+            >
+              <Mountain className="h-4 w-4" />
+              Detect terraces
+            </button>
+          )}
+
           {savedBuiltAt && !isBuilding && (
             <p className="text-xs text-slate-500">
               Saved model · built {new Date(savedBuiltAt).toLocaleString()}
             </p>
           )}
         </div>
+
+        {terraces && (
+          <p className="mt-3 text-sm text-slate-600">
+            {terraces.length === 0
+              ? "No terrace ridges detected on this field."
+              : `${terraces.length} terrace line${terraces.length === 1 ? "" : "s"} detected — ${Math.round(
+                  terraces.reduce((sum, t) => sum + t.lengthM, 0) * 3.28084,
+                ).toLocaleString()} ft total. Drawn in magenta on the map.`}
+          </p>
+        )}
 
         {selectedFieldId && (
           <div className="mt-4">
@@ -500,6 +530,7 @@ export function ElevationView() {
               boundary={selectedField?.boundary_geojson || null}
               bands={contours.bands}
               lines={contours.lines}
+              terraces={terraces}
             />
           </div>
         </>
