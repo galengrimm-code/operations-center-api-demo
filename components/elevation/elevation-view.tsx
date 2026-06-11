@@ -178,48 +178,55 @@ export function ElevationView() {
     projRef.current = proj;
 
     const selectedOps = ops.filter((op) => checkedOpIds.has(op.jd_operation_id));
-    const passPoints: { op: StoredFieldOperation; points: ReturnType<typeof extractElevationPoints> }[] =
-      [];
 
     try {
-      for (const op of selectedOps) {
-        const opId = op.jd_operation_id;
-        try {
-          setProgress(opId, { status: "polling", attempt: 0 });
-          // OneHertz: same elevation information as EachSensor at ~1/5 the
-          // size (row units share one GPS fix) — keeps big planter passes
-          // under the storage upload limit.
-          const storagePath = await pollForShapefileUrl(
-            opId,
-            (attempt) => setProgress(opId, { status: "polling", attempt }),
-            "OneHertz",
-          );
+      // All passes in parallel — JD generates shapefiles server-side
+      // concurrently, so a cold build costs the slowest pass, not the sum.
+      const results = await Promise.all(
+        selectedOps.map(async (op) => {
+          const opId = op.jd_operation_id;
+          try {
+            setProgress(opId, { status: "polling", attempt: 0 });
+            // OneHertz: same elevation information as EachSensor at ~1/5 the
+            // size (row units share one GPS fix) — keeps big planter passes
+            // under the storage upload limit.
+            const storagePath = await pollForShapefileUrl(
+              opId,
+              (attempt) => setProgress(opId, { status: "polling", attempt }),
+              "OneHertz",
+            );
 
-          setProgress(opId, { status: "downloading", attempt: 0 });
-          const { data: blob, error: downloadError } = await supabase.storage
-            .from("shapefiles")
-            .download(storagePath);
-          if (downloadError || !blob) {
-            throw new Error("Failed to download shapefile from storage");
+            setProgress(opId, { status: "downloading", attempt: 0 });
+            const { data: blob, error: downloadError } = await supabase.storage
+              .from("shapefiles")
+              .download(storagePath);
+            if (downloadError || !blob) {
+              throw new Error("Failed to download shapefile from storage");
+            }
+
+            setProgress(opId, { status: "parsing", attempt: 0 });
+            const fc = await processShapefile(await blob.arrayBuffer());
+            const extraction = extractElevationPoints(fc, proj);
+            setProgress(opId, {
+              status: "done",
+              attempt: 0,
+              detail: `${extraction.points.length.toLocaleString()} elevation points`,
+            });
+            return { op, points: extraction };
+          } catch (err) {
+            setProgress(opId, {
+              status: "error",
+              attempt: 0,
+              detail: err instanceof Error ? err.message : "Failed",
+            });
+            return null;
           }
-
-          setProgress(opId, { status: "parsing", attempt: 0 });
-          const fc = await processShapefile(await blob.arrayBuffer());
-          const extraction = extractElevationPoints(fc, proj);
-          passPoints.push({ op, points: extraction });
-          setProgress(opId, {
-            status: "done",
-            attempt: 0,
-            detail: `${extraction.points.length.toLocaleString()} elevation points`,
-          });
-        } catch (err) {
-          setProgress(opId, {
-            status: "error",
-            attempt: 0,
-            detail: err instanceof Error ? err.message : "Failed",
-          });
-        }
-      }
+        }),
+      );
+      const passPoints = results.filter(
+        (r): r is { op: StoredFieldOperation; points: ReturnType<typeof extractElevationPoints> } =>
+          r !== null,
+      );
 
       if (buildTokenRef.current !== buildToken) return;
 

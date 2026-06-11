@@ -271,7 +271,6 @@ export async function pollForShapefileUrl(
   onProgress?: (attempt: number, status: string) => void,
   resolution?: "EachSensor" | "OneHertz",
 ): Promise<string> {
-  const headers = await getAuthHeaders();
   // Budget: up to ~20 minutes total. JD usually finishes in 1-3 min, but
   // some large / dense operations take 10-15 min. Backoff starts fast
   // (5s) and ramps to 20s so we don't spam when it's clearly going to be slow.
@@ -286,6 +285,10 @@ export async function pollForShapefileUrl(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     onProgress?.(attempt, "polling");
+
+    // Fresh headers every attempt — a poll can outlive the access token on
+    // long JD generations, and getSession() auto-refreshes an expired token.
+    const headers = await getAuthHeaders();
 
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/john-deere-irrigation?action=shapefile-status&operationId=${encodeURIComponent(operationId)}${
