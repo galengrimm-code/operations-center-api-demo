@@ -407,9 +407,7 @@ export function ElevationView() {
                         >
                           {progress.status !== "done" &&
                             progress.status !== "error" &&
-                            isBuilding && (
-                              <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
-                            )}
+                            isBuilding && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
                           {statusLabel(progress)}
                         </span>
                       )}

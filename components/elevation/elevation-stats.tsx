@@ -39,9 +39,7 @@ export function ElevationStats({
         </div>
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Relief</p>
-          <p className="text-xl font-semibold text-slate-900">
-            {(maxZ - minZ).toFixed(1)} ft
-          </p>
+          <p className="text-xl font-semibold text-slate-900">{(maxZ - minZ).toFixed(1)} ft</p>
           <p className="text-xs text-slate-500">
             {minZ.toFixed(0)} – {maxZ.toFixed(0)} ft
           </p>
