@@ -11,6 +11,7 @@ import {
   Droplets,
   Package,
   Mountain,
+  Waypoints,
 } from "lucide-react";
 
 const links = [
@@ -22,6 +23,7 @@ const links = [
   { href: "/applications", label: "Applications", icon: Droplets },
   { href: "/products", label: "Products", icon: Package },
   { href: "/elevation", label: "Elevation", icon: Mountain },
+  { href: "/terraces", label: "Terraces", icon: Waypoints },
 ];
 
 export function NavLinks() {

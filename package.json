@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
+    "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@next/swc-wasm-nodejs": "^13.5.11",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -98,6 +99,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/d3-contour": "^3.0.6",
+    "@types/mapbox__mapbox-gl-draw": "^1.4.9",
     "@types/shpjs": "^3.4.7",
     "@vitest/ui": "^4.1.7",
     "dotenv": "^17.4.2",
