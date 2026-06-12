@@ -155,6 +155,9 @@ export function extractElevationPoints(
         entry.sy += y;
         entry.sz += z;
         entry.n++;
+        // Sections share one GPS fix/heading, but the first row may omit it —
+        // keep the first non-null heading the group provides.
+        if (entry.heading === undefined) entry.heading = readHeading(props);
         collapsedCount++;
       } else {
         byTime.set(timeRaw, { sx: x, sy: y, sz: z, n: 1, heading: readHeading(props) });

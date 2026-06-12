@@ -120,6 +120,7 @@ export function ElevationView() {
       setSavedBuiltAt(null);
       setTerraces(null);
       gridRef.current = null;
+      passPointsRef.current = null;
       return;
     }
     let cancelled = false;
@@ -130,6 +131,9 @@ export function ElevationView() {
     setSavedBuiltAt(null);
     setTerraces(null);
     gridRef.current = null;
+    // Stale pass points from a prior field would otherwise ride along in the
+    // next Export grid (a restored model never repopulates this ref).
+    passPointsRef.current = null;
 
     // Restore the saved model (if any) so the map appears without a rebuild.
     // restoreToken: a Build click (or another field change) advances the

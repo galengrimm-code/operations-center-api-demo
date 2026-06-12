@@ -18,8 +18,6 @@ export interface TerraceDetectOptions {
   minLengthM?: number;
   /** Douglas-Peucker simplification tolerance (meters). */
   simplifyToleranceM?: number;
-  /** Max endpoint gap (meters) to bridge between aligned fragments. */
-  joinGapM?: number;
 }
 
 export interface DetectedTerrace {
@@ -31,15 +29,17 @@ export interface DetectedTerrace {
 }
 
 const DEFAULTS: Required<TerraceDetectOptions> = {
-  // Tuned on the real Home Place machine-data grid (2026-06-11): ridges
-  // stand lower above trend than textbook 1 ft once the 4 m grid and build
-  // smoothing soften them, so the threshold sits just above grid noise and
-  // gap-joining reconnects the skeleton where a crest briefly dips.
+  // Tuned on the real Home Place machine-data grid (2026-06-11): ridges stand
+  // lower above trend than textbook 1 ft once the 4 m grid and build smoothing
+  // soften them, so the threshold sits just above grid noise. NOTE: this
+  // in-app DEM detector is the superseded approach — the production path
+  // detects on 1 m lidar offline (see docs/research); a crest that briefly
+  // dips below threshold can fragment here, which is why detection moved to
+  // lidar rather than adding a gap-join to this path.
   trendRadiusM: 80,
   ridgeThresholdFt: 0.12,
   minLengthM: 60,
   simplifyToleranceM: 5,
-  joinGapM: 30,
 };
 
 /**
