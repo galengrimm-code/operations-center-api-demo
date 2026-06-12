@@ -7,7 +7,7 @@ import { useFields } from "@/hooks/use-fields";
 import { supabase } from "@/lib/supabase";
 import { fetchStoredOperations, pollForShapefileUrl } from "@/lib/john-deere-client";
 import { filterHiddenOperations } from "@/lib/crop-filter";
-import { loadElevationModel, saveElevationModel } from "@/lib/elevation-store";
+import { loadElevationModel, saveElevationModel, serializeGrid } from "@/lib/elevation-store";
 import { processShapefile } from "@/lib/shapefile-analysis";
 import { detectTerraces, type DetectedTerrace } from "@/lib/terrace-detect";
 import {
@@ -87,6 +87,12 @@ export function ElevationView() {
   const projRef = useRef<LocalProjection | null>(null);
   // Mirrors intervalFt for effects that shouldn't re-run on interval change.
   const intervalRef = useRef(DEFAULT_INTERVAL_FT);
+  // Per-pass points from the most recent build (not persisted) — included in
+  // grid exports so offline tooling can use travel headings as a direction
+  // prior (bean passes drive along the terraces).
+  const passPointsRef = useRef<
+    { label: string; opId: string; points: [number, number, number, number | null][] }[] | null
+  >(null);
   // Invalidates in-flight builds when inputs change so a slow build for
   // field A can't commit its results after the user switched to field B.
   const buildTokenRef = useRef(0);
@@ -289,6 +295,19 @@ export function ElevationView() {
         lowConfidence: offsets[i].lowConfidence,
       }));
       setPassStats(stats);
+      passPointsRef.current = usablePasses.map((p, i) => ({
+        label: opLabel(p.op),
+        opId: p.op.jd_operation_id,
+        points: p.points.points.map(
+          (pt) =>
+            [
+              Math.round(pt.x * 10) / 10,
+              Math.round(pt.y * 10) / 10,
+              Math.round((pt.z + offsets[i].offsetFt) * 100) / 100,
+              pt.heading ?? null,
+            ] as [number, number, number, number | null],
+        ),
+      }));
       setContours(gridToContours(grid, proj, intervalFt));
 
       // Persist so the next visit renders without a rebuild. Failure is
@@ -331,6 +350,27 @@ export function ElevationView() {
   const handleDetectTerraces = () => {
     if (!gridRef.current || !projRef.current) return;
     setTerraces(detectTerraces(gridRef.current, projRef.current));
+  };
+
+  const handleExportGrid = () => {
+    if (!gridRef.current || !projRef.current || !selectedField) return;
+    const payload = {
+      fieldName: selectedField.name,
+      jdFieldId: selectedField.jd_field_id,
+      minZ: gridRef.current.minZ,
+      maxZ: gridRef.current.maxZ,
+      // Per-pass [x, y, z(corrected ft), heading deg|null] in local meters —
+      // present only when this session ran a build (not on restored models).
+      passes: passPointsRef.current,
+      ...serializeGrid(gridRef.current, projRef.current),
+    };
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `elevation-grid-${selectedField.name.replace(/\W+/g, "-").toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const statusLabel = (p: PassProgress): string => {
@@ -424,13 +464,21 @@ export function ElevationView() {
           </button>
 
           {contours && !isBuilding && (
-            <button
-              onClick={handleDetectTerraces}
-              className="flex items-center gap-2 rounded-lg border border-fuchsia-300 bg-fuchsia-50 px-4 py-2 text-sm font-medium text-fuchsia-700 transition-colors hover:bg-fuchsia-100"
-            >
-              <Mountain className="h-4 w-4" />
-              Detect terraces
-            </button>
+            <>
+              <button
+                onClick={handleDetectTerraces}
+                className="flex items-center gap-2 rounded-lg border border-fuchsia-300 bg-fuchsia-50 px-4 py-2 text-sm font-medium text-fuchsia-700 transition-colors hover:bg-fuchsia-100"
+              >
+                <Mountain className="h-4 w-4" />
+                Detect terraces
+              </button>
+              <button
+                onClick={handleExportGrid}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                Export grid
+              </button>
+            </>
           )}
 
           {savedBuiltAt && !isBuilding && (

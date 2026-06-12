@@ -12,6 +12,8 @@ export interface ElevationPoint {
   x: number;
   y: number;
   z: number;
+  /** Machine travel heading in degrees, when the shapefile records it. */
+  heading?: number;
 }
 
 export interface LocalProjection {
@@ -110,8 +112,16 @@ export function extractElevationPoints(
   // sharing the receiver's single GPS fix and elevation. Collapse records
   // with the same timestamp to one point (averaged centroid) so a single
   // elevation reading isn't smeared across the toolbar width.
-  const byTime = new Map<string, { sx: number; sy: number; sz: number; n: number }>();
+  const byTime = new Map<
+    string,
+    { sx: number; sy: number; sz: number; n: number; heading?: number }
+  >();
   let collapsedCount = 0;
+
+  const readHeading = (props: Record<string, unknown> | null): number | undefined => {
+    const raw = props?.Heading ?? props?.HEADING;
+    return typeof raw === "number" && Number.isFinite(raw) ? raw : undefined;
+  };
 
   for (const feature of fc.features) {
     const geom = feature.geometry;
@@ -147,15 +157,15 @@ export function extractElevationPoints(
         entry.n++;
         collapsedCount++;
       } else {
-        byTime.set(timeRaw, { sx: x, sy: y, sz: z, n: 1 });
+        byTime.set(timeRaw, { sx: x, sy: y, sz: z, n: 1, heading: readHeading(props) });
       }
     } else {
-      rawPoints.push({ x, y, z });
+      rawPoints.push({ x, y, z, heading: readHeading(props) });
     }
   }
 
-  byTime.forEach(({ sx, sy, sz, n }) => {
-    rawPoints.push({ x: sx / n, y: sy / n, z: sz / n });
+  byTime.forEach(({ sx, sy, sz, n, heading }) => {
+    rawPoints.push({ x: sx / n, y: sy / n, z: sz / n, heading });
   });
 
   // Robust outlier filter: real terrain relief survives (MAD covers it),
