@@ -7,6 +7,7 @@ drive this codebase.
 
 | Date | Document | Drives |
 | --- | --- | --- |
+| 2026-06-11 | [Terrain/slope modeling for variable-rate fert & seed](terrain-vr-modeling-research-2026-06-11.md) | Long-term vision: yield-by-terrain overlay → VR seed/fertility zones. Advanced Agrilytics / SWAT MAPS landscape, terrain-yield science (wet/dry flip, r²≈0.73), VR economics, build-vs-buy line |
 | 2026-06-11 | [Terrace crest/channel line extraction methods](terrace-line-extraction-research-2026-06-11.md) | Phase 2 terrace detection: 1 m KS lidar substrate, geomorphons classifier, contour-directional fusion (validated by Dai et al. 2019), terraceDL fallback |
 | 2026-06-11 | [Terrace detection prototype notes](terrace-detection-prototype-notes-2026-06-11.md) | Iteration history on machine-grid + ortho detection (the plateau that motivated the lidar pivot); prototype scripts in `~/Downloads/terrace-proto/` |
 
