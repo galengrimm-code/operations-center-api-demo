@@ -24,10 +24,18 @@ export async function debugFieldOperations(accessToken: string, orgId: string, f
           })),
         };
       } else {
-        results[opType] = { error: response.status, text: await response.text() };
+        // Do NOT return the raw upstream body to the client (error-response
+        // leakage). Log it server-side; surface only the status code.
+        console.error(
+          `[debug-field-operations] JD ${opType} non-OK ${response.status}:`,
+          await response.text(),
+        );
+        results[opType] = { error: response.status };
       }
     } catch (err) {
-      results[opType] = { error: (err as Error).message };
+      // Log the real error server-side; return a generic marker to the client.
+      console.error(`[debug-field-operations] ${opType} failed:`, err);
+      results[opType] = { error: "request_failed" };
     }
   }
 

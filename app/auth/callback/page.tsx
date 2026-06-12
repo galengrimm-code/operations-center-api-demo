@@ -49,6 +49,21 @@ export default function CallbackPage() {
       hasProcessed.current = true;
       setIsProcessing(true);
 
+      // Verify the OAuth state nonce against the value stored at authorize time
+      // (connect-overlay.tsx writes crypto.randomUUID() to sessionStorage before
+      // redirecting to John Deere). Without this comparison an attacker can inject
+      // their own authorization code into the victim's callback (OAuth login-CSRF
+      // / code injection). The nonce is single-use — cleared after a valid match.
+      const returnedState = searchParams.get("state");
+      const storedState = sessionStorage.getItem("jd_oauth_state");
+      if (!returnedState || !storedState || returnedState !== storedState) {
+        setError("Invalid or expired sign-in state. Please start the John Deere connection again.");
+        setIsProcessing(false);
+        hasProcessed.current = false;
+        return;
+      }
+      sessionStorage.removeItem("jd_oauth_state");
+
       try {
         const redirectUri = `${window.location.origin}/auth/callback`;
         console.log("[callback] Calling exchangeCodeForTokens...");

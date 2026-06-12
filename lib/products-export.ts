@@ -113,8 +113,17 @@ export async function exportProductsExcel(
   ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
   ws.getRow(1).font = { bold: true, color: { argb: "FFF1F5F9" } };
 
+  // Neutralize CSV/XLSX formula injection: a leading = + - @ (tab/CR) in a
+  // user/JD-sourced string executes as a formula when opened in Excel. exceljs
+  // does not auto-escape formula characters, so prefix such values with a
+  // single quote before writing the cell.
+  const neutralize = (v: unknown): unknown =>
+    typeof v === "string" && /^[=+\-@\t\r\n]/.test(v) ? "'" + v : v;
+
   for (const r of rows) {
     const d = buildRow(r, prices, allSeasons, avgs);
+    d.name = neutralize(d.name) as string;
+    d.categoryLabel = neutralize(d.categoryLabel) as string;
     const row = ws.addRow(d);
     const hex = CAT_HEX[d.category] ?? CAT_HEX.other;
     row.eachCell((cell) => {

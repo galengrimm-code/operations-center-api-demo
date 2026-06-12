@@ -5,6 +5,16 @@ function fmt(value: number | null | undefined, decimals = 1): string {
   return value.toFixed(decimals);
 }
 
+// Neutralize CSV/spreadsheet formula injection: a leading = + - @ (or tab/CR)
+// in a user/JD-sourced string executes as a formula when the export opens in
+// Excel/Sheets. Prefix such values with a single quote, then escape embedded
+// quotes and wrap. Quoting alone does NOT stop formula evaluation.
+function csvCell(value: string | null | undefined): string {
+  let s = String(value ?? "");
+  if (/^[=+\-@\t\r\n]/.test(s)) s = "'" + s;
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 export function generateCSV(rows: ReportRow[], season: string): string {
   const headers = [
     "Field",
@@ -36,8 +46,8 @@ export function generateCSV(rows: ReportRow[], season: string): string {
     );
     csvRows.push(
       [
-        `"${row.field.name}"`,
-        formatCropName(cropName),
+        csvCell(row.field.name),
+        csvCell(formatCropName(cropName)),
         row.operation.crop_season || season,
         fmt(row.irrigatedAcres),
         fmt(row.drylandAcres),
