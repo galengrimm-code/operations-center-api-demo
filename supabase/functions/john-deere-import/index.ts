@@ -7,8 +7,6 @@ import { importFields } from "./actions/import-fields.ts";
 import { importOperations } from "./actions/import-operations.ts";
 import { importFieldOperations } from "./actions/import-field-operations.ts";
 import { importApplications } from "./actions/import-applications.ts";
-import { debugFieldBoundaries } from "./actions/debug-field-boundaries.ts";
-import { debugFieldOperations } from "./actions/debug-field-operations.ts";
 
 // --- Main handler ---
 
@@ -92,32 +90,6 @@ Deno.serve(async (req: Request) => {
           url,
           req,
         });
-      }
-
-      case "debug-field-boundaries": {
-        const fieldId = url.searchParams.get("fieldId");
-        if (!fieldId) return errorResponse("Missing fieldId parameter", 400, undefined, req);
-        const result = await debugFieldBoundaries(accessToken, orgId, fieldId);
-        if (!result.ok) {
-          return errorResponse(
-            `John Deere API error: ${result.status}`,
-            result.status,
-            undefined,
-            req,
-          );
-        }
-        return jsonResponse(
-          { fieldId: result.fieldId, count: result.count, boundaries: result.boundaries },
-          200,
-          req,
-        );
-      }
-
-      case "debug-field-operations": {
-        const fieldId = url.searchParams.get("fieldId");
-        if (!fieldId) return errorResponse("Missing fieldId parameter", 400, undefined, req);
-        const result = await debugFieldOperations(accessToken, orgId, fieldId);
-        return jsonResponse(result, 200, req);
       }
 
       default:
