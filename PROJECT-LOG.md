@@ -14,6 +14,34 @@
 
 ---
 
+## 2026-06-11 — Project north star set: an agronomic engine (ROADMAP.md created)
+
+**Decision:** Galen articulated the long-term destination of Farm Data Hub —
+it is becoming **his agronomic engine**, organized around two pillars:
+
+1. **Profit per acre** — as-applied inputs + yield + grain price → exact margin
+   by acre / field / zone. (Cost layer shipped 2026-06; profit layer is the
+   highest-value next build; sub-acre profit-by-zone is the differentiator over
+   Harvest Profit's field-average.)
+2. **Agronomic testing / fine-tuning engine** — treat the farm as a permanent
+   replicated trial; vary inputs (N rate, variety, seeding rate) across known
+   conditions (soil type, landscape position) and learn each zone's real
+   optimum. This is also the mechanism that *generates* the agronomic
+   calibration the outside research (terrain-VR landscape, same day) said can't
+   be bought — nobody's terrain→rate coefficient transfers between fields.
+
+The terrain/elevation work (elevation model, lidar, terraces, slope/TPI/TWI/flow
+derivatives) is reframed in the roadmap as the **spatial substrate both pillars
+run on**, not a side feature. Full phased sequence and build-vs-buy line in
+**`ROADMAP.md`** (new this session). Research backing in
+`docs/research/terrain-vr-modeling-research-2026-06-11.md`.
+
+**Why logged:** this is the framing decision that orders every future build —
+worth preserving the _why_ so later sessions sequence against the two pillars
+rather than chasing features.
+
+---
+
 ## 2026-06-03 — Input-pricing cost layer shipped; NH3 nutrient-vs-product cost model; JD scope requirement
 
 **Milestone:** Built and shipped the full **input-pricing cost layer** — the Harvest-Profit-style per-acre input cost feature. Year-keyed prices set on the Products page flow into `$/ac` on every application line + a per-field cost summary (Actual vs Spread basis). This is the core of the plan to retire the $1,600/yr Harvest Profit subscription. Spec at `docs/superpowers/specs/2026-06-01-product-pricing-cost-layer-design.md`, plan at `docs/superpowers/plans/2026-06-02-product-pricing-cost-layer.md`. Built via subagent-driven TDD (11 tasks), Codex-reviewed twice.
