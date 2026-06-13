@@ -1,50 +1,40 @@
-# Session Handoff — 2026-06-11 (Elevation+persistence SHIPPED; terraces detected via lidar; VR research done)
+# Session Handoff — 2026-06-13 (Terraces shipped; security cleanup done; cost-side is next)
 
 > **Ephemeral.** Rewritten end of session.
 
-## What was done this session (long session)
+## What was done (multi-day session: elevation → terraces → security cleanup)
 
-### Shipped to production (pushed through `b1dc201`)
-- Elevation feature (multi-pass topo), OneHertz resolution (edge fn v13), parallel pulls + auth refresh, global farm filter + Precision Farms default, persistence (`elevation_models` migration APPLIED). All codex-gated, Galen-verified live.
+### Elevation + persistence (shipped to prod earlier, `b1dc201` and prior)
+Multi-pass RTK topo map, OneHertz resolution, persistence (`elevation_models`), farm filter + Precision Farms default.
 
-### Terrace detection — SOLVED via lidar (prototype offline, NOT yet in app)
-- Machine-grid + ortho fusion plateaued (~85%, fragmented). Root cause via deep-research: **3-4m machine grid is below terrace feature scale.**
-- **Pivot to free USGS 1m KS QL2 lidar** (tile `KS_1m_x27y443.tif` downloaded to `~/Downloads/terrace-proto/lidar/`). Detection on lidar = clean continuous crest+channel lines.
-- Pipeline (all in `~/Downloads/terrace-proto/`): `prep_lidar.py` → `detect_lidar.py` → `prune_lines.py` (graph spur-prune + dominant-path + crest-channel pairing + waterway/loop rejection). Output: **`terrace-lines.geojson`** — 11 crests / 24 channels, terrace_id-grouped, world coords. Galen validated visually against ortho (`crop-*.png`): lines sit on real banding.
-- Caveat: lidar is **2018 snapshot** — terraces built/rebuilt since won't appear (Galen to confirm; drone DSM or driven tracks fill gaps).
+### Terraces feature (shipped, `ae7ff7e`; heading/export `138e958`; codex fixes `3d571d0`)
+- `operations_center.terraces` migration **applied to prod** (RLS + grants). Home Place's **35 lidar-detected lines imported** (11 crests / 24 channels) as drafts.
+- `/terraces` page: Mapbox + mapbox-gl-draw — drag vertices, draw crest/channel, delete, lock-per-terrace + lock-field. Locked = read-only; drafts editable; detection only ever touches drafts. Galen verified live: "it works."
+- Detection itself is an **offline prototype** in `~/Downloads/terrace-proto/` (1 m KS lidar → crest/channel centerlines → `terrace-lines.geojson`). NOT yet ported in-app (see TECH-DEBT).
 
-### UNCOMMITTED app changes (in working tree, need commit + codex)
-- `lib/elevation-merge.ts`: heading capture in extractElevationPoints
-- `lib/elevation-store.ts` + `components/elevation/elevation-view.tsx`: grid Export button + per-pass points (with headings) in export
-- `lib/terrace-detect.ts` + tests + `components/elevation/*`: in-app DEM terrace detect + "Detect terraces"/"Export grid" buttons + magenta map layer (commit `203db8e` partial — verify what's staged vs not)
-- **2 codex reviews OWED** (quota was exhausted ~12:36, now reset): the terrace-detect commit `203db8e` and the heading/export changes.
+### Research committed (`d364f79`, `25bce62`) + ROADMAP (`c8b7efe`)
+`docs/research/`: terrace line-extraction + terrain-VR-modeling. ROADMAP.md sets the two pillars (profit-per-acre + agronomic testing engine).
 
-### Research committed to repo (`d364f79`, `25bce62`)
-- `docs/research/`: terrace line-extraction methods + **terrain/slope VR modeling** (Advanced Agrilytics/SWAT MAPS landscape, terrain-yield science, VR economics). Canonical copies in `~/Documents/AI/Content extraction/topics/Agronomy/`.
-
-### ROADMAP.md created (`c8b7efe`)
-- Project north star set: **agronomic engine, two pillars** — (1) profit per acre (sub-acre by zone = differentiator over Harvest Profit), (2) agronomic testing/fine-tuning engine (treatment-vs-response trials that GENERATE the calibration no vendor coefficient provides). Terrain work reframed as the spatial substrate both run on. Phased sequence in ROADMAP.md; framing decision logged in PROJECT-LOG.md.
-
-### Decisions made this session
-- **Terraces UI plan** (mockup: `~/Downloads/terraces-ui-mockup.html`): new Terraces page, `terraces` table (RLS), import GeoJSON as drafts, edit/lock screen (mapbox-gl-draw), detection only ever touches drafts not locked lines.
-- **Gator-with-RTK** will drive crest/channel lines → `driven` source (highest trust), folds into + calibrates lidar.
-- **Long-term thesis validated by research**: terrain layers (slope/TPI/TWI/flow) → yield-by-terrain overlay → VR seed/fertility zones → profit-per-acre. Build the map+zones; calibration (terrain→N rate) needs Galen's own strip trials.
+### Security cleanup (`e0d6a47`, held)
+- A Watchtower v7.1 scan committed `e1619d9` (OAuth state-nonce verify, CSV/XLSX formula-injection escaping, debug leak fix) AND pushed the whole branch → Vercel deployed everything held. **Verified no damage** (OAuth round-trip intact, full build+112 tests green).
+- Then **deleted both unused debug edge-actions** (`debug-field-operations` + `debug-field-boundaries`) from `john-deere-import` and **deployed live** — removes leak + attack surface (codex concurred: delete > harden).
+- **CLI deploy fix found:** `--use-api` (server-side bundling) via the direct binary through Bash works — sidesteps the `uv_spawn` local-bundler block. No more hand-transcribing files. (memory updated)
 
 ## Current state
-- `main` ahead of origin by the uncommitted work + `203db8e` + research commits. Dev server on localhost:3000.
-- Terrace detection proven; not yet productized.
+- Prod: elevation + terraces + security hardening all LIVE. Terraces page works against Home Place's 35 lines.
+- Git: `e0d6a47` HEAD, **1 commit held** (origin == e0d6a47's parent). Earlier commits already on origin (scan pushed them). Working tree clean after this /log commit.
+- Dev server may need restart (ran build while it was up — .next gotcha).
 
-## Open questions
-- Any Home Place terraces built/rebuilt after 2018? (lidar gap)
-- Drone platform DSM export? (asked repeatedly, still unanswered)
-- Riser pipe diameters (Phase 4 drawdown).
+## Open questions / pending
+- **Cost-side start:** seed cost (recommended) — but verify seeding rate/variety data is imported in usable shape first.
+- Any Home Place terraces built/rebuilt after 2018? (lidar vintage gap)
+- Drone DSM export availability? Riser pipe diameters (Phase 4 drawdown)?
+- Terraces vs Elevation tab consolidation — deferred until conservation tools land (BACKBURNER).
 
-## Immediate next steps
-1. **Close out**: commit uncommitted app changes, run the 2 owed codex reviews (quota back), push.
-2. **Terraces feature build** (next session, planned + mocked): `terraces` table migration → import `terrace-lines.geojson` → Terraces page with edit/lock UI (`driven` source supported day one). Port lidar pipeline in-app or run per-field offline + import.
-3. Then payoff math: crest profiles + low spots, pool stage-storage, dirt volumes.
-4. Then terrain-derivative layers (slope/TPI/TWI/flow) → yield-by-terrain → VR zones → profit layer.
-5. Watchtower leftovers: P2 debug-field-operations leakage, P3 silent catches in settings.
+## Next steps (immediate)
+1. **Cost side (Galen's pivot — cost BEFORE revenue):** seed cost first (verify data path → price seeding ops by variety/rate, reuse cost-calc/unit-convert). Then **other-costs bucket** (land/rent + flexible drying/hauling/insurance/equipment — a COST feature, no revenue needed) → total cost/acre per field/crop/season. Then surface cost in Reports (Application tab).
+2. Revenue/profit layer DEFERRED by Galen until cost is dialed. Banked decisions: land + flexible other-costs bucket; field-level P&L first (HP parity).
+3. Conservation math on locked terraces (pool storage, low spots, dirt) — when terraces thread resumes.
 
 ## How to resume
-Prototype + all scripts: `~/Downloads/terrace-proto/` (lidar pipeline, NOTES.md). Terraces lines ready: `terrace-lines.geojson`. UI mockup: `~/Downloads/terraces-ui-mockup.html`. Research: `docs/research/`. Roadmap above.
+ROADMAP.md = the destination (two pillars, cost-first sequencing). Cost code: `lib/cost-calc.ts`, `lib/unit-convert.ts`, products/applications pages, `lib/applications-client.ts`. Pricing spec: `docs/superpowers/specs/2026-06-01-product-pricing-cost-layer-design.md`. Terraces live in `operations_center.terraces`; detection prototype in `~/Downloads/terrace-proto/`.

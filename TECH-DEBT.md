@@ -8,6 +8,14 @@
 
 ## Active
 
+### Terrace detection runs offline; in-app detector is the superseded DEM approach
+
+- **Where:** `lib/terrace-detect.ts` (in-app, machine-DEM ridge detect) vs the production pipeline in `~/Downloads/terrace-proto/` (1 m lidar → crest/channel centerlines).
+- **What:** The good detection (lidar, validated against the drone ortho) is offline Python; the app's "Detect terraces" button still runs the DEM approach that plateaued at ~85%/fragmented. Home Place's lines got into the app via a one-off SQL import, not an in-app detect. Other fields can't be detected from the UI.
+- **Why it's debt:** Every other field needs a manual offline run + import until the lidar pipeline is ported in-app (or a per-field detect edge function exists). Lidar tile already on disk, covers the whole farm.
+- **Cost to fix:** medium — port the prune/pair pipeline to TS (or a server step), wire to a "Detect (lidar)" button that writes draft rows. Also: lidar is a **2018 snapshot** — terraces reworked since won't appear (RTK Gator `driven` source or drone DSM fills that).
+- **Trigger:** when Galen wants terraces on a second field, or after he collects RTK Gator / DSM data.
+
 ### Mixed-unit products show "—" for cost/total (no per-product unit handling)
 
 - **Where:** Products + Applications cost display. Affects products applied in **different unit families across operations** — confirmed in org 600550: `24D` (floz + ozm), `Absorb 100` (floz + ozm + pt + qt), `Accent Q` (floz + gal + ozm).

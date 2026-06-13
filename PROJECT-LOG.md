@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-06-12 — Terraces feature shipped (lidar detection); cost-before-revenue sequencing
+
+**Milestone — Terraces:** Shipped the `/terraces` feature (commit `ae7ff7e`): `operations_center.terraces` table (RLS, crest/channel/waterway grouped by `terrace_no`, draft/locked status, source tracking), Home Place's 35 detected lines imported, and a Mapbox + mapbox-gl-draw edit/lock UI. Detection re-runs only ever touch `draft` rows; `locked` lines are permanent field truth (read-only static layer). Galen verified live.
+
+**Research-driven pivot to lidar (the breakthrough):** Multi-pass RTK machine-grid terrace detection plateaued (~85%, fragmented). Deep-research (`docs/research/terrace-line-extraction-research-2026-06-11.md`) found the cause: a 3–4 m machine grid is **below terrace feature scale** (terraces are 2–5 px wide there vs 9–18 px in 1 m lidar). Free USGS 1 m KS QL2 lidar (tile `KS_1m_x27y443`) resolves them cleanly — Iowa BMP project precedent confirms. Detection pipeline (detrend → crest/channel by residual sign → graph spur-prune → crest-channel pairing) lives offline in `~/Downloads/terrace-proto/`; **not yet ported in-app** (TECH-DEBT). Dai et al. 2019 independently validated the contour-directional architecture.
+
+**Sequencing decision — cost before revenue:** Galen pivoted from terraces back to the Harvest-Profit-replacement (ROADMAP Pillar 1) and chose to **complete the COST side before adding revenue/profit**. Cost-completion gaps (value order): seed cost (planting carries zero cost today — biggest hole), then a flexible other-costs bucket (land/rent + drying/hauling/insurance/equipment — a cost feature needing no revenue), then surfacing cost in Reports. Banked for when revenue comes: land + flexible bucket; field-level P&L first (HP parity), zone-profit later. Why logged: orders the next several builds.
+
+**Ops learning:** Supabase CLI edge-function deploy works on this machine via `functions deploy <fn> --no-verify-jwt --use-api` (server-side bundling sidesteps the local-bundler `uv_spawn` block) — supersedes the earlier "CLI fully broken, use MCP" note.
+
+---
+
 ## 2026-06-11 — Project north star set: an agronomic engine (ROADMAP.md created)
 
 **Decision:** Galen articulated the long-term destination of Farm Data Hub —

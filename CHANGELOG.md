@@ -7,6 +7,8 @@
 
 ### Added
 
+- **Elevation page** (`/elevation`) — merge multiple John Deere planting/harvest passes into a topographic map of a field: color-graded elevation fill + labeled contour lines over satellite, with per-pass point counts and the automatic per-machine height correction shown. Builds save per field and reload instantly.
+- **Terraces page** (`/terraces`) — review machine-detected terrace crest and channel lines on a satellite map, drag points to correct them, draw or delete lines, and **lock** them in. Locked lines become permanent; re-detection only touches unlocked drafts. Crest/channel lines are grouped per terrace with channel-coverage shown.
 - **Input pricing & per-acre cost.** Set product prices per year on the **Products** page; cost flows to `$/ac • $/unit` on every application line, an application total, and a per-field input-cost summary with an **Actual / Spread** toggle (per-applied-acre vs spread over the whole field).
 - **Unit conversion built in** — price in tons/gallons even when applied in pounds/fluid-ounces; the cost and Total Applied convert automatically. Cross-family (priced $/ton, applied in gallons) uses a per-product **density**.
 - **NH3 / nutrient products** — a per-product **Content %** handles inputs recorded by nutrient (lb of N) but bought by product (ton of NH3 at 82% N), so the cost reflects what you actually purchased.
