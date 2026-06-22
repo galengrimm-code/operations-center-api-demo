@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-06-22 — Track 2: data layer migrated onto the `fdh` schema (built, not yet cut over)
+
+**Milestone — schema migration.** Moved Farm Data Hub off the flat `operations_center` tables onto the
+normalized **`fdh`** schema (the YieldStack v7 layout, single-operator/multi-grower) + a **`farm_overlay`**
+edit layer, read through reverse adapter views, all behind flags (default OFF). Kept in the SAME Supabase
+project (`nuxofsjzrgdauzriraze`) in new schemas to hold cost down. SQL: `docs/migration/01-07` +
+`OPS-PRODUCTS-CUTOVER-PLAN.md`. Commit `e7086d5` on branch `track2-ops-products-cutover` (not on `main`).
+
+**Why.** Foundation for field-level P&L across the farm apps and the eventual move of JD ingestion to
+YieldStack; `fdh` core stays YieldStack-aligned (agronomic truth), the FDH-only cost/edit layer lives in
+`farm_overlay` and never flows to YieldStack (Galen's call).
+
+**Architecture decided this session:**
+- Reverse views expose the **legacy id** (INNER joins back to operations_center.*) so the app's write-by-id
+  round-trips during transition; write-sync triggers propagate legacy writes into fdh+overlay. Flips to fdh
+  ids only when legacy is retired. (Caught + fixed a real bug where the fields view exposed the fdh id and
+  the irrigation_start_year edit was silently writing 0 rows.)
+- App still **writes** legacy (unchanged); triggers keep fdh current. App **reads** flip to fdh views behind
+  flags. Nested PostgREST embeds can't cross views, so `fetchApplications`/`fetchProductsRollup` were
+  rewritten as query-each-view + client-join.
+
+**Verification:** every layer parity-proven byte-exact vs legacy; Codex-reviewed (found + fixed real issues:
+multi-org join multiplication, null-id rows, soft-delete divergence, unknown-op-type hard-fail, subtype
+scoping); `prebuild` green (lint + typecheck + 112 tests); prod build passes; application `total_value`
+identical to the penny ($9,389,819.40) legacy vs fdh.
+
+**Status:** all read flags OFF in prod → nothing cut over yet. Remaining = get the commit on `main`, in-app
+cost-number smoke, then enable `FDH_READ_OPS` + `NEXT_PUBLIC_FDH_READ_OPS`. See SESSION-HANDOFF.md.
+
 ## 2026-06-12 — Terraces feature shipped (lidar detection); cost-before-revenue sequencing
 
 **Milestone — Terraces:** Shipped the `/terraces` feature (commit `ae7ff7e`): `operations_center.terraces` table (RLS, crest/channel/waterway grouped by `terrace_no`, draft/locked status, source tracking), Home Place's 35 detected lines imported, and a Mapbox + mapbox-gl-draw edit/lock UI. Detection re-runs only ever touch `draft` rows; `locked` lines are permanent field truth (read-only static layer). Galen verified live.

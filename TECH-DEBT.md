@@ -8,6 +8,17 @@
 
 ## Active
 
+### Track 2 (fdh migration) — transitional debt carried until cutover completes
+
+- **Where:** `docs/migration/01-07`, `operations_center.fdh_*` views, `farm_overlay.*`, the write-sync triggers.
+- **Items:**
+  - **operations_center not retired.** Legacy is still the write backbone; reverse views expose the **legacy id** so the app's write-by-id round-trips. Can't retire until writes move to fdh-native (R5). Triggers keep fdh current meanwhile.
+  - **Migration SQL lives in `docs/migration/`, applied via MCP `execute_sql` — NOT in `supabase/migrations/`.** Deviates from the project's migration discipline; not reproducible via `supabase db push`. Reconcile into real migrations before/at cutover.
+  - **Multi-org product modeling gap.** `fdh.product` is org-agnostic (grower_id null); `fdh_products` / `fdh_product_prices` scope the legacy product join by `jd_product_id` only — correct for one org, would multiply across a second org. Needs an org key on `fdh.product` for true multi-org.
+  - **Price-owner grower resolved by name `'Precision Farms'`** in `fn_sync_product_price_from_legacy` (single-operator convention; brittle if renamed — fails loud by design).
+  - **Grass ops divergence.** 4 GRASSLAND/HARD_FESCUE ops are excluded from fdh but the app still shows them (`hidden_crop_names` empty, only RYE globally excluded). Add GRASSLAND/HARD_FESCUE_GRASS to `lib/crop-filter.ts` GLOBALLY_EXCLUDED_CROPS so current == post-cutover before flipping reads.
+- **Cost to fix:** medium, spread across R4/R5. **Trigger:** the read-flip cutover, then operations_center retirement.
+
 ### Terrace detection runs offline; in-app detector is the superseded DEM approach
 
 - **Where:** `lib/terrace-detect.ts` (in-app, machine-DEM ridge detect) vs the production pipeline in `~/Downloads/terrace-proto/` (1 m lidar → crest/channel centerlines).

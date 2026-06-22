@@ -1,40 +1,49 @@
-# Session Handoff — 2026-06-13 (Terraces shipped; security cleanup done; cost-side is next)
+# Session Handoff — 2026-06-22 (Track 2: migrate reads onto the `fdh` schema)
 
 > **Ephemeral.** Rewritten end of session.
 
-## What was done (multi-day session: elevation → terraces → security cleanup)
+## What was done
+Migrated the app's data layer from the flat `operations_center` tables onto the new normalized
+**`fdh`** schema + **`farm_overlay`** edit layer, read through reverse adapter views, behind flags
+(default OFF). All DB work is parity-proven byte-exact vs legacy and Codex-reviewed. SQL lives in
+`docs/migration/01-07` + `OPS-PRODUCTS-CUTOVER-PLAN.md`.
 
-### Elevation + persistence (shipped to prod earlier, `b1dc201` and prior)
-Multi-pass RTK topo map, OneHertz resolution, persistence (`elevation_models`), farm filter + Precision Farms default.
-
-### Terraces feature (shipped, `ae7ff7e`; heading/export `138e958`; codex fixes `3d571d0`)
-- `operations_center.terraces` migration **applied to prod** (RLS + grants). Home Place's **35 lidar-detected lines imported** (11 crests / 24 channels) as drafts.
-- `/terraces` page: Mapbox + mapbox-gl-draw — drag vertices, draw crest/channel, delete, lock-per-terrace + lock-field. Locked = read-only; drafts editable; detection only ever touches drafts. Galen verified live: "it works."
-- Detection itself is an **offline prototype** in `~/Downloads/terrace-proto/` (1 m KS lidar → crest/channel centerlines → `terrace-lines.geojson`). NOT yet ported in-app (see TECH-DEBT).
-
-### Research committed (`d364f79`, `25bce62`) + ROADMAP (`c8b7efe`)
-`docs/research/`: terrace line-extraction + terrain-VR-modeling. ROADMAP.md sets the two pillars (profit-per-acre + agronomic testing engine).
-
-### Security cleanup (`e0d6a47`, held)
-- A Watchtower v7.1 scan committed `e1619d9` (OAuth state-nonce verify, CSV/XLSX formula-injection escaping, debug leak fix) AND pushed the whole branch → Vercel deployed everything held. **Verified no damage** (OAuth round-trip intact, full build+112 tests green).
-- Then **deleted both unused debug edge-actions** (`debug-field-operations` + `debug-field-boundaries`) from `john-deere-import` and **deployed live** — removes leak + attack surface (codex concurred: delete > harden).
-- **CLI deploy fix found:** `--use-api` (server-side bundling) via the direct binary through Bash works — sidesteps the `uv_spawn` local-bundler block. No more hand-transcribing files. (memory updated)
+- **Fields:** cut over — edge `get-stored-fields` reads `operations_center.fdh_fields`
+  (`FDH_READ_FIELDS=true` live). Fixed a real bug: views must expose the **legacy id** so the
+  app's write-by-id round-trips (the irrigation_start_year edit had been writing 0 rows post-cutover).
+  Write-sync trigger `fdh.fn_sync_field_from_legacy` live + tested.
+- **Ops/products DB layer:** overlay tables (`05`), reverse views `fdh_field_operations /
+  fdh_field_operation_products / fdh_products / fdh_product_prices` (`06`, Codex-hardened),
+  write-sync triggers (`07`, Codex-reviewed/fixed/tested). LIVE + additive — they silently keep
+  fdh current on every legacy write; the app still reads legacy, so no behavior change yet.
+- **Ops/products app layer (R2):** `lib/fdh-flags.ts` flag; all browser reads flag-gated to the
+  fdh views; the two nested PostgREST embeds (`fetchApplications`, `fetchProductsRollup`) rewritten
+  as query-each-view + client-join. Writes stay on legacy (write-by-id; triggers sync). Edge
+  `get-stored-operations` gated on `FDH_READ_OPS`.
 
 ## Current state
-- Prod: elevation + terraces + security hardening all LIVE. Terraces page works against Home Place's 35 lines.
-- Git: `e0d6a47` HEAD, **1 commit held** (origin == e0d6a47's parent). Earlier commits already on origin (scan pushed them). Working tree clean after this /log commit.
-- Dev server may need restart (ran build while it was up — .next gotcha).
+- Verified: `npm run prebuild` green (lint + typecheck + 112 tests), prod build passes,
+  data-equivalence identical to the penny (application `total_value` = $9,389,819.40 both paths).
+  Galen confirmed Codex is happy.
+- **Pushed to `main`** (Galen authorized 2026-06-22) → Vercel prod deploy. Commits `e7086d5` (code) +
+  `e637ada` (docs). All read flags **OFF**, so the deploy is behavior-neutral — nothing cut over yet.
 
-## Open questions / pending
-- **Cost-side start:** seed cost (recommended) — but verify seeding rate/variety data is imported in usable shape first.
-- Any Home Place terraces built/rebuilt after 2018? (lidar vintage gap)
-- Drone DSM export availability? Riser pipe diameters (Phase 4 drawdown)?
-- Terraces vs Elevation tab consolidation — deferred until conservation tools land (BACKBURNER).
+## Open question
+Resolved: pushed to main. Now do the in-app smoke + flip the flags (next steps below).
 
-## Next steps (immediate)
-1. **Cost side (Galen's pivot — cost BEFORE revenue):** seed cost first (verify data path → price seeding ops by variety/rate, reuse cost-calc/unit-convert). Then **other-costs bucket** (land/rent + flexible drying/hauling/insurance/equipment — a COST feature, no revenue needed) → total cost/acre per field/crop/season. Then surface cost in Reports (Application tab).
-2. Revenue/profit layer DEFERRED by Galen until cost is dialed. Banked decisions: land + flexible other-costs bucket; field-level P&L first (HP parity).
-3. Conservation math on locked terraces (pool storage, low spots, dirt) — when terraces thread resumes.
+## Next steps (immediate — R4 → R5)
+1. Get `e7086d5` onto `main` per Galen's choice → Vercel deploy (flag still off).
+2. In-app smoke via `localStorage.setItem('fdh_read_ops','true')` on prod: confirm Applications /
+   Reports / Products cost numbers render identical to flag-off.
+3. Add `GRASSLAND` + `HARD_FESCUE_GRASS` to `lib/crop-filter.ts` GLOBALLY_EXCLUDED_CROPS (4 grass
+   ops are excluded from fdh but the app still shows them today; `hidden_crop_names` is empty).
+4. Enable together: `FDH_READ_OPS` (edge secret) + `NEXT_PUBLIC_FDH_READ_OPS` (Vercel env, needs
+   redeploy) = the real cutover. Revert = flags off.
+5. R5 (later): retire `operations_center` once stable; eventually JD ingestion → YieldStack.
 
-## How to resume
-ROADMAP.md = the destination (two pillars, cost-first sequencing). Cost code: `lib/cost-calc.ts`, `lib/unit-convert.ts`, products/applications pages, `lib/applications-client.ts`. Pricing spec: `docs/superpowers/specs/2026-06-01-product-pricing-cost-layer-design.md`. Terraces live in `operations_center.terraces`; detection prototype in `~/Downloads/terrace-proto/`.
+## How to resume / caveats
+- Reverse views expose **legacy ids** (INNER joins to operations_center.*) so writes-by-id
+  round-trip during transition; flip to fdh ids when legacy is retired.
+- Multi-org product modeling is a known gap (`fdh.product` is org-agnostic) — fine for single-org.
+- Price-owner grower resolved by name 'Precision Farms' (single-operator convention).
+- Memory: `~/.claude/.../memory/farm-apps-integration-thesis.md` has the full migration status.
