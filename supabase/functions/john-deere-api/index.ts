@@ -88,8 +88,14 @@ Deno.serve(async (req: Request) => {
         return errorResponse("No organization selected", 400, undefined, req);
       }
 
+      // Track 2 (fdh migration): when FDH_READ_FIELDS=true, read the fdh adapter
+      // view instead of the legacy table. Same columns/shape (drop-in). Flip the
+      // secret to revert — no redeploy needed.
+      const fieldsSource =
+        Deno.env.get("FDH_READ_FIELDS") === "true" ? "fdh_fields" : "fields";
+
       const { data: storedFields, error: fieldsError } = await supabase
-        .from("fields")
+        .from(fieldsSource)
         .select("*")
         .eq("user_id", user.id)
         .eq("org_id", orgId);
@@ -110,8 +116,13 @@ Deno.serve(async (req: Request) => {
       const fieldId = url.searchParams.get("fieldId");
       const operationType = url.searchParams.get("operationType");
 
+      // Track 2 (fdh ops migration): read the fdh adapter view when FDH_READ_OPS=true.
+      // Same columns/shape (drop-in). Flip the secret to revert — no redeploy needed.
+      const opsSource =
+        Deno.env.get("FDH_READ_OPS") === "true" ? "fdh_field_operations" : "field_operations";
+
       let query = supabase
-        .from("field_operations")
+        .from(opsSource)
         .select("*")
         .eq("user_id", user.id)
         .eq("org_id", orgId)

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { EyeOff, Loader2, Check } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabase";
+import { opsTable } from "@/lib/fdh-flags";
 import { COMMON_COVER_CROPS } from "@/lib/crop-filter";
 import { formatCropName } from "@/lib/reports-data";
 
@@ -29,7 +30,7 @@ export function HiddenCropsSection() {
       return;
     }
     const loadCrops = async () => {
-      const { data } = await (supabase.from("field_operations") as any)
+      const { data } = await (supabase.from(opsTable("field_operations")) as any)
         .select("crop_name")
         .eq("user_id", user.id)
         .eq("org_id", orgId)

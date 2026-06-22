@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useClientFilter } from "@/contexts/client-filter-context";
 import { supabase } from "@/lib/supabase";
+import { opsTable } from "@/lib/fdh-flags";
 import { Users } from "lucide-react";
 
 export function ClientFilterDropdown() {
@@ -15,7 +16,7 @@ export function ClientFilterDropdown() {
     if (!user || !orgId) return;
 
     const loadFarms = async () => {
-      const { data } = await (supabase.from("fields") as any)
+      const { data } = await (supabase.from(opsTable("fields")) as any)
         .select("farm_name")
         .eq("user_id", user.id)
         .eq("org_id", orgId)

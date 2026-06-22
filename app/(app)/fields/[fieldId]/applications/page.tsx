@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fetchApplications } from "@/lib/applications-client";
 import { supabase } from "@/lib/supabase";
+import { opsTable } from "@/lib/fdh-flags";
 import { acresFrom } from "@/lib/cost-calc";
 import type { ApplicationWithLines } from "@/types/applications";
 import { ApplicationsList } from "@/components/applications/applications-list";
@@ -27,7 +28,7 @@ export default function FieldApplicationsPage() {
       // to reject. Skip the field lookup (pass 0 acres) if orgId is not yet available.
       const fieldPromise =
         orgId != null
-          ? (supabase.from("fields") as any)
+          ? (supabase.from(opsTable("fields")) as any)
               .select("boundary_area_value, boundary_area_unit")
               .eq("org_id", orgId)
               .eq("jd_field_id", fieldId)

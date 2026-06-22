@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { opsTable } from "./fdh-flags";
 import { convertArea } from "./area-utils";
 import { GLOBALLY_EXCLUDED_CROPS } from "./crop-filter";
 import turfArea from "@turf/area";
@@ -66,7 +67,7 @@ export function toDryYield(
 
 /** Fetch all fields that have irrigated boundaries */
 export async function fetchIrrigatedFields(userId: string, orgId: string): Promise<StoredField[]> {
-  const { data, error } = await (supabase.from("fields") as any)
+  const { data, error } = await (supabase.from(opsTable("fields")) as any)
     .select("*")
     .eq("user_id", userId)
     .eq("org_id", orgId)
@@ -87,7 +88,7 @@ export async function fetchHarvestOperations(
   operationType: string = "harvest",
   hiddenCrops: string[] = [],
 ): Promise<StoredFieldOperation[]> {
-  let query = (supabase.from("field_operations") as any)
+  let query = (supabase.from(opsTable("field_operations")) as any)
     .select("*")
     .eq("user_id", userId)
     .eq("org_id", orgId)
@@ -114,7 +115,7 @@ export async function fetchAvailableSeasons(
   orgId: string,
   operationType: string = "harvest",
 ): Promise<string[]> {
-  const { data, error } = await (supabase.from("field_operations") as any)
+  const { data, error } = await (supabase.from(opsTable("field_operations")) as any)
     .select("crop_season")
     .eq("user_id", userId)
     .eq("org_id", orgId)
@@ -136,7 +137,7 @@ export async function fetchAvailableCrops(
   operationType: string = "harvest",
   hiddenCrops: string[] = [],
 ): Promise<string[]> {
-  const { data, error } = await (supabase.from("field_operations") as any)
+  const { data, error } = await (supabase.from(opsTable("field_operations")) as any)
     .select("crop_name, crop_name_override")
     .eq("user_id", userId)
     .eq("org_id", orgId)

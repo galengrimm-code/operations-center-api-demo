@@ -1,5 +1,6 @@
 // lib/applications-client.ts
 import { supabase } from "./supabase";
+import { fdhReadOps, opsTable } from "./fdh-flags";
 import { checkMutationResult } from "./check-mutation-result";
 import type {
   ApplicationOperation,
@@ -23,9 +24,69 @@ export interface ApplicationsListFilter {
 export async function fetchApplications(
   filter: ApplicationsListFilter = {},
 ): Promise<ApplicationWithLines[]> {
-  let q = (supabase.from("field_operations") as any)
-    .select(
-      `
+  let data: any[];
+  if (fdhReadOps()) {
+    // fdh path: PostgREST can't embed across the reverse VIEWS (no FK metadata),
+    // so query each view and reassemble the embed shape client-side. The views
+    // expose the LEGACY ids, so field_operation_id / product_id join exactly as
+    // the legacy embed did.
+    let opQ = (supabase.from("fdh_field_operations") as any)
+      .select(
+        `id, user_id, org_id, jd_field_id, jd_operation_id, operation_type,
+         crop_season, start_date, end_date,
+         application_name, application_name_jd_original, application_name_user_edited,
+         measurement_status`,
+      )
+      .eq("operation_type", "application")
+      .order("start_date", { ascending: false });
+    if (filter.fieldId) opQ = opQ.eq("jd_field_id", filter.fieldId);
+    if (filter.season) opQ = opQ.eq("crop_season", filter.season);
+    const { data: ops, error: opErr } = await opQ;
+    if (opErr) throw opErr;
+
+    const opIds = (ops ?? []).map((o: any) => o.id);
+    let lines: any[] = [];
+    if (opIds.length > 0) {
+      const { data: lineData, error: lineErr } = await (
+        supabase.from("fdh_field_operation_products") as any
+      )
+        .select(
+          `id, user_id, org_id, field_operation_id, product_id, line_index,
+           product_category_override, is_carrier,
+           rate_value, rate_unit, rate_variable,
+           total_value, total_unit, total_variable,
+           area_value, area_unit,
+           rate_value_jd_original, total_value_jd_original, area_value_jd_original,
+           is_user_edited, edited_at, deleted_at, created_at, updated_at`,
+        )
+        .in("field_operation_id", opIds)
+        .is("deleted_at", null)
+        .order("line_index", { ascending: true });
+      if (lineErr) throw lineErr;
+      lines = lineData ?? [];
+    }
+
+    const prodIds = Array.from(new Set(lines.map((l: any) => l.product_id)));
+    const prodMap = new Map<string, any>();
+    if (prodIds.length > 0) {
+      const { data: prods, error: prodErr } = await (supabase.from("fdh_products") as any)
+        .select("*")
+        .in("id", prodIds);
+      if (prodErr) throw prodErr;
+      for (const p of (prods ?? []) as any[]) prodMap.set(p.id, p);
+    }
+
+    const linesByOp = new Map<string, any[]>();
+    for (const l of lines) {
+      const arr = linesByOp.get(l.field_operation_id) ?? [];
+      arr.push({ ...l, product: prodMap.get(l.product_id) ?? null });
+      linesByOp.set(l.field_operation_id, arr);
+    }
+    data = (ops ?? []).map((o: any) => ({ ...o, product_lines: linesByOp.get(o.id) ?? [] }));
+  } else {
+    let q = (supabase.from("field_operations") as any)
+      .select(
+        `
       id, user_id, org_id, jd_field_id, jd_operation_id, operation_type,
       crop_season, start_date, end_date,
       application_name, application_name_jd_original, application_name_user_edited,
@@ -41,23 +102,25 @@ export async function fetchApplications(
         product:products(*)
       )
     `,
-    )
-    .eq("operation_type", "application")
-    .is("product_lines.deleted_at", null)
-    .order("start_date", { ascending: false });
+      )
+      .eq("operation_type", "application")
+      .is("product_lines.deleted_at", null)
+      .order("start_date", { ascending: false });
 
-  if (filter.fieldId) q = q.eq("jd_field_id", filter.fieldId);
-  if (filter.season) q = q.eq("crop_season", filter.season);
+    if (filter.fieldId) q = q.eq("jd_field_id", filter.fieldId);
+    if (filter.season) q = q.eq("crop_season", filter.season);
 
-  const { data, error } = await q;
-  if (error) throw error;
+    const { data: embedData, error } = await q;
+    if (error) throw error;
+    data = embedData ?? [];
+  }
 
   // No FK from field_operations -> fields for a PostgREST embed; resolve field
   // name + farm via a separate query. Fields uniqueness is (user_id, org_id, jd_field_id),
   // so jd_field_id alone is not a safe key across orgs — key on org_id + jd_field_id.
-  const { data: fieldRows, error: fieldErr } = await (supabase.from("fields") as any).select(
-    "org_id, jd_field_id, name, farm_name",
-  );
+  const { data: fieldRows, error: fieldErr } = await (
+    supabase.from(opsTable("fields")) as any
+  ).select("org_id, jd_field_id, name, farm_name");
   if (fieldErr) throw fieldErr;
   const fieldByKey = new Map<string, { name: string; farm_name: string | null }>(
     (fieldRows ?? []).map((f: any) => [
@@ -81,7 +144,7 @@ export async function fetchApplications(
   if (years.length > 0) {
     // No org filter needed: product_id is a UUID PK belonging to exactly one org, and RLS
     // already scopes to the authenticated user, so product_id:year keys cannot collide across orgs.
-    const { data: pData, error: pErr } = await (supabase.from("product_prices") as any)
+    const { data: pData, error: pErr } = await (supabase.from(opsTable("product_prices")) as any)
       .select("*")
       .in("year", years);
     if (pErr) throw pErr;
@@ -161,23 +224,63 @@ export async function fetchProductsRollup(
   }>
 > {
   // Use a single query with aggregation; Supabase RPC would be cleaner but we keep it client-side for v1.
-  const { data, error } = await (supabase.from("field_operation_products") as any)
-    .select(
-      `
+  let data: any[];
+  if (fdhReadOps()) {
+    // fdh path: query each view + join client-side (no cross-view embeds).
+    const { data: lineData, error: lineErr } = await (
+      supabase.from("fdh_field_operation_products") as any
+    )
+      .select("total_value, total_unit, product_id, field_operation_id")
+      .is("deleted_at", null);
+    if (lineErr) throw lineErr;
+    const lines = (lineData ?? []) as any[];
+
+    const opIds = Array.from(new Set(lines.map((l) => l.field_operation_id)));
+    const opMap = new Map<string, any>();
+    if (opIds.length > 0) {
+      const { data: ops, error: opErr } = await (supabase.from("fdh_field_operations") as any)
+        .select("id, crop_season, jd_field_id, org_id")
+        .in("id", opIds);
+      if (opErr) throw opErr;
+      for (const o of (ops ?? []) as any[]) opMap.set(o.id, o);
+    }
+    const prodIds = Array.from(new Set(lines.map((l) => l.product_id)));
+    const prodMap = new Map<string, any>();
+    if (prodIds.length > 0) {
+      const { data: prods, error: prodErr } = await (supabase.from("fdh_products") as any)
+        .select("*")
+        .in("id", prodIds);
+      if (prodErr) throw prodErr;
+      for (const p of (prods ?? []) as any[]) prodMap.set(p.id, p);
+    }
+    // !inner: keep only lines whose operation resolves
+    data = lines
+      .filter((l) => opMap.has(l.field_operation_id))
+      .map((l) => ({
+        ...l,
+        field_operation: opMap.get(l.field_operation_id),
+        product: prodMap.get(l.product_id) ?? null,
+      }));
+  } else {
+    const { data: embedData, error } = await (supabase.from("field_operation_products") as any)
+      .select(
+        `
       total_value, total_unit, product_id, field_operation_id,
       field_operation:field_operations!inner(crop_season, jd_field_id, org_id),
       product:products(*)
     `,
-    )
-    .is("deleted_at", null);
-  if (error) throw error;
+      )
+      .is("deleted_at", null);
+    if (error) throw error;
+    data = embedData ?? [];
+  }
 
   // Resolve farm per field (no FK embed available) so the global farm filter applies here too.
   let farmByKey: Map<string, string | null> | null = null;
   if (farm) {
-    const { data: fieldRows, error: fieldErr } = await (supabase.from("fields") as any).select(
-      "org_id, jd_field_id, farm_name",
-    );
+    const { data: fieldRows, error: fieldErr } = await (
+      supabase.from(opsTable("fields")) as any
+    ).select("org_id, jd_field_id, farm_name");
     if (fieldErr) throw fieldErr;
     farmByKey = new Map<string, string | null>(
       (fieldRows ?? []).map((f: any) => [`${f.org_id}:${f.jd_field_id}`, f.farm_name ?? null]),
@@ -317,7 +420,7 @@ export async function revertApplicationName(operationId: string): Promise<Applic
 }
 
 export async function fetchProductPrices(year: number, orgId: string): Promise<ProductPrice[]> {
-  const { data, error } = await (supabase.from("product_prices") as any)
+  const { data, error } = await (supabase.from(opsTable("product_prices")) as any)
     .select("*")
     .eq("year", year)
     .eq("org_id", orgId);
@@ -327,7 +430,7 @@ export async function fetchProductPrices(year: number, orgId: string): Promise<P
 
 // Years that actually have application data (drives the year selector — no hardcoded list).
 export async function fetchSeasonYears(orgId: string): Promise<number[]> {
-  const { data, error } = await (supabase.from("field_operations") as any)
+  const { data, error } = await (supabase.from(opsTable("field_operations")) as any)
     .select("crop_season")
     .eq("org_id", orgId)
     .eq("operation_type", "application");
@@ -344,7 +447,7 @@ export async function fetchSeasonYears(orgId: string): Promise<number[]> {
 export async function fetchProductPriceAverages(
   orgId: string,
 ): Promise<Map<string, { avg: number; unit: string }>> {
-  const { data, error } = await (supabase.from("product_prices") as any)
+  const { data, error } = await (supabase.from(opsTable("product_prices")) as any)
     .select("product_id, price_per_unit, price_unit")
     .eq("org_id", orgId);
   if (error) throw error;
@@ -426,7 +529,7 @@ export async function setCategoryPriceUnit(
   if (!userId) throw new Error("not authenticated");
 
   // Which products in this category (org-scoped)?
-  const { data: prods, error: prodErr } = await (supabase.from("products") as any)
+  const { data: prods, error: prodErr } = await (supabase.from(opsTable("products")) as any)
     .select("id")
     .eq("org_id", orgId)
     .eq("product_category", category);

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { opsTable } from "@/lib/fdh-flags";
 import { convertArea } from "@/lib/area-utils";
 import { GLOBALLY_EXCLUDED_CROPS } from "@/lib/crop-filter";
 import type { StoredField, StoredFieldOperation, FieldSeason } from "@/types/john-deere";
@@ -101,12 +102,12 @@ export async function loadSeasonProgress(opts: {
 
   const [fieldsRes, opsRes, seasonsRes] = await Promise.all([
     supabase
-      .from("fields")
+      .from(opsTable("fields"))
       .select("id,jd_field_id,name,farm_name,boundary_area_value,boundary_area_unit")
       .eq("user_id", userId)
       .eq("org_id", orgId),
     supabase
-      .from("field_operations")
+      .from(opsTable("field_operations"))
       .select(
         "jd_field_id,crop_season,crop_name,crop_name_override,start_date,area_value,area_unit",
       )
