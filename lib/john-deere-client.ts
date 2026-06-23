@@ -137,40 +137,101 @@ export async function fetchFields() {
   return response.json();
 }
 
-export async function importFieldsWithBoundaries() {
-  const headers = await getAuthHeaders();
-  const response = await fetch(
-    `${SUPABASE_URL}/functions/v1/john-deere-import?action=import-fields`,
-    {
-      method: "POST",
-      headers,
-    },
-  );
+// Full imports fire hundreds of John Deere API calls and routinely run past the
+// ~150s Supabase edge gateway timeout. The browser then gets a 504 while the
+// function keeps running to completion server-side and commits its outcome to
+// operations_center.import_runs. Rather than hold the connection open (and show a
+// scary 504 on an import that actually succeeds), we poll that durable status row
+// for completion — the same shape as pollForShapefileUrl above.
+const IMPORT_POLL_MAX_ATTEMPTS = 90; // ceiling ~14 min (6×5s then 84×10s)
+const IMPORT_NO_ROW_GIVE_UP_ATTEMPT = 6; // ~30s: the run row should exist by now
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(apiErrorMessage(error, "Failed to import fields"));
+function importPollDelay(attempt: number): number {
+  return attempt <= 6 ? 5_000 : 10_000;
+}
+
+// Poll the durable run row by its exact (client-minted) id. RLS scopes reads to
+// the current user, and the id is unique per run, so there is no cross-tab /
+// cross-org cross-talk and no timestamp-skew guessing.
+async function pollImportRun(runId: string): Promise<unknown> {
+  let sawRow = false;
+  for (let attempt = 1; attempt <= IMPORT_POLL_MAX_ATTEMPTS; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, importPollDelay(attempt)));
+
+    const { data } = await (supabase.from("import_runs") as any)
+      .select("status, result, error_code")
+      .eq("id", runId)
+      .maybeSingle();
+
+    const run = data as { status: string; result: unknown; error_code: string | null } | null;
+    if (!run) {
+      // The function writes the 'running' row within ~2s of receiving the request
+      // (and on a 504 the row exists long before we start polling). If no row has
+      // appeared after ~30s, the POST never reached the server (offline / DNS /
+      // CORS) — fail fast instead of waiting out the full ceiling.
+      if (!sawRow && attempt >= IMPORT_NO_ROW_GIVE_UP_ATTEMPT) {
+        throw new Error(
+          "Import didn't start — couldn't reach the server. Check your connection and try again.",
+        );
+      }
+      continue;
+    }
+    sawRow = true;
+    if (run.status === "done") return run.result ?? {};
+    if (run.status === "error") {
+      throw new Error(apiErrorMessage({ code: run.error_code ?? undefined }, "Import failed"));
+    }
+    // status === 'running' — keep polling
+  }
+  throw new Error(
+    "Import is still running on the server. It should finish shortly — refresh in a minute to see the imported data.",
+  );
+}
+
+// Fire an import, then resolve via either the direct response (small orgs that
+// finish under the gateway timeout) or — on a 504 / dropped connection — by
+// polling the durable import-run status. Returns the run result/summary.
+async function runImportWithPoll(baseUrl: string): Promise<unknown> {
+  const headers = await getAuthHeaders();
+  // The client mints the run id and passes it in, so it can poll that exact row.
+  const runId = crypto.randomUUID();
+  const requestUrl = `${baseUrl}&runId=${runId}`;
+
+  let response: Response | null = null;
+  try {
+    response = await fetch(requestUrl, { method: "POST", headers });
+  } catch {
+    response = null; // connection dropped mid-import; the function runs on — poll
   }
 
-  return response.json();
+  if (response) {
+    if (response.ok) return response.json(); // finished under the gateway timeout
+    if (response.status !== 504) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(apiErrorMessage(error, `Failed to import (${response.status})`));
+    }
+    // 504 gateway timeout → still running server-side; poll the durable status row.
+  }
+
+  return pollImportRun(runId);
+}
+
+export async function importFieldsWithBoundaries() {
+  const result = (await runImportWithPoll(
+    `${SUPABASE_URL}/functions/v1/john-deere-import?action=import-fields`,
+  )) as { fields?: unknown[] } & Record<string, unknown>;
+
+  // Fast path already includes the fields array; the poll path returns only the
+  // summary, so re-fetch the stored fields to keep the { fields, ... } contract.
+  if (result && Array.isArray(result.fields)) return result;
+  const { fields } = await fetchStoredFields();
+  return { fields: fields || [], ...(result || {}) };
 }
 
 export async function importOperations() {
-  const headers = await getAuthHeaders();
-  const response = await fetch(
+  return runImportWithPoll(
     `${SUPABASE_URL}/functions/v1/john-deere-import?action=import-operations`,
-    {
-      method: "POST",
-      headers,
-    },
   );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(apiErrorMessage(error, "Failed to import operations"));
-  }
-
-  return response.json();
 }
 
 export interface ImportApplicationsResult {

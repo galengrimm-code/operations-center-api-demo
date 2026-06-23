@@ -7,6 +7,7 @@ import { importFields } from "./actions/import-fields.ts";
 import { importOperations } from "./actions/import-operations.ts";
 import { importFieldOperations } from "./actions/import-field-operations.ts";
 import { importApplications } from "./actions/import-applications.ts";
+import { beginImportRun, finishImportRun, isValidRunId } from "./import-run.ts";
 
 // --- Main handler ---
 
@@ -36,42 +37,70 @@ Deno.serve(async (req: Request) => {
 
     switch (action) {
       case "import-fields": {
-        // Import fields, then automatically import operations + applications
-        const fieldResult = await importFields(supabase, accessToken, user.id, orgId);
-        const opsResult = await importOperations(supabase, accessToken, user.id, orgId);
-        // importApplications returns a Response; we invoke it for side effects only
-        // (it writes to the applications table) and surface a simple flag in the composite.
-        await importApplications({
-          supabase,
-          accessToken,
-          user,
-          orgId,
-          url,
-          req,
-        });
+        // This composite import (fields + operations + applications, hundreds of
+        // JD API calls) regularly runs past the ~150s edge gateway timeout, so the
+        // browser sees a 504 while the function finishes server-side. We record the
+        // run's outcome in import_runs under the client-minted runId; the client
+        // polls that exact row instead of holding the connection open. A client
+        // that omits runId (older bundle, can't poll) still works — we mint one
+        // server-side and it gets the legacy direct response.
+        const runIdParam = url.searchParams.get("runId");
+        if (runIdParam !== null && !isValidRunId(runIdParam)) {
+          return errorResponse("Invalid runId", 400, undefined, req);
+        }
+        const runId = runIdParam ?? crypto.randomUUID();
+        await beginImportRun(supabase, runId, user.id, orgId, "import-fields");
+        try {
+          // Import fields, then automatically import operations + applications
+          const fieldResult = await importFields(supabase, accessToken, user.id, orgId);
+          const opsResult = await importOperations(supabase, accessToken, user.id, orgId);
+          // importApplications returns a Response; we invoke it for side effects only
+          // (it writes to the applications table) and surface a simple flag in the composite.
+          await importApplications({
+            supabase,
+            accessToken,
+            user,
+            orgId,
+            url,
+            req,
+          });
 
-        const { data: storedFields } = await supabase
-          .from("fields")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("org_id", orgId);
+          const { data: storedFields } = await supabase
+            .from("fields")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("org_id", orgId);
 
-        return jsonResponse(
-          {
-            fields: storedFields || [],
+          const summary = {
             totalImported: fieldResult.totalImported,
             withoutBoundaries: fieldResult.withoutBoundaries,
             operationsImported: opsResult.totalImported,
             applicationsImported: true,
-          },
-          200,
-          req,
-        );
+          };
+          await finishImportRun(supabase, runId, "done", summary);
+          return jsonResponse({ fields: storedFields || [], ...summary }, 200, req);
+        } catch (err) {
+          await finishImportRun(supabase, runId, "error", undefined, "IMPORT_FIELDS_FAILED");
+          throw err;
+        }
       }
 
       case "import-operations": {
-        const opsResult = await importOperations(supabase, accessToken, user.id, orgId);
-        return jsonResponse({ totalImported: opsResult.totalImported }, 200, req);
+        const runIdParam = url.searchParams.get("runId");
+        if (runIdParam !== null && !isValidRunId(runIdParam)) {
+          return errorResponse("Invalid runId", 400, undefined, req);
+        }
+        const runId = runIdParam ?? crypto.randomUUID();
+        await beginImportRun(supabase, runId, user.id, orgId, "import-operations");
+        try {
+          const opsResult = await importOperations(supabase, accessToken, user.id, orgId);
+          const summary = { totalImported: opsResult.totalImported };
+          await finishImportRun(supabase, runId, "done", summary);
+          return jsonResponse(summary, 200, req);
+        } catch (err) {
+          await finishImportRun(supabase, runId, "error", undefined, "IMPORT_OPERATIONS_FAILED");
+          throw err;
+        }
       }
 
       case "import-field-operations": {
