@@ -5,7 +5,9 @@
  * Crops in GLOBALLY_EXCLUDED_CROPS are *always* hidden — not user-toggleable.
  * Treat these as off the platform entirely.
  */
-export const GLOBALLY_EXCLUDED_CROPS = ["RYE"] as const;
+// GRASSLAND + HARD_FESCUE_GRASS are excluded from the fdh schema (the migration dropped them),
+// so they must be globally hidden here too or the app would show ops the fdh reads can't return.
+export const GLOBALLY_EXCLUDED_CROPS = ["RYE", "GRASSLAND", "HARD_FESCUE_GRASS"] as const;
 
 function mergedHidden(hidden: string[] | null | undefined): Set<string> {
   const set = new Set<string>(GLOBALLY_EXCLUDED_CROPS);

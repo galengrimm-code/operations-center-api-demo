@@ -210,6 +210,22 @@ created_at        timestamptz
 
 Global (not per-user) name-pattern → category seed list used to auto-categorize imported products (21 rows, e.g. 'glyphosate' → chemical).
 
+## Reads now served from the `fdh` schema (Track 2, 2026-06-22 — see architecture.md)
+
+The tables above are still the **write** targets, but the app now **reads** through reverse adapter
+views `operations_center.fdh_fields / fdh_field_operations / fdh_field_operation_products /
+fdh_products / fdh_product_prices`, backed by the normalized **`fdh`** schema (agronomic truth) +
+**`farm_overlay`** (FDH-only cost/edit layer: `operation_edit`, `operation_product_edit`,
+`product_meta`, `product_price`, `field_season`). The views present the OLD shapes here AND expose the
+**legacy id** so write-by-id still round-trips; AFTER triggers on the `operations_center` tables sync
+each write into `fdh` + `farm_overlay`. Full fdh schema (35 tables): `supabase/migrations/20260620203501_fdh_v7_schema`
++ `docs/migration/01_fdh_schema.sql`. Reverse views / overlay / triggers: `supabase/migrations/20260622120*`.
+Toggle the read source via the `FDH_READ_*` flags (architecture.md).
+
 ## Migration discipline
 
-All migrations live in `supabase/migrations/` and must target `operations_center.<table>` explicitly. Before pushing: confirm the linked Supabase project ref is `nuxofsjzrgdauzriraze`, not the wrong project.
+All migrations live in `supabase/migrations/`. operations_center tables target `operations_center.<table>`;
+the fdh migration adds the `fdh` + `farm_overlay` schemas. Before pushing: confirm the linked project ref
+is `nuxofsjzrgdauzriraze`. NOTE: this project's `schema_migrations` is SHARED with Landowner-Portal +
+Farm Budget — `supabase db push` from this repo shows their migrations as "remote-only"; only add THIS
+app's rows when reconciling the history.

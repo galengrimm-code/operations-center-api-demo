@@ -25,21 +25,30 @@ Migrated the app's data layer from the flat `operations_center` tables onto the 
 - Verified: `npm run prebuild` green (lint + typecheck + 112 tests), prod build passes,
   data-equivalence identical to the penny (application `total_value` = $9,389,819.40 both paths).
   Galen confirmed Codex is happy.
-- **Pushed to `main`** (Galen authorized 2026-06-22) → Vercel prod deploy. Commits `e7086d5` (code) +
-  `e637ada` (docs). All read flags **OFF**, so the deploy is behavior-neutral — nothing cut over yet.
+- **CUTOVER LIVE IN PROD (2026-06-22).** Pushed to `main` (`e7086d5` code + `e637ada` docs), Vercel
+  prod redeployed, and ALL read flags flipped ON: `FDH_READ_FIELDS` + `FDH_READ_OPS` (Supabase edge
+  secrets) and `NEXT_PUBLIC_FDH_READ_OPS=true` (Vercel prod env, baked into the build). Verified in
+  prod: browser reads hit `/rest/v1/fdh_field_operation_products` with NO localStorage override and
+  zero console errors; data byte-exact ($9,389,819.40). Reads now served from fdh; writes still hit
+  legacy and the triggers sync. **Revert:** unset the two edge secrets + the Vercel env (or
+  `localStorage.setItem('fdh_read_ops','false')` per-browser) — instant.
 
 ## Open question
-Resolved: pushed to main. Now do the in-app smoke + flip the flags (next steps below).
+None — cutover is live.
 
-## Next steps (immediate — R4 → R5)
-1. Get `e7086d5` onto `main` per Galen's choice → Vercel deploy (flag still off).
-2. In-app smoke via `localStorage.setItem('fdh_read_ops','true')` on prod: confirm Applications /
-   Reports / Products cost numbers render identical to flag-off.
-3. Add `GRASSLAND` + `HARD_FESCUE_GRASS` to `lib/crop-filter.ts` GLOBALLY_EXCLUDED_CROPS (4 grass
-   ops are excluded from fdh but the app still shows them today; `hidden_crop_names` is empty).
-4. Enable together: `FDH_READ_OPS` (edge secret) + `NEXT_PUBLIC_FDH_READ_OPS` (Vercel env, needs
-   redeploy) = the real cutover. Revert = flags off.
-5. R5 (later): retire `operations_center` once stable; eventually JD ingestion → YieldStack.
+## Migration hygiene — DONE (2026-06-22)
+- fdh DDL now version-controlled in `supabase/migrations/20260622120{0..4}00_fdh_*` (idempotent) and
+  REGISTERED applied in `supabase_migrations.schema_migrations` (additive; fdh core was already
+  `20260620203501_fdh_v7_schema`). One-time data backfills stay in `docs/migration/`.
+- `lib/crop-filter.ts` GLOBALLY_EXCLUDED_CROPS now includes GRASSLAND + HARD_FESCUE_GRASS.
+- Stale rule docs updated: `.claude/rules/architecture.md` (Track 2 section) + `database.md` (fdh read note).
+- ⚠ `schema_migrations` is SHARED across Farm Data Hub / Landowner-Portal / Farm Budget — only ever ADD
+  this app's rows. `supabase db push` from this repo shows the other apps' migrations as remote-only.
+
+## Next steps (R5, later)
+1. Watch for a day: re-import fields/ops once and confirm the write-sync triggers keep fdh current.
+2. R5: retire `operations_center` once stable (move writes to fdh-native, drop triggers + legacy tables);
+   eventually JD ingestion → YieldStack.
 
 ## How to resume / caveats
 - Reverse views expose **legacy ids** (INNER joins to operations_center.*) so writes-by-id
