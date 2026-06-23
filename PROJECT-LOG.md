@@ -14,6 +14,38 @@
 
 ---
 
+## 2026-06-23 — Import made async to survive the 150s edge gateway timeout
+
+**Milestone — import architecture.** A full John Deere re-import (`john-deere-import` → fields +
+operations + applications, hundreds of JD API calls) runs past Supabase's ~150s edge **gateway**
+timeout, so the browser 504s even though the function finishes server-side. A real re-import surfaced
+it; a HAR showed both `import-fields` and `import-operations` dying at exactly ~150s. Data was never
+lost — the function completes and the write-sync triggers kept `fdh` current — the 504 was a UX defect
+on a working import.
+
+**Decision — async + poll, NOT faster import.** Chose to make the import asynchronous rather than chase
+the import under 150s. Reasons: (1) the JD-call volume alone is near/over 150s, so trimming the trigger
+overhead might not have been enough; (2) async is robust regardless of import duration / data growth;
+(3) it keeps the proven write-sync triggers untouched (lower risk on financial data than a new bulk
+re-sync path). Mirrors the existing `pollForShapefileUrl` pattern already in the codebase.
+
+**Shape:**
+- `operations_center.import_runs` (migration `20260623134441_import_runs_status.sql`) records each run:
+  running / done / error + a small result summary. RLS: select own rows; service-role writes only.
+- Edge wraps `import-fields` / `import-operations` to record the run under a **client-minted `runId`**;
+  back-compat mints server-side if absent (older client keeps working, gets the legacy direct response).
+- Client (`lib/john-deere-client.ts`) mints the UUID, fires the POST, and on a 504 / dropped connection
+  polls that exact `import_runs` row. Fast path (small orgs under 150s) still returns directly.
+
+**Codex review (clean after fixes):** poll keyed by exact run id (no cross-tab/cross-org cross-talk, no
+`started_at` ms-skew), fail-fast if no row appears in ~30s (offline), and status bookkeeping wrapped so
+it can never throw and fail a working import. Branch `fix-import-504-async-poll`, commit `a2cfd9f`,
+merged to `main` 2026-06-23.
+
+**Deferred (not debt-free):** the per-row write-sync trigger overhead on the bulk import is untouched —
+the import is still ~3 min server-side, now invisible behind the poll. Trimming it is optional perf
+(TECH-DEBT), not a correctness gap, because async kills the 504 regardless.
+
 ## 2026-06-22 — Track 2: data layer migrated onto the `fdh` schema (built, not yet cut over)
 
 **Milestone — schema migration.** Moved Farm Data Hub off the flat `operations_center` tables onto the

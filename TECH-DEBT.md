@@ -8,6 +8,19 @@
 
 ## Active
 
+### Per-row write-sync triggers fire during the bulk JD import (perf, not correctness)
+
+- **Where:** `fdh.fn_sync_*_from_legacy` / `farm_overlay.fn_sync_*_from_legacy` AFTER triggers on the
+  `operations_center` tables, hit on every upsert during `john-deere-import` (~7k row writes per full import).
+- **What:** The triggers decompose each legacy row into `fdh` + `farm_overlay` one row at a time, so a full
+  re-import does the sync work ~7k times inline. This is a chunk of the import's ~3 min server-side runtime.
+- **Why it's only perf now:** As of 2026-06-23 the import is async (client polls `import_runs`), so the long
+  runtime is invisible to the user and no longer 504s. Correctness is fine — triggers keep `fdh` current.
+- **Cost to fix:** medium — pause the per-row triggers during a bulk import (control flag the triggers check)
+  + one set-based `fdh` re-sync afterward (needs upsert semantics, riskier on financial data than the async
+  fix, which is why it was deferred). **Trigger:** if import runtime becomes a problem, or data growth pushes
+  the import toward the edge function **wall-clock** limit (not the gateway — async already handles that).
+
 ### Track 2 (fdh migration) — transitional debt carried until cutover completes
 
 - **Where:** `docs/migration/01-07`, `operations_center.fdh_*` views, `farm_overlay.*`, the write-sync triggers.

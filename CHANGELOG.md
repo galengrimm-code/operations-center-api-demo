@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- **Full imports no longer fail with a timeout.** A full field/operation re-import does a lot of work and could run past the server's request limit, so the browser showed a Gateway Timeout even though the import had actually finished. The import now runs in the background and the app waits for it to complete, so you're carried through to success instead of an error.
 - **Spray applications now import.** The import was returning nothing because the John Deere connection lacked the `ag2`/`ag3` scopes that application/chemical data needs (reconnect required after the fix). Large imports also now run per-field with a progress bar instead of timing out.
 - **Dropdown menus are readable** — native select options were faint gray on the dark theme.
 - **Server-side auth gate no longer blocks signed-in users.** The route-protection middleware read the session from cookies while the client stored it in localStorage, so authenticated users were redirected off all protected routes back to login. The client now uses cookie-based sessions (`@supabase/ssr`).
