@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { selectInChunks } from "./supabase-batch";
 import { opsTable } from "./fdh-flags";
 import { convertArea } from "./area-utils";
 import { GLOBALLY_EXCLUDED_CROPS } from "./crop-filter";
@@ -162,13 +163,19 @@ export async function fetchAnalysisResults(
   operationIds: string[],
 ): Promise<IrrigationAnalysisResult[]> {
   if (operationIds.length === 0) return [];
-  const { data, error } = await (supabase.from("irrigation_analysis_results") as any)
-    .select("*")
-    .eq("user_id", userId)
-    .in("jd_operation_id", operationIds);
-
-  if (error) throw new Error(`Failed to load analysis results: ${(error as any).message}`);
-  return (data as IrrigationAnalysisResult[]) || [];
+  // Batched: the harvest-op id list can be large enough that a single in.(...)
+  // URL would 400 (same class as the applications client-join). See supabase-batch.
+  try {
+    const data = await selectInChunks(
+      "irrigation_analysis_results",
+      "jd_operation_id",
+      operationIds,
+      (q) => q.select("*").eq("user_id", userId),
+    );
+    return (data as IrrigationAnalysisResult[]) || [];
+  } catch (error) {
+    throw new Error(`Failed to load analysis results: ${(error as any).message}`);
+  }
 }
 
 /** Save an analysis result (upsert by user_id + jd_operation_id) */

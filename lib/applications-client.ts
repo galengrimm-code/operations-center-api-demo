@@ -1,5 +1,6 @@
 // lib/applications-client.ts
 import { supabase } from "./supabase";
+import { selectInChunks } from "./supabase-batch";
 import { fdhReadOps, opsTable } from "./fdh-flags";
 import { checkMutationResult } from "./check-mutation-result";
 import type {
@@ -45,36 +46,29 @@ export async function fetchApplications(
     if (opErr) throw opErr;
 
     const opIds = (ops ?? []).map((o: any) => o.id);
-    let lines: any[] = [];
-    if (opIds.length > 0) {
-      const { data: lineData, error: lineErr } = await (
-        supabase.from("fdh_field_operation_products") as any
-      )
-        .select(
-          `id, user_id, org_id, field_operation_id, product_id, line_index,
-           product_category_override, is_carrier,
-           rate_value, rate_unit, rate_variable,
-           total_value, total_unit, total_variable,
-           area_value, area_unit,
-           rate_value_jd_original, total_value_jd_original, area_value_jd_original,
-           is_user_edited, edited_at, deleted_at, created_at, updated_at`,
-        )
-        .in("field_operation_id", opIds)
-        .is("deleted_at", null)
-        .order("line_index", { ascending: true });
-      if (lineErr) throw lineErr;
-      lines = lineData ?? [];
-    }
+    const lines = await selectInChunks(
+      "fdh_field_operation_products",
+      "field_operation_id",
+      opIds,
+      (q) =>
+        q
+          .select(
+            `id, user_id, org_id, field_operation_id, product_id, line_index,
+             product_category_override, is_carrier,
+             rate_value, rate_unit, rate_variable,
+             total_value, total_unit, total_variable,
+             area_value, area_unit,
+             rate_value_jd_original, total_value_jd_original, area_value_jd_original,
+             is_user_edited, edited_at, deleted_at, created_at, updated_at`,
+          )
+          .is("deleted_at", null)
+          .order("line_index", { ascending: true }),
+    );
 
     const prodIds = Array.from(new Set(lines.map((l: any) => l.product_id)));
     const prodMap = new Map<string, any>();
-    if (prodIds.length > 0) {
-      const { data: prods, error: prodErr } = await (supabase.from("fdh_products") as any)
-        .select("*")
-        .in("id", prodIds);
-      if (prodErr) throw prodErr;
-      for (const p of (prods ?? []) as any[]) prodMap.set(p.id, p);
-    }
+    const prods = await selectInChunks("fdh_products", "id", prodIds, (q) => q.select("*"));
+    for (const p of prods) prodMap.set(p.id, p);
 
     const linesByOp = new Map<string, any[]>();
     for (const l of lines) {
@@ -237,22 +231,14 @@ export async function fetchProductsRollup(
 
     const opIds = Array.from(new Set(lines.map((l) => l.field_operation_id)));
     const opMap = new Map<string, any>();
-    if (opIds.length > 0) {
-      const { data: ops, error: opErr } = await (supabase.from("fdh_field_operations") as any)
-        .select("id, crop_season, jd_field_id, org_id")
-        .in("id", opIds);
-      if (opErr) throw opErr;
-      for (const o of (ops ?? []) as any[]) opMap.set(o.id, o);
-    }
+    const ops = await selectInChunks("fdh_field_operations", "id", opIds, (q) =>
+      q.select("id, crop_season, jd_field_id, org_id"),
+    );
+    for (const o of ops) opMap.set(o.id, o);
     const prodIds = Array.from(new Set(lines.map((l) => l.product_id)));
     const prodMap = new Map<string, any>();
-    if (prodIds.length > 0) {
-      const { data: prods, error: prodErr } = await (supabase.from("fdh_products") as any)
-        .select("*")
-        .in("id", prodIds);
-      if (prodErr) throw prodErr;
-      for (const p of (prods ?? []) as any[]) prodMap.set(p.id, p);
-    }
+    const prods = await selectInChunks("fdh_products", "id", prodIds, (q) => q.select("*"));
+    for (const p of prods) prodMap.set(p.id, p);
     // !inner: keep only lines whose operation resolves
     data = lines
       .filter((l) => opMap.has(l.field_operation_id))

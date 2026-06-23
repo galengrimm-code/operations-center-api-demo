@@ -27,6 +27,15 @@ Fix = make the import **asynchronous** (mirrors `pollForShapefileUrl`):
 - Verified: `npm run prebuild` green (lint + typecheck + **112 tests**). Codex-reviewed: 4 findings
   (run-id binding, ms-skew, offline fail-fast, bookkeeping-never-throws) all fixed.
 
+### Follow-on fix (2026-06-23): Applications/Reports 400 at full scale
+After the import populated the full dataset, the Applications page 400'd: the Track 2 fdh
+client-joins query `fdh_field_operation_products` / `fdh_field_operations` with a single
+`id=in.(~1700 uuids)` — a ~63KB URL the edge rejects (legacy used a server-side embed). Fixed by
+batching every data-sized `.in()` into parallel 100-id chunks via new `lib/supabase-batch.ts`
+(`selectInChunks`), applied in `lib/applications-client.ts` (both fdh joins + products) and
+`lib/reports-data.ts` (`fetchAnalysisResults`, same class on the harvest-op id list). Verified at the
+HTTP layer: 100-id URL (3.9KB) → server processes it; 1700-id URL (63KB) → 520 at the edge.
+
 ## Open questions / decisions pending
 - None blocking. The **real end-to-end proof** is still outstanding (see next step) — it needs a live
   import run, which only Galen can trigger (JD-connected).
